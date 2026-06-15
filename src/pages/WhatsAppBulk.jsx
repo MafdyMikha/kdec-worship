@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Check, Copy, ExternalLink, Users, Phone, ChevronDown, ChevronUp, Send, AlertCircle } from 'lucide-react'
-import { useStore } from '../store/useStore.jsx'
+import { useStore, hasRole, roleLabel } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, Select } from '../components/ui'
 
@@ -26,7 +26,7 @@ const fillTemplate = (template, person, service) => {
     .replace(/\{service\}/gi, service?.title || '')
     .replace(/\{date\}/gi,    date)
     .replace(/\{time\}/gi,    time)
-    .replace(/\{role\}/gi,    person?.role || '')
+    .replace(/\{role\}/gi,    roleLabel(person))
 }
 
 // ── Default templates ───────────────────────────────────────
@@ -89,7 +89,7 @@ export default function WhatsAppBulk() {
       return activeMembers.filter(p => ids.has(p.id))
     }
     if (filterMode === 'role' && selectedRoles.size > 0) {
-      return activeMembers.filter(p => selectedRoles.has(p.role))
+      return activeMembers.filter(p => [...selectedRoles].some(role => hasRole(p, role)))
     }
     return activeMembers
   }, [filterMode, selectedSvc, selectedRoles, activeMembers])
@@ -228,7 +228,7 @@ export default function WhatsAppBulk() {
                     <input type="checkbox" className="sr-only" checked={selectedRoles.has(role)} onChange={() => toggleRole(role)}/>
                     <Badge color={ROLE_COLOR[role] || 'slate'} size="xs">{role}</Badge>
                     <span className="text-xs text-slate-400 ml-auto">
-                      {activeMembers.filter(p => p.role === role).length}
+                      {activeMembers.filter(p => hasRole(p, role)).length}
                     </span>
                   </label>
                 ))}

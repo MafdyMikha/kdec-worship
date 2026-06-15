@@ -16,6 +16,7 @@ create table public.profiles (
   phone         text default '',
   whatsapp      text default '',
   role          text default 'Vocalist',
+  roles         text[] default array['Vocalist'],
   position      text default 'Member',
   status        text default 'active' check (status in ('active','inactive','on-leave')),
   is_admin      boolean default false,
@@ -167,6 +168,7 @@ create table public.invitations (
   code          text not null unique,
   email         text not null,
   role          text default 'Vocalist',
+  roles         text[] default array['Vocalist'],
   method        text default 'email' check (method in ('email','whatsapp')),
   status        text default 'pending' check (status in ('pending','accepted','cancelled','expired')),
   created_by    uuid references public.profiles(id),
@@ -279,6 +281,17 @@ create policy "Admins can manage invitations"
 create policy "Anyone can read invitation by code (for signup)"
   on public.invitations for select
   using (true);
+
+create policy "Invited users can accept their invitation"
+  on public.invitations for update to authenticated
+  using (lower(email) = lower(auth.jwt() ->> 'email') and status = 'pending')
+  with check (lower(email) = lower(auth.jwt() ->> 'email') and status = 'accepted');
+
+-- Safe upgrade for existing Supabase projects that already ran an older schema.
+alter table public.profiles add column if not exists roles text[] default array['Vocalist'];
+alter table public.invitations add column if not exists roles text[] default array['Vocalist'];
+update public.profiles set roles = array[coalesce(role, 'Vocalist')] where roles is null or array_length(roles, 1) is null;
+update public.invitations set roles = array[coalesce(role, 'Vocalist')] where roles is null or array_length(roles, 1) is null;
 
 -- ============================================================
 -- SEED DATA — run after creating your first admin account

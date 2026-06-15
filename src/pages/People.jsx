@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Plus, Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useStore } from '../store/useStore.jsx'
+import { useStore, hasRole, roleLabel } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog, StatusDot } from '../components/ui'
 
@@ -18,7 +18,7 @@ const DAYS_CONFIG = [
 ]
 
 // ── Person Card ─────────────────────────────────────────────
-function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
+function PersonCard({ person, isAdmin, onEdit, onDelete, t }) {
   const phone    = person.whatsapp || person.phone
   const availDays = DAYS_CONFIG.filter(d => person.availability?.[d.key])
   return (
@@ -40,7 +40,12 @@ function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
           </div>
         )}
       </div>
-      <Badge color={ROLE_COLOR[person.role] || 'slate'} size="sm">{person.role || '—'}</Badge>
+      <div className="flex flex-wrap gap-1.5">
+        {(person.roles?.length ? person.roles : [person.role]).filter(Boolean).map(role => (
+          <Badge key={role} color={ROLE_COLOR[role] || 'slate'} size="sm">{role}</Badge>
+        ))}
+        {!roleLabel(person) && <Badge color="slate" size="sm">—</Badge>}
+      </div>
       <div className="mt-3 space-y-1">
         {person.email && <div className="flex items-center gap-2 text-xs text-slate-500"><Mail size={11}/><span className="truncate">{person.email}</span></div>}
         {phone && <div className="flex items-center gap-2 text-xs text-slate-500" dir="ltr"><Phone size={11}/>{phone}</div>}
@@ -57,10 +62,10 @@ function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
 }
 
 // ── Role Group View ─────────────────────────────────────────
-function ByRoleView({ people, isAdmin, onEdit, onDelete, t, isAr, ROLES }) {
+function ByRoleView({ people, isAdmin, onEdit, onDelete, t, ROLES }) {
   const grouped = useMemo(() => {
     const map = {}
-    ROLES.forEach(r => { map[r] = people.filter(p => p.role === r) })
+    ROLES.forEach(r => { map[r] = people.filter(p => hasRole(p, r)) })
     return map
   }, [people, ROLES])
 
@@ -78,7 +83,7 @@ function ByRoleView({ people, isAdmin, onEdit, onDelete, t, isAr, ROLES }) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {members.map(p => (
-                <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} t={t} isAr={isAr}/>
+                <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} t={t}/>
               ))}
             </div>
           </div>
@@ -131,7 +136,13 @@ function RosterView({ people, t, isAr }) {
                       <span className="font-medium text-slate-800" dir="ltr">{p.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3"><Badge color={ROLE_COLOR[p.role] || 'slate'} size="xs">{p.role || '—'}</Badge></td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(p.roles?.length ? p.roles : [p.role]).filter(Boolean).map(role => (
+                        <Badge key={role} color={ROLE_COLOR[role] || 'slate'} size="xs">{role}</Badge>
+                      ))}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-slate-500 text-xs">{POSITION_LABEL[p.position] || p.position || '—'}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs" dir="ltr">{p.whatsapp || p.phone || '—'}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs truncate max-w-[150px]">{p.email || '—'}</td>
@@ -150,7 +161,7 @@ function RosterView({ people, t, isAr }) {
 }
 
 // ── Availability Grid View ──────────────────────────────────
-function AvailabilityView({ people, t, isAr }) {
+function AvailabilityView({ people, t }) {
   const DAYS = DAYS_CONFIG.map(d => ({ ...d, label: t(d.key) }))
   const active = people.filter(p => p.status === 'active')
 
@@ -199,6 +210,13 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
     Volunteer: isAr ? 'متطوع' : 'Volunteer',
     Admin: isAr ? 'مسؤول' : 'Admin',
   }
+  const selectedRoles = value.roles?.length ? value.roles : (value.role ? [value.role] : [])
+  const toggleRole = (role) => {
+    const next = selectedRoles.includes(role)
+      ? selectedRoles.filter(r => r !== role)
+      : [...selectedRoles, role]
+    onChange({ ...value, roles: next, role: next[0] || '' })
+  }
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
@@ -229,10 +247,20 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Select label={t('role')} value={value.role || ''} onChange={e => onChange({ ...value, role: e.target.value })}>
-          <option value="">{isAr ? 'اختر الدور...' : 'Select role...'}</option>
-          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-        </Select>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">{isAr ? 'Roles' : 'Roles'}</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {ROLES.map(role => {
+              const on = selectedRoles.includes(role)
+              return (
+                <button key={role} type="button" onClick={() => toggleRole(role)}
+                  className={`text-left px-3 py-2 rounded-lg border text-xs font-medium cursor-pointer transition-all ${on ? 'bg-indigo-50 border-indigo-400 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-indigo-300'}`}>
+                  {role}
+                </button>
+              )
+            })}
+          </div>
+        </div>
         <Select label={t('position')} value={value.position || 'Member'} onChange={e => onChange({ ...value, position: e.target.value })}>
           {POSITIONS.map(p => <option key={p} value={p}>{POSITION_LABEL[p] || p}</option>)}
         </Select>
@@ -263,7 +291,7 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
 }
 
 // ── Main Page ───────────────────────────────────────────────
-const blank = { name:'', email:'', phone:'', whatsapp:'', role:'', position:'Member', status:'active', notes:'', availability:{} }
+const blank = { name:'', email:'', phone:'', whatsapp:'', role:'', roles:[], position:'Member', status:'active', notes:'', availability:{} }
 
 export default function People() {
   const { people, updatePerson, deletePerson, currentUser, ROLES, POSITIONS } = useStore()
@@ -284,8 +312,8 @@ export default function People() {
   const allFiltered = useMemo(() => {
     const q = search.toLowerCase()
     return people.filter(p => {
-      const matchQ      = !q || p.name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q) || p.role?.toLowerCase().includes(q)
-      const matchRole   = filterRole === 'all' || p.role === filterRole
+      const matchQ      = !q || p.name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q) || roleLabel(p).toLowerCase().includes(q)
+      const matchRole   = filterRole === 'all' || hasRole(p, filterRole)
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
       return matchQ && matchRole && matchStatus
     }).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en'))
@@ -382,7 +410,7 @@ export default function People() {
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {allFiltered.map(p => (
-                <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={openEdit} onDelete={setDeleteTarget} t={t} isAr={isAr}/>
+                <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={openEdit} onDelete={setDeleteTarget} t={t}/>
               ))}
             </div>
           ) : (
@@ -393,7 +421,7 @@ export default function People() {
 
       {/* BY ROLE */}
       {subTab === 'byRole' && (
-        <ByRoleView people={allFiltered} isAdmin={isAdmin} onEdit={openEdit} onDelete={setDeleteTarget} t={t} isAr={isAr} ROLES={ROLES}/>
+        <ByRoleView people={allFiltered} isAdmin={isAdmin} onEdit={openEdit} onDelete={setDeleteTarget} t={t} ROLES={ROLES}/>
       )}
 
       {/* ROSTER — printable */}
@@ -403,7 +431,7 @@ export default function People() {
 
       {/* AVAILABILITY */}
       {subTab === 'availability' && (
-        <AvailabilityView people={people} t={t} isAr={isAr}/>
+        <AvailabilityView people={people} t={t}/>
       )}
 
       {/* Edit modal */}

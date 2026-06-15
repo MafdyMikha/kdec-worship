@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Users, Edit2, Check, X, Save, Repeat, RefreshCw, AlertCircle } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { useStore } from '../store/useStore.jsx'
+import { useStore, hasRole, roleLabel } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Btn, Badge, Avatar, Modal, Select, Textarea, Card, StatusDot, ConfirmDialog } from '../components/ui'
 import WhatsAppNotify from '../components/WhatsAppNotify'
@@ -27,7 +27,7 @@ export default function ServiceDetail() {
   const [subModal,        setSubModal]       = useState(null)
 
   const isAdmin  = currentUser?.isAdmin || currentUser?.is_admin
-  const isLeader = ['Worship Leader','Music Director'].includes(currentUser?.role)
+  const isLeader = hasRole(currentUser, 'Worship Leader') || hasRole(currentUser, 'Music Director')
   const canEdit  = isAdmin || isLeader
   const service  = services.find(s => s.id === id)
 
@@ -57,7 +57,7 @@ export default function ServiceDetail() {
     setShowAddPerson(false); setSelectedPerson(''); setSelectedRole(ROLES[0])
   }
 
-  const getSubs = (role) => people.filter(p => p.status==='active' && p.role===role && !service.team.find(t => t.personId===p.id))
+  const getSubs = (role) => people.filter(p => p.status==='active' && hasRole(p, role) && !service.team.find(t => t.personId===p.id))
 
   const TABS = [
     { key:'setlist',  label: isAr?'قائمة الترانيم':'Setlist', count: service.setlist.length },
@@ -249,7 +249,7 @@ export default function ServiceDetail() {
         <div className="space-y-4">
           <Select label={isAr?'العضو':'Person'} value={selectedPerson} onChange={e=>setSelectedPerson(e.target.value)}>
             <option value="">{isAr?'اختر عضواً...':'Select person...'}</option>
-            {availablePeople.map(p=><option key={p.id} value={p.id}>{p.name} — {p.role}</option>)}
+            {availablePeople.map(p=><option key={p.id} value={p.id}>{p.name} — {roleLabel(p)}</option>)}
           </Select>
           <Select label={isAr?'الدور في هذه الخدمة':'Role for this service'} value={selectedRole} onChange={e=>setSelectedRole(e.target.value)}>
             {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
@@ -275,7 +275,7 @@ export default function ServiceDetail() {
               ):subModal.subs.map(p=>(
                 <div key={p.id} className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
                   <Avatar name={p.name} size="sm"/>
-                  <div className="flex-1"><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{p.role}</div></div>
+                  <div className="flex-1"><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{roleLabel(p)}</div></div>
                   <button onClick={()=>{addTeamMember(id,p.id,subModal.role);setSubModal(null)}}
                     className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-medium rounded-lg cursor-pointer hover:bg-emerald-600">
                     {t('addAsSub')}

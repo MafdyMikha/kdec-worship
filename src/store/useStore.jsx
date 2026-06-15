@@ -45,6 +45,16 @@ export function buildInvitationMsg(inviteCode, inviterName) {
 export const ROLES = ['Worship Leader','Music Director','Pianist/Keys','Acoustic Guitar','Electric Guitar','Bass Guitar','Drummer','Vocalist','AUX Instrument','Sound Engineer','Projection','Camera']
 export const POSITIONS = ['Leader','Member','Volunteer','Admin']
 
+const normalizeRoles = (input, fallback = 'Vocalist') => {
+  if (Array.isArray(input)) return input.filter(Boolean)
+  if (typeof input === 'string') return input.split(',').map(r => r.trim()).filter(Boolean)
+  return fallback ? [fallback] : []
+}
+
+export const primaryRole = (person) => normalizeRoles(person?.roles, person?.role || 'Vocalist')[0] || person?.role || 'Vocalist'
+export const roleLabel = (person) => normalizeRoles(person?.roles, person?.role).join(', ') || person?.role || ''
+export const hasRole = (person, role) => normalizeRoles(person?.roles, person?.role).includes(role)
+
 // ─────────────────────────────────────────────────────────
 // Demo seed data — rich realistic KDEC data for testing
 // ─────────────────────────────────────────────────────────
@@ -351,7 +361,10 @@ export function AppProvider({ children }) {
     loadAll()
   }
 
-  const normalizeProfile = (p) => ({ ...p, isAdmin: p.is_admin, joinDate: p.join_date, timeSlots: p.time_slots || [], tags: p.tags || [], availability: p.availability || {} })
+  const normalizeProfile = (p) => {
+    const roles = normalizeRoles(p.roles, p.role || 'Vocalist')
+    return { ...p, roles, role: roles[0] || p.role || 'Vocalist', isAdmin: p.is_admin, joinDate: p.join_date, timeSlots: p.time_slots || [], tags: p.tags || [], availability: p.availability || {} }
+  }
   const normalizeSong    = (s) => ({ ...s, titleAr: s.title_ar||'', timeSignature: s.time_signature, ccliNumber: s.ccli_number||'', usageCount: s.usage_count||0, lastUsed: s.last_used, arrangements: s.arrangements||[], sequence: s.sequence||[], themes: s.themes||[] })
   const normalizeService = (s) => ({
     ...s,
@@ -429,7 +442,8 @@ export function AppProvider({ children }) {
     if (new Date() > new Date(inv.expires_at)) return { error: 'Invitation has expired' }
     const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{ name: name||email.split('@')[0] } } })
     if (error) return { error: error.message }
-    await supabase.from('profiles').update({ role: inv.role }).eq('id', data.user.id)
+    const roles = normalizeRoles(inv.roles, inv.role || 'Vocalist')
+    await supabase.from('profiles').update({ role: roles[0], roles }).eq('id', data.user.id)
     await supabase.from('invitations').update({ status:'accepted', accepted_at: new Date().toISOString() }).eq('code', inviteCode)
     return { success: true }
   }
@@ -457,13 +471,15 @@ export function AppProvider({ children }) {
   }
 
   // ── INVITATIONS ─────────────────────────────────────────
-  const createInvitation = async (email, role, method) => {
+  const createInvitation = async (email, rolesInput, method) => {
     const code = Math.random().toString(36).slice(2,10).toUpperCase()
+    const roles = normalizeRoles(rolesInput, 'Vocalist')
+    const role = roles[0] || 'Vocalist'
     if (isDemoMode) {
-      const inv = { id:'inv_'+Date.now(), code, email, role, method, status:'pending', created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString(), created_at: new Date().toISOString() }
+      const inv = { id:'inv_'+Date.now(), code, email, role, roles, method, status:'pending', created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString(), created_at: new Date().toISOString() }
       setInvitations(prev => [inv, ...prev]); toast(`Invitation created for ${email}`); return inv
     }
-    const { data, error } = await supabase.from('invitations').insert({ code, email, role, method, created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString() }).select().single()
+    const { data, error } = await supabase.from('invitations').insert({ code, email, role, roles, method, created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString() }).select().single()
     if (!error) { setInvitations(prev => [data,...prev]); toast(`Invitation created for ${email}`); return data }
     toast('Failed to create invitation','error'); return null
   }
@@ -478,7 +494,8 @@ export function AppProvider({ children }) {
   // ── PEOPLE ──────────────────────────────────────────────
   const addPerson    = async ()      => toast('Invite members via the Invitations page','info')
   const updatePerson = async (id, data) => {
-    const updates = { name:data.name, phone:data.phone, whatsapp:data.whatsapp, role:data.role, position:data.position, status:data.status, notes:data.notes, availability:data.availability, isAdmin:data.position==='Admin', is_admin:data.position==='Admin' }
+    const roles = normalizeRoles(data.roles, data.role || 'Vocalist')
+    const updates = { name:data.name, phone:data.phone, whatsapp:data.whatsapp, role:roles[0] || 'Vocalist', roles, position:data.position, status:data.status, notes:data.notes, availability:data.availability, isAdmin:data.position==='Admin', is_admin:data.position==='Admin' }
     if (isDemoMode) { setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated'); return }
     await supabase.from('profiles').update({ ...updates, is_admin:updates.isAdmin }).eq('id',id)
     setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated')

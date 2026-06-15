@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Clock, Calendar, CheckCircle, AlertCircle, ChevronRight, Music2, Users, X } from 'lucide-react'
 import { format, parseISO, isAfter, addDays, differenceInMinutes, differenceInHours } from 'date-fns'
 import { ar } from 'date-fns/locale'
-import { useStore } from '../store/useStore.jsx'
+import { useStore, hasRole, primaryRole, roleLabel } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Badge, Btn, Modal, Textarea } from '../components/ui'
 import InstrumentDisplay, { INSTRUMENT_COLORS } from '../components/instruments/InstrumentDisplay.jsx'
@@ -41,7 +41,7 @@ function ExcuseModal({ open, onClose, onSubmit, serviceName, isAr }) {
 
 function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
   const [note, setNote] = useState('')
-  const subs = people.filter(p=>p.status==='active'&&p.role===myRole&&!service?.team.find(t=>t.personId===p.id))
+  const subs = people.filter(p=>p.status==='active'&&hasRole(p, myRole)&&!service?.team.find(t=>t.personId===p.id))
   return (
     <Modal open={open} onClose={onClose} title={isAr?'طلب بديل':'Request Substitute'} size="md"
       footer={<><Btn variant="secondary" onClick={onClose}>{isAr?'إلغاء':'Cancel'}</Btn><Btn onClick={()=>{onSubmit(note);onClose()}}>{isAr?'إرسال الطلب':'Send Request'}</Btn></>}>
@@ -63,7 +63,7 @@ function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
                 <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold">
                   {p.name.split(' ').map(w=>w[0]).join('').slice(0,2)}
                 </div>
-                <div><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{p.role}</div></div>
+                <div><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{roleLabel(p)}</div></div>
               </div>
             ))}
           </div>
@@ -91,7 +91,8 @@ export default function MemberHome() {
 
   const nextSvc   = myServices[0]
   const myEntry   = nextSvc?.team.find(t=>t.personId===currentUser?.id)
-  const colors    = INSTRUMENT_COLORS[currentUser?.role] || INSTRUMENT_COLORS['Vocalist']
+  const mainRole  = primaryRole(currentUser)
+  const colors    = INSTRUMENT_COLORS[mainRole] || INSTRUMENT_COLORS['Vocalist']
 
   // Top songs
   const topSongs  = [...songs].sort((a,b)=>(b.usageCount||0)-(a.usageCount||0)).slice(0,5)
@@ -107,7 +108,7 @@ export default function MemberHome() {
       {/* Hero card */}
       <div className={`rounded-2xl p-6 text-white bg-gradient-to-br ${colors?.bg||'from-indigo-500 to-violet-600'} relative overflow-hidden`}>
         <div className="absolute inset-0 opacity-10">
-          <InstrumentDisplay role={currentUser?.role} animated size="lg"/>
+          <InstrumentDisplay role={mainRole} animated size="lg"/>
         </div>
         <div className="relative">
           <div className="text-white/70 text-sm mb-1">
@@ -116,7 +117,7 @@ export default function MemberHome() {
           <h2 className="font-display text-2xl font-bold mb-1">
             {isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0]}! 🎵` : `Welcome, ${currentUser?.name?.split(' ')[0]}! 🎵`}
           </h2>
-          <p className="text-white/80 text-sm">{currentUser?.role}</p>
+          <p className="text-white/80 text-sm">{roleLabel(currentUser)}</p>
           {nextSvc && (
             <div className="mt-4 flex items-center gap-2">
               <TimeUntil dateStr={nextSvc.date} timeStr={nextSvc.time} isAr={isAr}/>
@@ -226,7 +227,7 @@ export default function MemberHome() {
       />
       <SubModal
         open={!!subModal} onClose={()=>setSubModal(null)}
-        service={subModal} myRole={currentUser?.role}
+        service={subModal} myRole={mainRole}
         people={people} onSubmit={()=>{}} isAr={isAr}
       />
     </div>

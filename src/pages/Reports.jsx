@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { BarChart3, Music2, Users, Calendar, TrendingUp, Award, ChevronRight } from 'lucide-react'
-import { useStore } from '../store/useStore.jsx'
+import { useStore, roleLabel } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Badge, Avatar, StatCard, Tabs } from '../components/ui'
 import { format, subMonths, parseISO } from 'date-fns'
@@ -37,7 +37,9 @@ export default function Reports() {
   const subRate      = totalAsgn > 0 ? Math.round((declined  / totalAsgn) * 100) : 0
 
   const roleCounts = {}
-  people.forEach(p => { if (p.role) roleCounts[p.role] = (roleCounts[p.role]||0) + 1 })
+  people.forEach(p => (p.roles?.length ? p.roles : [p.role]).filter(Boolean).forEach(role => {
+    roleCounts[role] = (roleCounts[role]||0) + 1
+  }))
   const roles   = Object.entries(roleCounts).sort((a,b) => b[1] - a[1]).slice(0, 8)
   const maxRole = roles[0]?.[1] || 1
 
@@ -246,7 +248,7 @@ export default function Reports() {
                   <div className="flex-1 min-w-0">
                     {/* Name always Latin */}
                     <div className="text-sm font-medium text-slate-700 truncate" dir="ltr">{person.name}</div>
-                    <div className="text-xs text-slate-400">{person.role}</div>
+                    <div className="text-xs text-slate-400">{roleLabel(person)}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold text-indigo-600">{count}</div>
@@ -268,7 +270,7 @@ export default function Reports() {
                     <Avatar name={person.name} size="sm"/>
                     <div className="w-36 min-w-0">
                       <div className="text-sm font-medium text-slate-700 truncate" dir="ltr">{person.name}</div>
-                      <div className="text-xs text-slate-400">{person.role}</div>
+                      <div className="text-xs text-slate-400">{roleLabel(person)}</div>
                     </div>
                     <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${rate>=80?'bg-emerald-500':rate>=50?'bg-amber-400':'bg-red-400'}`} style={{ width:`${rate}%` }}/>
