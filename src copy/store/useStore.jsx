@@ -1,0 +1,698 @@
+import { useState, useEffect, createContext, useContext, useCallback } from 'react'
+import { addWeeks, addMonths, format, parseISO } from 'date-fns'
+import { supabase, hasSupabase } from '../lib/supabase.js'
+
+// ─────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────
+export function generateOccurrences(base, recurrence) {
+  if (!recurrence?.enabled) return []
+  const { frequency, count, endDate, copyTeam, copySetlist } = recurrence
+  const results = []; let cursor = parseISO(base.date)
+  const maxCount = count || 12
+  const until = endDate ? parseISO(endDate) : null
+  for (let i = 1; i <= maxCount; i++) {
+    if (frequency === 'weekly')        cursor = addWeeks(cursor, 1)
+    else if (frequency === 'biweekly') cursor = addWeeks(cursor, 2)
+    else if (frequency === 'monthly')  cursor = addMonths(cursor, 1)
+    if (until && cursor > until) break
+    results.push({
+      title: base.title, date: format(cursor,'yyyy-MM-dd'), time: base.time,
+      type: base.type, status: 'scheduled', notes: base.notes || '',
+      recurrence_group_id: base.recurrence_group_id || base.id,
+      recurrenceGroupId:   base.recurrence_group_id || base.id,
+      recurrence_index: i, recurrenceIndex: i,
+      _copyTeam: copyTeam ? base.team : [],
+      _copySetlist: copySetlist ? base.setlist : [],
+    })
+  }
+  return results
+}
+
+export function buildWhatsAppUrl(phone, message) {
+  const clean = phone.replace(/\s+/g,'').replace(/[^+\d]/g,'')
+  const num = clean.startsWith('+') ? clean.slice(1) : clean
+  return `https://wa.me/${num}?text=${encodeURIComponent(message)}`
+}
+export function buildServiceNotificationMsg(service, person, role) {
+  return `🎵 *KDEC Worship – Service Assignment*\n\nHi ${person.name}!\n\nYou've been assigned to serve:\n\n📅 *${service.title}*\n🗓 ${service.date} at ${service.time}\n🎸 Your role: *${role}*\n\nPlease confirm your attendance.\n\n— KDEC Worship Team`
+}
+export function buildInvitationMsg(inviteCode, inviterName) {
+  const url = `${window.location.origin}?invite=${inviteCode}`
+  return `🎵 *You're invited to KDEC Worship Platform!*\n\n${inviterName} has invited you to join.\n\n🔗 ${url}\n\nThis link expires in 7 days.\n\nGod bless! 🙏`
+}
+
+export const ROLES = ['Worship Leader','Music Director','Pianist/Keys','Acoustic Guitar','Electric Guitar','Bass Guitar','Drummer','Vocalist','AUX Instrument','Sound Engineer','Projection','Camera']
+export const POSITIONS = ['Leader','Member','Volunteer','Admin']
+
+// ─────────────────────────────────────────────────────────
+// Demo seed data — rich realistic KDEC data for testing
+// ─────────────────────────────────────────────────────────
+const today = new Date()
+const fmt   = (d) => format(d,'yyyy-MM-dd')
+const daysUntil = (dow) => { const d = new Date(today); const diff = (dow - d.getDay() + 7) % 7 || 7; d.setDate(d.getDate() + diff); return d }
+const nextSun  = daysUntil(0)
+const nextWed  = daysUntil(3)
+const nextFri  = daysUntil(5)
+const in2Suns  = new Date(nextSun);  in2Suns.setDate(nextSun.getDate()  + 7)
+const in3Suns  = new Date(nextSun);  in3Suns.setDate(nextSun.getDate()  + 14)
+const lastSun  = new Date(today);    lastSun.setDate(today.getDate() - ((today.getDay() + 7) % 7 || 7))
+
+// ── 14 Team Members ───────────────────────────────────────
+const DEMO_PEOPLE = [
+  // ── Admins ──
+  { id:'p1',  name:'مافدي حنا',       nameEn:'Mafdy Hanna',       email:'mafdy@kdec.org',      phone:'+20 100 111 0001', whatsapp:'+20 100 111 0001', role:'Worship Leader',  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'قائد التسبيح الرئيسي',  joinDate:'2020-01-15', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p2',  name:'كريستين رمزي',   nameEn:'Christine Ramzy',   email:'christine@kdec.org',  phone:'+20 100 111 0002', whatsapp:'+20 100 111 0002', role:'Music Director',  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'مديرة موسيقية',         joinDate:'2019-06-01', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  // ── Members ──
+  { id:'p3',  name:'سارة ميخائيل',   nameEn:'Sarah Mikhail',     email:'sarah@kdec.org',      phone:'+20 100 111 0003', whatsapp:'+20 100 111 0003', role:'Pianist/Keys',    position:'Leader',   status:'active', isAdmin:false, is_admin:false, notes:'بيانو رئيسي، تعزف من سنة ٢٠١٨', joinDate:'2020-03-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p4',  name:'داود سمير',      nameEn:'David Samir',       email:'david@kdec.org',      phone:'+20 100 111 0004', whatsapp:'+20 100 111 0004', role:'Acoustic Guitar', position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'جيتار أكوستيك',         joinDate:'2021-06-01', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p5',  name:'مريم جورج',      nameEn:'Mary George',       email:'mary@kdec.org',       phone:'+20 100 111 0005', whatsapp:'+20 100 111 0005', role:'Vocalist',        position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'ألتو — الصوت الأول',     joinDate:'2021-09-15', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p6',  name:'بطرس نجيب',      nameEn:'Peter Naguib',      email:'peter@kdec.org',      phone:'+20 100 111 0006', whatsapp:'+20 100 111 0006', role:'Bass Guitar',     position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'باس جيتار',              joinDate:'2022-01-20', availability:{sun:false,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p7',  name:'يوحنا فارس',     nameEn:'John Fares',        email:'john@kdec.org',       phone:'+20 100 111 0007', whatsapp:'+20 100 111 0007', role:'Drummer',         position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'طبول',                   joinDate:'2020-11-05', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p8',  name:'ريتا بشارة',     nameEn:'Rita Beshara',      email:'rita@kdec.org',       phone:'+20 100 111 0008', whatsapp:'+20 100 111 0008', role:'Vocalist',        position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'سوبرانو',                joinDate:'2023-02-14', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p9',  name:'مرقس يوسف',      nameEn:'Mark Youssef',      email:'mark@kdec.org',       phone:'+20 100 111 0009', whatsapp:'+20 100 111 0009', role:'Sound Engineer',  position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'مهندس الصوت',            joinDate:'2021-04-22', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p10', name:'ناديا فريد',     nameEn:'Nadia Farid',       email:'nadia@kdec.org',      phone:'+20 100 111 0010', whatsapp:'+20 100 111 0010', role:'Projection',      position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'عرض وبروجكتر',           joinDate:'2023-07-01', availability:{sun:true,wed:false,fri:false,mon:false,tue:false,thu:false,sat:false},timeSlots:[], tags:[] },
+  { id:'p11', name:'هاني أسعد',      nameEn:'Hany Asaad',        email:'hany@kdec.org',       phone:'+20 100 111 0011', whatsapp:'+20 100 111 0011', role:'Electric Guitar', position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'جيتار كهربائي',          joinDate:'2022-08-10', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p12', name:'مينا أنطون',     nameEn:'Mina Anton',        email:'mina@kdec.org',       phone:'+20 100 111 0012', whatsapp:'+20 100 111 0012', role:'Vocalist',        position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'تينور',                  joinDate:'2022-05-01', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p13', name:'فيفي وليم',      nameEn:'Fifi William',      email:'fifi@kdec.org',       phone:'+20 100 111 0013', whatsapp:'+20 100 111 0013', role:'Pianist/Keys',    position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'بيانو احتياطي',          joinDate:'2024-01-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p14', name:'بولس شحاتة',    nameEn:'Boles Shehata',     email:'boles@kdec.org',      phone:'+20 100 111 0014', whatsapp:'+20 100 111 0014', role:'Camera',          position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'مصور',                   joinDate:'2024-03-15', availability:{sun:true,wed:false,fri:false,mon:false,tue:false,thu:false,sat:false},timeSlots:[], tags:[] },
+]
+
+// ── 16 Songs — Arabic primary ─────────────────────────────
+const DEMO_SONGS = [
+  { id:'s1',  title:'عظيم أمانتك',            titleEn:'Great Is Thy Faithfulness', author:'Thomas O. Chisholm', key:'D',  bpm:72, timeSignature:'3/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'كابو ٢ على الجيتار', ccliNumber:'18723',   usageCount:24, lastUsed:'2026-03-30', status:'active' },
+  { id:'s2',  title:'كم هو عظيم إلهنا',       titleEn:'How Great Is Our God',      author:'Chris Tomlin',       key:'G',  bpm:76, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'',               ccliNumber:'4348399', usageCount:31, lastUsed:'2026-04-06', status:'active' },
+  { id:'s3',  title:'يا مالئ كوني',            titleEn:'',                          author:'KDEC Worship',       key:'Am', bpm:68, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر'],               notes:'ترنيمة عربية',   ccliNumber:'',        usageCount:18, lastUsed:'2026-04-06', status:'active' },
+  { id:'s4',  title:'صلاح الله',               titleEn:'Goodness of God',           author:'Beth Redman',        key:'C',  bpm:70, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'',               ccliNumber:'7117726', usageCount:15, lastUsed:'2026-03-23', status:'active' },
+  { id:'s5',  title:'صانع الطريق',             titleEn:'Way Maker',                 author:'Sinach',             key:'Bb', bpm:74, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','جسر','ختام'],                         notes:'',               ccliNumber:'7115744', usageCount:27, lastUsed:'2026-04-01', status:'active' },
+  { id:'s6',  title:'أنت تستحق',               titleEn:'',                          author:'KDEC Worship',       key:'G',  bpm:66, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة'],                    notes:'',               ccliNumber:'',        usageCount:9,  lastUsed:'2026-03-16', status:'active' },
+  { id:'s7',  title:'ابنِ حياتي',              titleEn:'Build My Life',             author:'Pat Barrett',        key:'E',  bpm:68, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','قبل اللازمة','لازمة','مقطع ٢','لازمة','جسر'], notes:'',               ccliNumber:'7070345', usageCount:12, lastUsed:'2026-02-23', status:'active' },
+  { id:'s8',  title:'محيطات',                  titleEn:'Oceans',                    author:'Hillsong United',    key:'D',  bpm:60, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'جسر طويل',       ccliNumber:'6428767', usageCount:8,  lastUsed:'2026-01-19', status:'active' },
+  { id:'s9',  title:'أنا لك يا رب',            titleEn:'I Am Yours Lord',           author:'KDEC Worship',       key:'F',  bpm:65, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر'],               notes:'',               ccliNumber:'',        usageCount:14, lastUsed:'2026-03-09', status:'active' },
+  { id:'s10', title:'روح الرب',                 titleEn:'Spirit of the Lord',        author:'KDEC Worship',       key:'A',  bpm:72, timeSignature:'4/4', language:'ar', sequence:['مقدمة','مقطع ١','لازمة','مقطع ٢','لازمة','جسر'],       notes:'',               ccliNumber:'',        usageCount:11, lastUsed:'2026-02-16', status:'active' },
+  { id:'s11', title:'تعظّم',                    titleEn:'Glorious',                  author:'Paul Baloche',       key:'C',  bpm:80, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'',               ccliNumber:'5590997', usageCount:6,  lastUsed:'2026-01-05', status:'active' },
+  { id:'s12', title:'مجدك ملأ الأرض',          titleEn:'Your Glory Fills the Earth', author:'KDEC Worship',      key:'D',  bpm:70, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','جسر','لازمة'],                        notes:'ترنيمة عيد القيامة', ccliNumber:'',    usageCount:5,  lastUsed:'2025-12-28', status:'active' },
+  { id:'s13', title:'كل مجدي',                  titleEn:'All My Glory',              author:'KDEC Worship',       key:'Bb', bpm:68, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'',               ccliNumber:'',        usageCount:7,  lastUsed:'2026-02-02', status:'active' },
+  { id:'s14', title:'أملي ثابت',                titleEn:'My Hope Is Certain',        author:'KDEC Worship',       key:'C',  bpm:66, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة'],                    notes:'ختامية هادئة',   ccliNumber:'',        usageCount:10, lastUsed:'2026-03-02', status:'active' },
+  { id:'s15', title:'لأنك أنت الرب',            titleEn:'For You Are the Lord',      author:'KDEC Worship',       key:'G',  bpm:64, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','جسر','لازمة','ختام'],                 notes:'ترنيمة تقليدية', ccliNumber:'',        usageCount:13, lastUsed:'2026-03-16', status:'active' },
+  { id:'s16', title:'في حضرتك',                 titleEn:'In Your Presence',          author:'KDEC Worship',       key:'Dm', bpm:58, timeSignature:'4/4', language:'ar', sequence:['مقدمة','مقطع ١','لازمة','مقطع ٢','لازمة','جسر'],       notes:'ختام تأملي',     ccliNumber:'',        usageCount:16, lastUsed:'2026-04-06', status:'active' },
+]
+
+// ── 4 Services with full setlists ────────────────────────
+const DEMO_SERVICES = [
+  // 1 ─ This Sunday
+  {
+    id:'sv1', title:'خدمة أحد التسبيح',
+    date:fmt(nextSun), time:'10:00',
+    type:'Sunday Service', status:'scheduled',
+    notes:'أحد الشعانين - ترانيم فرح وتسبيح',
+    recurrenceGroupId:null, recurrenceIndex:0,
+    practice:{
+      enabled:true, date:fmt(nextFri), time:'18:00',
+      location:'قاعة الكنيسة - الدور الثاني',
+      notes:'نركز على ترنيمة يا مالئ كوني والجسر',
+      attendance:[
+        {personId:'p1',status:'attending'},{personId:'p2',status:'attending'},
+        {personId:'p3',status:'attending'},{personId:'p4',status:'maybe'},
+        {personId:'p5',status:'attending'},{personId:'p7',status:'attending'},
+        {personId:'p8',status:'absent'},
+      ]
+    },
+    setlist:[
+      { id:'sl1',  songId:'s1',  key:'Am', notes:'ابدأ بقوة',          order:1,  song:null },
+      { id:'sl2',  songId:'s5',  key:'G',  notes:'',                    order:2,  song:null },
+      { id:'sl3',  songId:'s6',  key:'A',  notes:'أسرع قليلاً',        order:3,  song:null },
+      { id:'sl4',  songId:'s2',  key:'G',  notes:'الجسر مرتين',         order:4,  song:null },
+      { id:'sl5',  songId:'s4',  key:'D',  notes:'أهدأ تدريجياً',       order:5,  song:null },
+      { id:'sl6',  songId:'s16', key:'Dm', notes:'ختام هادئ',           order:6,  song:null },
+    ],
+    team:[
+      { personId:'p1',  role:'Worship Leader',  status:'confirmed', person:null },
+      { personId:'p2',  role:'Music Director',  status:'confirmed', person:null },
+      { personId:'p3',  role:'Pianist/Keys',    status:'confirmed', person:null },
+      { personId:'p4',  role:'Acoustic Guitar', status:'pending',   person:null },
+      { personId:'p11', role:'Electric Guitar', status:'confirmed', person:null },
+      { personId:'p6',  role:'Bass Guitar',     status:'confirmed', person:null },
+      { personId:'p7',  role:'Drummer',         status:'pending',   person:null },
+      { personId:'p5',  role:'Vocalist',        status:'confirmed', person:null },
+      { personId:'p8',  role:'Vocalist',        status:'confirmed', person:null },
+      { personId:'p12', role:'Vocalist',        status:'pending',   person:null },
+      { personId:'p9',  role:'Sound Engineer',  status:'confirmed', person:null },
+      { personId:'p10', role:'Projection',      status:'confirmed', person:null },
+      { personId:'p14', role:'Camera',          status:'pending',   person:null },
+    ],
+  },
+  // 2 ─ Wednesday prayer
+  {
+    id:'sv2', title:'ليلة الصلاة الأسبوعية',
+    date:fmt(nextWed), time:'19:00',
+    type:'Prayer Night', status:'scheduled',
+    notes:'تسبيح هادئ وصلاة شفاعية - أقل من ٦ ترانيم',
+    recurrenceGroupId:null, recurrenceIndex:0, practice:null,
+    setlist:[
+      { id:'sl7',  songId:'s16', key:'Dm', notes:'افتح بهدوء',          order:1,  song:null },
+      { id:'sl8',  songId:'s11', key:'F',  notes:'',                    order:2,  song:null },
+      { id:'sl9',  songId:'s7',  key:'C',  notes:'',                    order:3,  song:null },
+      { id:'sl10', songId:'s9',  key:'D',  notes:'جسر مفتوح للصلاة',   order:4,  song:null },
+      { id:'sl11', songId:'s14', key:'C',  notes:'ختام',               order:5,  song:null },
+    ],
+    team:[
+      { personId:'p1',  role:'Worship Leader',  status:'confirmed', person:null },
+      { personId:'p3',  role:'Pianist/Keys',    status:'confirmed', person:null },
+      { personId:'p5',  role:'Vocalist',        status:'confirmed', person:null },
+      { personId:'p8',  role:'Vocalist',        status:'pending',   person:null },
+      { personId:'p9',  role:'Sound Engineer',  status:'confirmed', person:null },
+      { personId:'p10', role:'Projection',      status:'confirmed', person:null },
+    ],
+  },
+  // 3 ─ Next Sunday
+  {
+    id:'sv3', title:'خدمة أحد الفصح',
+    date:fmt(in2Suns), time:'10:00',
+    type:'Sunday Service', status:'scheduled',
+    notes:'أحد القيامة - خدمة احتفالية',
+    recurrenceGroupId:null, recurrenceIndex:0, practice:null,
+    setlist:[
+      { id:'sl12', songId:'s3',  key:'D',  notes:'افتتاح احتفالي',      order:1,  song:null },
+      { id:'sl13', songId:'s10', key:'A',  notes:'',                    order:2,  song:null },
+      { id:'sl14', songId:'s5',  key:'G',  notes:'',                    order:3,  song:null },
+      { id:'sl15', songId:'s15', key:'G',  notes:'تقليدي',              order:4,  song:null },
+      { id:'sl16', songId:'s2',  key:'G',  notes:'',                    order:5,  song:null },
+      { id:'sl17', songId:'s4',  key:'D',  notes:'ختام',               order:6,  song:null },
+    ],
+    team:[
+      { personId:'p1',  role:'Worship Leader',  status:'pending',   person:null },
+      { personId:'p2',  role:'Music Director',  status:'confirmed', person:null },
+      { personId:'p13', role:'Pianist/Keys',    status:'confirmed', person:null },
+      { personId:'p4',  role:'Acoustic Guitar', status:'confirmed', person:null },
+      { personId:'p11', role:'Electric Guitar', status:'pending',   person:null },
+      { personId:'p6',  role:'Bass Guitar',     status:'pending',   person:null },
+      { personId:'p7',  role:'Drummer',         status:'confirmed', person:null },
+      { personId:'p5',  role:'Vocalist',        status:'confirmed', person:null },
+      { personId:'p8',  role:'Vocalist',        status:'confirmed', person:null },
+      { personId:'p9',  role:'Sound Engineer',  status:'confirmed', person:null },
+      { personId:'p10', role:'Projection',      status:'pending',   person:null },
+    ],
+  },
+  // 4 ─ 3rd Sunday (recurring example)
+  {
+    id:'sv4', title:'خدمة أحد الاعتيادية',
+    date:fmt(in3Suns), time:'10:00',
+    type:'Sunday Service', status:'scheduled',
+    notes:'',
+    recurrenceGroupId:'rg1', recurrenceIndex:1, practice:null,
+    setlist:[
+      { id:'sl18', songId:'s6',  key:'Bb', notes:'',  order:1, song:null },
+      { id:'sl19', songId:'s12', key:'Bb', notes:'',  order:2, song:null },
+      { id:'sl20', songId:'s8',  key:'E',  notes:'',  order:3, song:null },
+      { id:'sl21', songId:'s13', key:'Bb', notes:'',  order:4, song:null },
+      { id:'sl22', songId:'s11', key:'F',  notes:'',  order:5, song:null },
+    ],
+    team:[
+      { personId:'p1',  role:'Worship Leader',  status:'pending', person:null },
+      { personId:'p2',  role:'Music Director',  status:'pending', person:null },
+      { personId:'p3',  role:'Pianist/Keys',    status:'pending', person:null },
+      { personId:'p4',  role:'Acoustic Guitar', status:'pending', person:null },
+      { personId:'p6',  role:'Bass Guitar',     status:'pending', person:null },
+      { personId:'p7',  role:'Drummer',         status:'pending', person:null },
+      { personId:'p5',  role:'Vocalist',        status:'pending', person:null },
+      { personId:'p12', role:'Vocalist',        status:'pending', person:null },
+      { personId:'p9',  role:'Sound Engineer',  status:'pending', person:null },
+      { personId:'p10', role:'Projection',      status:'pending', person:null },
+    ],
+  },
+]
+
+const DEMO_ANNOUNCEMENTS = [
+  { id:'a1', title:'بروفة هذا الجمعة', content:'لدينا بروفة كاملة مع الفريق الجمعة الساعة ٦ م. من فضلكم أكدوا حضوركم. سنركز على ترانيم أحد الشعانين.', priority:'high',   author_id:'p1', authorName:'مافدي حنا',    created_at: new Date().toISOString() },
+  { id:'a2', title:'ترنيمة جديدة في المكتبة', content:'تم إضافة ترنيمة "يسوع أنت جميل" للمكتبة. من فضلكم استمعوا إليها قبل الأحد.', priority:'normal', author_id:'p2', authorName:'كريستين رمزي', created_at: new Date(Date.now()-86400000).toISOString() },
+  { id:'a3', title:'اجتماع الفريق الأسبوع القادم', content:'سيكون هناك اجتماع فريق التسبيح الأسبوع القادم الثلاثاء الساعة ٧ م لمناقشة خطة ترانيم شهر مايو.', priority:'normal', author_id:'p1', authorName:'مافدي حنا', created_at: new Date(Date.now()-172800000).toISOString() },
+  { id:'a4', title:'تذكير: حضور البروفات', content:'الحضور الثابت في البروفات ضروري جداً لجودة الخدمة. من فضلكم أبلغوا مسبقاً في حالة الغياب.', priority:'low',    author_id:'p2', authorName:'كريستين رمزي', created_at: new Date(Date.now()-259200000).toISOString() },
+]
+
+function hydrateDemoServices(services, songs, people) {
+  return services.map(s => ({
+    ...s,
+    setlist: s.setlist.map(item => ({ ...item, song: songs.find(sg => sg.id === item.songId) || null })),
+    team:    s.team.map(t => ({ ...t, person: people.find(p => p.id === t.personId) || null })),
+  }))
+}
+
+// ─────────────────────────────────────────────────────────
+// Context
+// ─────────────────────────────────────────────────────────
+const AppContext = createContext(null)
+
+export function AppProvider({ children }) {
+  const isDemoMode = !hasSupabase
+
+  // ── State ───────────────────────────────────────────────
+  const [currentUser,    setCurrentUser]    = useState(null)
+  const [authLoading,    setAuthLoading]    = useState(true)
+  const [people,         setPeople]         = useState([])
+  const [songs,          setSongs]          = useState([])
+  const [services,       setServices]       = useState([])
+  const [announcements,  setAnnouncements]  = useState([])
+  const [invitations,    setInvitations]    = useState([])
+  const [notifications,  setNotifications]  = useState([])
+  const [loading,        setLoading]        = useState(false)
+
+  const toast = useCallback((msg, type='success') => {
+    const id = Date.now()
+    setNotifications(n => [...n, { id, msg, type }])
+    setTimeout(() => setNotifications(n => n.filter(x => x.id !== id)), 3500)
+  }, [])
+
+  // ── DEMO MODE bootstrap ─────────────────────────────────
+  useEffect(() => {
+    if (!isDemoMode) return
+    // Load from localStorage — but fall back to DEMO seed if stored value is missing OR empty array
+    const storedUser = localStorage.getItem('kdec_demo_user')
+    if (storedUser) {
+      try { setCurrentUser(JSON.parse(storedUser)) } catch {}
+    }
+
+    const storedPeople = localStorage.getItem('kdec_people')
+    const storedSongs  = localStorage.getItem('kdec_songs')
+    const storedSvcs   = localStorage.getItem('kdec_services')
+    const storedAnns   = localStorage.getItem('kdec_announcements')
+
+    // Parse stored values — if empty array or missing, use seed
+    const parseSafe = (raw, fallback) => {
+      if (!raw) return fallback
+      try {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) && parsed.length > 0 ? parsed : fallback
+      } catch { return fallback }
+    }
+
+    const p      = parseSafe(storedPeople, DEMO_PEOPLE)
+    const s      = parseSafe(storedSongs,  DEMO_SONGS)
+    const a      = parseSafe(storedAnns,   DEMO_ANNOUNCEMENTS)
+    const rawSvcs = parseSafe(storedSvcs,  DEMO_SERVICES)
+
+    // Always write fresh seed to localStorage so future saves don't blank it
+    localStorage.setItem('kdec_people',        JSON.stringify(p))
+    localStorage.setItem('kdec_songs',         JSON.stringify(s))
+    localStorage.setItem('kdec_announcements', JSON.stringify(a))
+
+    setPeople(p)
+    setSongs(s)
+    setAnnouncements(a)
+    setServices(hydrateDemoServices(rawSvcs, s, p))
+    setAuthLoading(false)
+  }, [isDemoMode])
+
+  // Save demo data to localStorage on change — only when data is loaded (non-empty)
+  useEffect(() => {
+    if (!isDemoMode || people.length === 0) return
+    localStorage.setItem('kdec_people', JSON.stringify(people))
+  }, [isDemoMode, people])
+
+  useEffect(() => {
+    if (!isDemoMode || songs.length === 0) return
+    localStorage.setItem('kdec_songs', JSON.stringify(songs))
+  }, [isDemoMode, songs])
+
+  useEffect(() => {
+    if (!isDemoMode || services.length === 0) return
+    // strip the hydrated .song and .person before saving (re-hydrated on load)
+    const stripped = services.map(s => ({
+      ...s,
+      setlist: s.setlist.map(i => ({ ...i, song: null })),
+      team:    s.team.map(t => ({ ...t, person: null })),
+    }))
+    localStorage.setItem('kdec_services', JSON.stringify(stripped))
+  }, [isDemoMode, services])
+
+  useEffect(() => {
+    if (!isDemoMode || announcements.length === 0) return
+    localStorage.setItem('kdec_announcements', JSON.stringify(announcements))
+  }, [isDemoMode, announcements])
+
+  // ── SUPABASE MODE bootstrap ─────────────────────────────
+  useEffect(() => {
+    if (isDemoMode) return
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) loadCurrentUser(session.user)
+      else setAuthLoading(false)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) loadCurrentUser(session.user)
+      else { setCurrentUser(null); setAuthLoading(false) }
+    })
+    return () => subscription.unsubscribe()
+  }, [isDemoMode])
+
+  const loadCurrentUser = async (user) => {
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    setCurrentUser({ ...user, ...profile, personId: user.id, isAdmin: profile?.is_admin })
+    setAuthLoading(false)
+    loadAll()
+  }
+
+  const normalizeProfile = (p) => ({ ...p, isAdmin: p.is_admin, joinDate: p.join_date, timeSlots: p.time_slots || [], tags: p.tags || [], availability: p.availability || {} })
+  const normalizeSong    = (s) => ({ ...s, titleAr: s.title_ar||'', timeSignature: s.time_signature, ccliNumber: s.ccli_number||'', usageCount: s.usage_count||0, lastUsed: s.last_used, arrangements: s.arrangements||[], sequence: s.sequence||[], themes: s.themes||[] })
+  const normalizeService = (s) => ({
+    ...s,
+    recurrenceGroupId: s.recurrence_group_id, recurrenceIndex: s.recurrence_index,
+    setlist: (s.setlist||[]).sort((a,b) => a.sort_order-b.sort_order).map(i => ({ id:i.id, songId:i.song_id, key:i.key, notes:i.notes||'', order:i.sort_order, song:i.song ? normalizeSong(i.song) : null })),
+    team:    (s.team||[]).map(t => ({ personId:t.person_id, role:t.role, status:t.status, person:t.person ? normalizeProfile(t.person) : null })),
+  })
+
+  const loadAll = useCallback(async () => {
+    if (isDemoMode) return
+    setLoading(true)
+    const [{ data:ppl },{ data:sng },{ data:svc },{ data:ann },{ data:inv }] = await Promise.all([
+      supabase.from('profiles').select('*').order('name'),
+      supabase.from('songs').select('*').order('title'),
+      supabase.from('services').select('*, setlist:setlist_items(*, song:songs(*)), team:service_team(*, person:profiles(*))').order('date'),
+      supabase.from('announcements').select('*, author:profiles(name)').order('created_at',{ascending:false}),
+      supabase.from('invitations').select('*').order('created_at',{ascending:false}),
+    ])
+    if (ppl) setPeople(ppl.map(normalizeProfile))
+    if (sng) setSongs(sng.map(normalizeSong))
+    if (svc) setServices(svc.map(normalizeService))
+    if (ann) setAnnouncements(ann.map(a => ({ ...a, author:a.author_id, authorName:a.author?.name })))
+    if (inv) setInvitations(inv)
+    setLoading(false)
+  }, [isDemoMode])
+
+  // ── AUTH ────────────────────────────────────────────────
+  const login = async (email, password) => {
+    if (isDemoMode) {
+      // Match seeded people by email
+      const p = DEMO_PEOPLE.find(u => u.email.toLowerCase() === email.toLowerCase())
+      if (p) {
+        const user = { ...p, id: p.id, personId: p.id }
+        setCurrentUser(user)
+        localStorage.setItem('kdec_demo_user', JSON.stringify(user))
+        return { success: true }
+      }
+      // Accept any credentials — create a guest admin session
+      const guest = {
+        id: 'guest', personId: 'guest',
+        name: email.split('@')[0] || 'Guest',
+        email,
+        role: 'Worship Leader',
+        position: 'Admin',
+        status: 'active',
+        isAdmin: true,
+        is_admin: true,
+        availability: {},
+        timeSlots: [],
+        notes: '',
+      }
+      setCurrentUser(guest)
+      localStorage.setItem('kdec_demo_user', JSON.stringify(guest))
+      return { success: true }
+    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { error: error.message }
+    return { success: true }
+  }
+
+  const logout = async () => {
+    if (isDemoMode) {
+      localStorage.removeItem('kdec_demo_user')
+      setCurrentUser(null)
+      return
+    }
+    await supabase.auth.signOut()
+    setCurrentUser(null); setPeople([]); setSongs([]); setServices([]); setAnnouncements([]); setInvitations([])
+  }
+
+  const registerWithInvite = async (inviteCode, email, password, name) => {
+    if (isDemoMode) return { error: 'Registration is disabled in demo mode. Use a demo account to log in.' }
+    const { data: inv } = await supabase.from('invitations').select('*').eq('code', inviteCode).eq('status','pending').single()
+    if (!inv) return { error: 'Invalid or expired invitation' }
+    if (new Date() > new Date(inv.expires_at)) return { error: 'Invitation has expired' }
+    const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{ name: name||email.split('@')[0] } } })
+    if (error) return { error: error.message }
+    await supabase.from('profiles').update({ role: inv.role }).eq('id', data.user.id)
+    await supabase.from('invitations').update({ status:'accepted', accepted_at: new Date().toISOString() }).eq('code', inviteCode)
+    return { success: true }
+  }
+
+  const updateProfile = async (data) => {
+    if (isDemoMode) {
+      const updates = { name:data.name, phone:data.phone, whatsapp:data.whatsapp, notes:data.notes, availability:data.availability, timeSlots:data.timeSlots||[] }
+      setCurrentUser(prev => ({ ...prev, ...updates }))
+      setPeople(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...updates } : p))
+      toast('Profile updated')
+      return
+    }
+    const updates = { name:data.name, phone:data.phone, whatsapp:data.whatsapp, notes:data.notes, availability:data.availability, time_slots:data.timeSlots||[] }
+    if (data.email && data.email !== currentUser.email) await supabase.auth.updateUser({ email: data.email })
+    if (data.newPassword) await supabase.auth.updateUser({ password: data.newPassword })
+    const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id)
+    if (!error) { setCurrentUser(prev => ({ ...prev, ...updates })); setPeople(prev => prev.map(p => p.id===currentUser.id?{...p,...updates}:p)); toast('Profile updated') }
+  }
+
+  const updatePersonAvailability = async (personId, availability) => {
+    if (isDemoMode) { setPeople(prev => prev.map(p => p.id===personId?{...p,availability}:p)); toast('Availability updated'); return }
+    await supabase.from('profiles').update({ availability }).eq('id', personId)
+    setPeople(prev => prev.map(p => p.id===personId?{...p,availability}:p))
+    toast('Availability updated')
+  }
+
+  // ── INVITATIONS ─────────────────────────────────────────
+  const createInvitation = async (email, role, method) => {
+    const code = Math.random().toString(36).slice(2,10).toUpperCase()
+    if (isDemoMode) {
+      const inv = { id:'inv_'+Date.now(), code, email, role, method, status:'pending', created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString(), created_at: new Date().toISOString() }
+      setInvitations(prev => [inv, ...prev]); toast(`Invitation created for ${email}`); return inv
+    }
+    const { data, error } = await supabase.from('invitations').insert({ code, email, role, method, created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString() }).select().single()
+    if (!error) { setInvitations(prev => [data,...prev]); toast(`Invitation created for ${email}`); return data }
+    toast('Failed to create invitation','error'); return null
+  }
+
+  const cancelInvitation = async (id) => {
+    if (isDemoMode) { setInvitations(prev => prev.map(i => i.id===id?{...i,status:'cancelled'}:i)); toast('Cancelled','error'); return }
+    await supabase.from('invitations').update({ status:'cancelled' }).eq('id',id)
+    setInvitations(prev => prev.map(i => i.id===id?{...i,status:'cancelled'}:i))
+    toast('Invitation cancelled','error')
+  }
+
+  // ── PEOPLE ──────────────────────────────────────────────
+  const addPerson    = async ()      => toast('Invite members via the Invitations page','info')
+  const updatePerson = async (id, data) => {
+    const updates = { name:data.name, phone:data.phone, whatsapp:data.whatsapp, role:data.role, position:data.position, status:data.status, notes:data.notes, availability:data.availability, isAdmin:data.position==='Admin', is_admin:data.position==='Admin' }
+    if (isDemoMode) { setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated'); return }
+    await supabase.from('profiles').update({ ...updates, is_admin:updates.isAdmin }).eq('id',id)
+    setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated')
+  }
+  const deletePerson = async (id) => {
+    if (isDemoMode) { setPeople(prev => prev.map(p => p.id===id?{...p,status:'inactive'}:p)); toast('Marked inactive','error'); return }
+    await supabase.from('profiles').update({ status:'inactive' }).eq('id',id)
+    setPeople(prev => prev.map(p => p.id===id?{...p,status:'inactive'}:p)); toast('Marked inactive','error')
+  }
+
+  // ── SONGS ───────────────────────────────────────────────
+  const addSong = async (data) => {
+    const song = { ...data, id:'s'+Date.now(), usageCount:0, status:'active', titleAr:data.titleAr||'', arrangements:data.arrangements||[], themes:data.themes||[], sequence:data.sequence||[] }
+    if (isDemoMode) { setSongs(prev => [...prev, song]); toast('Song added'); return }
+    const { data:s, error } = await supabase.from('songs').insert({ title:data.title, title_ar:data.titleAr||'', author:data.author||'', key:data.key, bpm:data.bpm||null, time_signature:data.timeSignature||'4/4', language:data.language||'en', sequence:data.sequence||[], themes:data.themes||[], notes:data.notes||'', ccli_number:data.ccliNumber||'', usage_count:0, status:'active', created_by:currentUser.id }).select().single()
+    if (!error) { setSongs(prev => [...prev, normalizeSong(s)]); toast('Song added') } else toast('Failed','error')
+  }
+  const updateSong = async (id, data) => {
+    if (isDemoMode) { setSongs(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Song updated'); return }
+    await supabase.from('songs').update({ title:data.title, title_ar:data.titleAr||'', author:data.author, key:data.key, bpm:data.bpm, time_signature:data.timeSignature, language:data.language, sequence:data.sequence||[], notes:data.notes||'', ccli_number:data.ccliNumber||'' }).eq('id',id)
+    setSongs(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Song updated')
+  }
+  const deleteSong = async (id) => {
+    if (isDemoMode) { setSongs(prev => prev.filter(s => s.id!==id)); toast('Song deleted','error'); return }
+    await supabase.from('songs').delete().eq('id',id); setSongs(prev => prev.filter(s => s.id!==id)); toast('Song deleted','error')
+  }
+
+  // ── SERVICES ────────────────────────────────────────────
+  const addService = async (data) => {
+    if (isDemoMode) {
+      const base = { ...data, id:'sv'+Date.now(), status:'scheduled', setlist:[], team:[], practice:null, recurrenceGroupId:null, recurrenceIndex:0 }
+      const newSvcs = [base]
+      if (data.recurrence?.enabled) {
+        const occs = generateOccurrences({ ...base, recurrence_group_id: base.id }, data.recurrence)
+        const updBase = { ...base, recurrenceGroupId: base.id }
+        occs.forEach((o,i) => newSvcs.push({ ...o, id:'sv'+Date.now()+i, setlist:[], team:[], practice:null, recurrenceGroupId:base.id, recurrenceIndex:i+1 }))
+        newSvcs[0] = updBase
+        toast(`Created ${newSvcs.length} services`)
+      } else toast('Service created')
+      setServices(prev => [...prev, ...newSvcs])
+      return
+    }
+    // Supabase path
+    const { data:svc, error } = await supabase.from('services').insert({ title:data.title, date:data.date, time:data.time, type:data.type, status:'scheduled', notes:data.notes||'', created_by:currentUser.id }).select().single()
+    if (error) { toast('Failed','error'); return }
+    if (data.recurrence?.enabled) {
+      const occs = generateOccurrences({ ...data, id:svc.id, recurrence_group_id:svc.id }, data.recurrence)
+      await supabase.from('services').update({ recurrence_group_id:svc.id }).eq('id',svc.id)
+      for (const occ of occs) await supabase.from('services').insert({ title:occ.title, date:occ.date, time:occ.time, type:occ.type, status:'scheduled', notes:occ.notes||'', recurrence_group_id:svc.id, recurrence_index:occ.recurrence_index, created_by:currentUser.id })
+      toast(`Created services`)
+    } else toast('Service created')
+    await loadAll()
+  }
+
+  const updateService = async (id, data) => {
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Service updated'); return }
+    const u = {}
+    ;['title','date','time','type','status','notes','practice'].forEach(k => { if (data[k]!==undefined) u[k]=data[k] })
+    await supabase.from('services').update(u).eq('id',id)
+    setServices(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Service updated')
+  }
+
+  const updateRecurringService = async (id, data, scope) => {
+    const svc = services.find(s => s.id===id)
+    if (!svc?.recurrenceGroupId || scope==='this') return updateService(id, data)
+    if (isDemoMode) {
+      setServices(prev => prev.map(s => {
+        if (s.recurrenceGroupId !== svc.recurrenceGroupId) return s
+        if (scope==='this_and_future' && parseISO(s.date) < parseISO(svc.date)) return s
+        return { ...s, ...data }
+      })); toast('Series updated'); return
+    }
+    const u = {}
+    ;['title','time','type','notes'].forEach(k => { if (data[k]) u[k]=data[k] })
+    const q = supabase.from('services').update(u).eq('recurrence_group_id',svc.recurrenceGroupId)
+    if (scope==='this_and_future') q.gte('date',svc.date)
+    await q; toast('Series updated'); await loadAll()
+  }
+
+  const deleteService = async (id) => {
+    if (isDemoMode) { setServices(prev => prev.filter(s => s.id!==id)); toast('Deleted','error'); return }
+    await supabase.from('services').delete().eq('id',id); setServices(prev => prev.filter(s => s.id!==id)); toast('Deleted','error')
+  }
+
+  const deleteRecurringService = async (id, scope) => {
+    const svc = services.find(s => s.id===id)
+    if (!svc?.recurrenceGroupId || scope==='this') return deleteService(id)
+    if (isDemoMode) {
+      setServices(prev => prev.filter(s => {
+        if (s.recurrenceGroupId !== svc.recurrenceGroupId) return true
+        if (scope==='all') return false
+        return parseISO(s.date) < parseISO(svc.date)
+      })); toast('Deleted','error'); return
+    }
+    const q = supabase.from('services').delete().eq('recurrence_group_id',svc.recurrenceGroupId)
+    if (scope==='this_and_future') q.gte('date',svc.date)
+    await q; toast('Deleted','error'); await loadAll()
+  }
+
+  const generateMoreOccurrences = async (groupId, count) => {
+    const group = services.filter(s => s.recurrenceGroupId===groupId).sort((a,b)=>parseISO(a.date)-parseISO(b.date))
+    if (!group.length) return
+    const last = group[group.length-1]
+    let frequency = 'weekly'
+    if (group.length>=2) { const diff=Math.round((parseISO(group[1].date)-parseISO(group[0].date))/86400000); if(diff>=28)frequency='monthly'; else if(diff>=14)frequency='biweekly' }
+    const newOnes = generateOccurrences({ ...last, recurrence_group_id:groupId }, { enabled:true, frequency, count, endDate:null, copyTeam:true, copySetlist:false })
+    if (isDemoMode) {
+      const newSvcs = newOnes.map((o,i) => ({ ...o, id:'sv'+Date.now()+i, setlist:[], team: last.team.map(t=>({...t,status:'pending'})), practice:null, recurrenceGroupId:groupId, recurrenceIndex:(group.length+i) }))
+      setServices(prev => [...prev, ...newSvcs]); toast(`Added ${count} more`); return
+    }
+    for (const occ of newOnes) {
+      const { data:occSvc } = await supabase.from('services').insert({ title:occ.title, date:occ.date, time:occ.time, type:occ.type, status:'scheduled', notes:occ.notes||'', recurrence_group_id:groupId, recurrence_index:occ.recurrence_index, created_by:currentUser.id }).select().single()
+      if (occSvc && last.team?.length) await supabase.from('service_team').insert(last.team.map(t=>({ service_id:occSvc.id, person_id:t.personId, role:t.role, status:'pending' })))
+    }
+    toast(`Added ${count} more`); await loadAll()
+  }
+
+  // ── SETLIST ─────────────────────────────────────────────
+  const addToSetlist = async (serviceId, songId, key, notes) => {
+    const svc = services.find(s => s.id===serviceId)
+    const order = (svc?.setlist?.length||0)+1
+    const song  = songs.find(s => s.id===songId)
+    const item  = { id:'sl'+Date.now(), songId, key: key||song?.key, notes:notes||'', order, song }
+    if (isDemoMode) {
+      setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:[...s.setlist,item]}))
+      setSongs(prev => prev.map(s => s.id===songId?{...s,usageCount:(s.usageCount||0)+1,lastUsed:fmt(new Date())}:s))
+      toast('Song added'); return
+    }
+    const { error } = await supabase.from('setlist_items').insert({ service_id:serviceId, song_id:songId, key:key||song?.key, notes:notes||'', sort_order:order })
+    if (!error) { await supabase.from('songs').update({ usage_count:(song?.usageCount||0)+1, last_used:fmt(new Date()) }).eq('id',songId); toast('Song added'); await loadAll() }
+  }
+
+  const removeFromSetlist = async (serviceId, itemId) => {
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:s.setlist.filter(i=>i.id!==itemId)})); return }
+    await supabase.from('setlist_items').delete().eq('id',itemId)
+    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:s.setlist.filter(i=>i.id!==itemId)}))
+  }
+
+  const reorderSetlist = async (serviceId, newSetlist) => {
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:newSetlist})); return }
+    await Promise.all(newSetlist.map((item,idx) => supabase.from('setlist_items').update({ sort_order:idx+1 }).eq('id',item.id)))
+    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:newSetlist.map((i,idx)=>({...i,order:idx+1}))}))
+  }
+
+  // ── TEAM ────────────────────────────────────────────────
+  const addTeamMember = async (serviceId, personId, role) => {
+    const person = people.find(p => p.id===personId)
+    const entry  = { personId, role, status:'pending', person }
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:[...s.team,entry]})); toast('Added'); return }
+    const { error } = await supabase.from('service_team').insert({ service_id:serviceId, person_id:personId, role, status:'pending' })
+    if (!error) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:[...s.team,entry]})); toast('Added') }
+  }
+
+  const updateTeamMemberStatus = async (serviceId, personId, status) => {
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:s.team.map(t=>t.personId===personId?{...t,status}:t)})); return }
+    await supabase.from('service_team').update({ status }).eq('service_id',serviceId).eq('person_id',personId)
+    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:s.team.map(t=>t.personId===personId?{...t,status}:t)}))
+  }
+
+  const removeTeamMember = async (serviceId, personId) => {
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:s.team.filter(t=>t.personId!==personId)})); return }
+    await supabase.from('service_team').delete().eq('service_id',serviceId).eq('person_id',personId)
+    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:s.team.filter(t=>t.personId!==personId)}))
+  }
+
+  // ── ANNOUNCEMENTS ───────────────────────────────────────
+  const addAnnouncement = async (data) => {
+    const ann = { ...data, id:'a'+Date.now(), author_id:currentUser.id, authorName:currentUser.name||currentUser.email, created_at:new Date().toISOString() }
+    if (isDemoMode) { setAnnouncements(prev => [ann,...prev]); toast('Posted'); return }
+    const { data:a, error } = await supabase.from('announcements').insert({ title:data.title, content:data.content, priority:data.priority||'normal', author_id:currentUser.id }).select('*, author:profiles(name)').single()
+    if (!error) { setAnnouncements(prev => [{...a, author:a.author_id, authorName:a.author?.name},...prev]); toast('Posted') }
+  }
+
+  const deleteAnnouncement = async (id) => {
+    if (isDemoMode) { setAnnouncements(prev => prev.filter(a => a.id!==id)); toast('Deleted','error'); return }
+    await supabase.from('announcements').delete().eq('id',id); setAnnouncements(prev => prev.filter(a => a.id!==id)); toast('Deleted','error')
+  }
+
+  // ── PRACTICE ────────────────────────────────────────────
+  const setPractice = async (serviceId, practice) => {
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id===serviceId?{...s,practice}:s)); toast(practice?.enabled?'Practice saved':'Practice removed'); return }
+    await supabase.from('services').update({ practice }).eq('id',serviceId)
+    setServices(prev => prev.map(s => s.id===serviceId?{...s,practice}:s)); toast(practice?.enabled?'Practice saved':'Practice removed')
+  }
+
+  const updatePracticeAttendance = async (serviceId, personId, status) => {
+    const svc = services.find(s => s.id===serviceId)
+    const attendance = svc?.practice?.attendance || []
+    const exists = attendance.find(a => a.personId===personId)
+    const newAtt = exists ? attendance.map(a => a.personId===personId?{...a,status}:a) : [...attendance,{personId,status}]
+    const newPractice = { ...svc.practice, attendance:newAtt }
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id===serviceId?{...s,practice:newPractice}:s)); toast('Updated'); return }
+    await supabase.from('services').update({ practice:newPractice }).eq('id',serviceId)
+    setServices(prev => prev.map(s => s.id===serviceId?{...s,practice:newPractice}:s)); toast('Updated')
+  }
+
+  const value = {
+    isDemoMode, currentUser, authLoading, loading,
+    people, songs, services, announcements, invitations, notifications,
+    ROLES, POSITIONS,
+    login, logout, registerWithInvite, updateProfile,
+    createInvitation, cancelInvitation,
+    addPerson, updatePerson, deletePerson, updatePersonAvailability,
+    addSong, updateSong, deleteSong,
+    addService, updateService, updateRecurringService,
+    deleteService, deleteRecurringService, generateMoreOccurrences,
+    addToSetlist, removeFromSetlist, reorderSetlist,
+    addTeamMember, updateTeamMemberStatus, removeTeamMember,
+    addAnnouncement, deleteAnnouncement,
+    setPractice, updatePracticeAttendance,
+    toast, loadAll,
+  }
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+}
+
+export const useStore = () => useContext(AppContext)
