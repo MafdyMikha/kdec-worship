@@ -18,6 +18,7 @@ import Invitations from './pages/Invitations'
 import Attendance from './pages/Attendance'
 import Events from './pages/Events'
 import WhatsAppBulk from './pages/WhatsAppBulk'
+import ResetPassword from './pages/ResetPassword'
 
 function Spinner() {
   return (
@@ -31,7 +32,7 @@ function Spinner() {
 }
 
 function AuthGate() {
-  const { currentUser, authLoading } = useStore()
+  const { currentUser, authLoading, isPasswordRecovery } = useStore()
   const [inviteCode, setInviteCode] = useState(null)
 
   useEffect(() => {
@@ -40,6 +41,11 @@ function AuthGate() {
   }, [])
 
   if (authLoading) return <Spinner/>
+
+  // Password recovery link clicked — show "set new password" screen
+  // regardless of whether Supabase created a temporary session
+  if (isPasswordRecovery) return <ResetPassword/>
+
   if (!currentUser)  return <Login inviteCode={inviteCode}/>
 
   const isAdmin = currentUser?.isAdmin || currentUser?.is_admin

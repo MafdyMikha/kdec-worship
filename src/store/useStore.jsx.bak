@@ -92,10 +92,6 @@ const DEMO_SONGS = [
   { id:'s10', title:'روح الرب',                 titleEn:'Spirit of the Lord',        author:'KDEC Worship',       key:'A',  bpm:72, timeSignature:'4/4', language:'ar', sequence:['مقدمة','مقطع ١','لازمة','مقطع ٢','لازمة','جسر'],       notes:'',               ccliNumber:'',        usageCount:11, lastUsed:'2026-02-16', status:'active' },
   { id:'s11', title:'تعظّم',                    titleEn:'Glorious',                  author:'Paul Baloche',       key:'C',  bpm:80, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'',               ccliNumber:'5590997', usageCount:6,  lastUsed:'2026-01-05', status:'active' },
   { id:'s12', title:'مجدك ملأ الأرض',          titleEn:'Your Glory Fills the Earth', author:'KDEC Worship',      key:'D',  bpm:70, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','جسر','لازمة'],                        notes:'ترنيمة عيد القيامة', ccliNumber:'',    usageCount:5,  lastUsed:'2025-12-28', status:'active' },
-  { id:'s13', title:'كل مجدي',                  titleEn:'All My Glory',              author:'KDEC Worship',       key:'Bb', bpm:68, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر','لازمة'],       notes:'',               ccliNumber:'',        usageCount:7,  lastUsed:'2026-02-02', status:'active' },
-  { id:'s14', title:'أملي ثابت',                titleEn:'My Hope Is Certain',        author:'KDEC Worship',       key:'C',  bpm:66, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','مقطع ٢','لازمة'],                    notes:'ختامية هادئة',   ccliNumber:'',        usageCount:10, lastUsed:'2026-03-02', status:'active' },
-  { id:'s15', title:'لأنك أنت الرب',            titleEn:'For You Are the Lord',      author:'KDEC Worship',       key:'G',  bpm:64, timeSignature:'4/4', language:'ar', sequence:['مقطع ١','لازمة','جسر','لازمة','ختام'],                 notes:'ترنيمة تقليدية', ccliNumber:'',        usageCount:13, lastUsed:'2026-03-16', status:'active' },
-  { id:'s16', title:'في حضرتك',                 titleEn:'In Your Presence',          author:'KDEC Worship',       key:'Dm', bpm:58, timeSignature:'4/4', language:'ar', sequence:['مقدمة','مقطع ١','لازمة','مقطع ٢','لازمة','جسر'],       notes:'ختام تأملي',     ccliNumber:'',        usageCount:16, lastUsed:'2026-04-06', status:'active' },
 ]
 
 // ── 4 Services with full setlists ────────────────────────
@@ -266,35 +262,20 @@ export function AppProvider({ children }) {
   // ── DEMO MODE bootstrap ─────────────────────────────────
   useEffect(() => {
     if (!isDemoMode) return
-    // Load from localStorage — but fall back to DEMO seed if stored value is missing OR empty array
+    // Load from localStorage or use seed data
     const storedUser = localStorage.getItem('kdec_demo_user')
     if (storedUser) {
       try { setCurrentUser(JSON.parse(storedUser)) } catch {}
     }
-
     const storedPeople = localStorage.getItem('kdec_people')
     const storedSongs  = localStorage.getItem('kdec_songs')
     const storedSvcs   = localStorage.getItem('kdec_services')
     const storedAnns   = localStorage.getItem('kdec_announcements')
 
-    // Parse stored values — if empty array or missing, use seed
-    const parseSafe = (raw, fallback) => {
-      if (!raw) return fallback
-      try {
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) && parsed.length > 0 ? parsed : fallback
-      } catch { return fallback }
-    }
-
-    const p      = parseSafe(storedPeople, DEMO_PEOPLE)
-    const s      = parseSafe(storedSongs,  DEMO_SONGS)
-    const a      = parseSafe(storedAnns,   DEMO_ANNOUNCEMENTS)
-    const rawSvcs = parseSafe(storedSvcs,  DEMO_SERVICES)
-
-    // Always write fresh seed to localStorage so future saves don't blank it
-    localStorage.setItem('kdec_people',        JSON.stringify(p))
-    localStorage.setItem('kdec_songs',         JSON.stringify(s))
-    localStorage.setItem('kdec_announcements', JSON.stringify(a))
+    const p = storedPeople ? JSON.parse(storedPeople) : DEMO_PEOPLE
+    const s = storedSongs  ? JSON.parse(storedSongs)  : DEMO_SONGS
+    const a = storedAnns   ? JSON.parse(storedAnns)   : DEMO_ANNOUNCEMENTS
+    const rawSvcs = storedSvcs ? JSON.parse(storedSvcs) : DEMO_SERVICES
 
     setPeople(p)
     setSongs(s)
@@ -303,19 +284,17 @@ export function AppProvider({ children }) {
     setAuthLoading(false)
   }, [isDemoMode])
 
-  // Save demo data to localStorage on change — only when data is loaded (non-empty)
+  // Save demo data to localStorage on change
   useEffect(() => {
-    if (!isDemoMode || people.length === 0) return
+    if (!isDemoMode) return
     localStorage.setItem('kdec_people', JSON.stringify(people))
   }, [isDemoMode, people])
-
   useEffect(() => {
-    if (!isDemoMode || songs.length === 0) return
+    if (!isDemoMode) return
     localStorage.setItem('kdec_songs', JSON.stringify(songs))
   }, [isDemoMode, songs])
-
   useEffect(() => {
-    if (!isDemoMode || services.length === 0) return
+    if (!isDemoMode) return
     // strip the hydrated .song and .person before saving (re-hydrated on load)
     const stripped = services.map(s => ({
       ...s,
@@ -324,43 +303,24 @@ export function AppProvider({ children }) {
     }))
     localStorage.setItem('kdec_services', JSON.stringify(stripped))
   }, [isDemoMode, services])
-
   useEffect(() => {
-    if (!isDemoMode || announcements.length === 0) return
+    if (!isDemoMode) return
     localStorage.setItem('kdec_announcements', JSON.stringify(announcements))
   }, [isDemoMode, announcements])
 
   // ── SUPABASE MODE bootstrap ─────────────────────────────
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
-
   useEffect(() => {
     if (isDemoMode) return
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) loadCurrentUser(session.user)
       else setAuthLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // User clicked the reset-password email link — show "set new password" screen,
-        // do NOT route into the app even though Supabase creates a temp session
-        setIsPasswordRecovery(true)
-        setAuthLoading(false)
-        return
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (session) loadCurrentUser(session.user)
       else { setCurrentUser(null); setAuthLoading(false) }
     })
     return () => subscription.unsubscribe()
   }, [isDemoMode])
-
-  const updatePassword = async (newPassword) => {
-    if (isDemoMode) return { error: 'Not available in demo mode.' }
-    if (!newPassword || newPassword.length < 6) return { error: 'Password must be at least 6 characters.' }
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) return { error: error.message }
-    setIsPasswordRecovery(false)
-    return { success: true }
-  }
 
   const loadCurrentUser = async (user) => {
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -399,30 +359,13 @@ export function AppProvider({ children }) {
   // ── AUTH ────────────────────────────────────────────────
   const login = async (email, password) => {
     if (isDemoMode) {
-      // Match seeded people by email
+      // Demo: match against seed people
       const p = DEMO_PEOPLE.find(u => u.email.toLowerCase() === email.toLowerCase())
-      if (p) {
-        const user = { ...p, id: p.id, personId: p.id }
-        setCurrentUser(user)
-        localStorage.setItem('kdec_demo_user', JSON.stringify(user))
-        return { success: true }
-      }
-      // Accept any credentials — create a guest admin session
-      const guest = {
-        id: 'guest', personId: 'guest',
-        name: email.split('@')[0] || 'Guest',
-        email,
-        role: 'Worship Leader',
-        position: 'Admin',
-        status: 'active',
-        isAdmin: true,
-        is_admin: true,
-        availability: {},
-        timeSlots: [],
-        notes: '',
-      }
-      setCurrentUser(guest)
-      localStorage.setItem('kdec_demo_user', JSON.stringify(guest))
+      if (!p) return { error: 'No account found with this email in demo mode.' }
+      // Any password works in demo mode
+      const user = { ...p, id: p.id, personId: p.id }
+      setCurrentUser(user)
+      localStorage.setItem('kdec_demo_user', JSON.stringify(user))
       return { success: true }
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -442,68 +385,13 @@ export function AppProvider({ children }) {
 
   const registerWithInvite = async (inviteCode, email, password, name) => {
     if (isDemoMode) return { error: 'Registration is disabled in demo mode. Use a demo account to log in.' }
-
-    // Validate invite code
-    const { data: inv } = await supabase
-      .from('invitations')
-      .select('*')
-      .eq('code', inviteCode)
-      .eq('status', 'pending')
-      .single()
-
-    if (!inv) return { error: 'Invalid or expired invitation code' }
-    if (new Date() > new Date(inv.expires_at)) return { error: 'This invitation has expired. Ask admin for a new one.' }
-
-    // Sign up — emailRedirectTo is blank so no confirmation email is sent
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: undefined,
-        data: { name: name || email.split('@')[0] }
-      }
-    })
-
+    const { data: inv } = await supabase.from('invitations').select('*').eq('code', inviteCode).eq('status','pending').single()
+    if (!inv) return { error: 'Invalid or expired invitation' }
+    if (new Date() > new Date(inv.expires_at)) return { error: 'Invitation has expired' }
+    const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{ name: name||email.split('@')[0] } } })
     if (error) return { error: error.message }
-
-    // Mark invitation as accepted
-    await supabase
-      .from('invitations')
-      .update({ status: 'accepted', accepted_at: new Date().toISOString() })
-      .eq('code', inviteCode)
-
-    // Update profile role if profile already exists
-    if (data?.user?.id) {
-      await supabase
-        .from('profiles')
-        .upsert({
-          id: data.user.id,
-          name: name || email.split('@')[0],
-          email,
-          role: inv.role || 'Member',
-          status: 'active',
-          is_admin: false,
-        })
-        .eq('id', data.user.id)
-    }
-
-    // Auto sign in immediately — no email confirmation needed
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-    if (signInError) {
-      // If Supabase still requires confirmation (dashboard setting), tell user clearly
-      return { error: 'Account created! Please check your email to confirm, then sign in. Or ask your admin to disable email confirmation in Supabase.' }
-    }
-
-    return { success: true, autoLoggedIn: true }
-  }
-
-  const forgotPassword = async (email) => {
-    if (isDemoMode) return { error: 'Password reset is not available in demo mode.' }
-    if (!email) return { error: 'Please enter your email address.' }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-    if (error) return { error: error.message }
+    await supabase.from('profiles').update({ role: inv.role }).eq('id', data.user.id)
+    await supabase.from('invitations').update({ status:'accepted', accepted_at: new Date().toISOString() }).eq('code', inviteCode)
     return { success: true }
   }
 
@@ -749,10 +637,10 @@ export function AppProvider({ children }) {
   }
 
   const value = {
-    isDemoMode, currentUser, authLoading, loading, isPasswordRecovery,
+    isDemoMode, currentUser, authLoading, loading,
     people, songs, services, announcements, invitations, notifications,
     ROLES, POSITIONS,
-    login, logout, registerWithInvite, forgotPassword, updatePassword, updateProfile,
+    login, logout, registerWithInvite, updateProfile,
     createInvitation, cancelInvitation,
     addPerson, updatePerson, deletePerson, updatePersonAvailability,
     addSong, updateSong, deleteSong,
