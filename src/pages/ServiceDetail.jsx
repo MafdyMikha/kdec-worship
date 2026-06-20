@@ -57,7 +57,10 @@ export default function ServiceDetail() {
     setShowAddPerson(false); setSelectedPerson(''); setSelectedRole(ROLES[0])
   }
 
-  const getSubs = (role) => people.filter(p => p.status==='active' && p.role===role && !service.team.find(t => t.personId===p.id))
+  const getSubs = (role) => people.filter(p => {
+    const roles = (Array.isArray(p.roles) && p.roles.length > 0) ? p.roles : (p.role ? [p.role] : [])
+    return p.status === 'active' && roles.includes(role) && !service.team.find(t => t.personId === p.id)
+  })
 
   const TABS = [
     { key:'setlist',  label: isAr?'قائمة الترانيم':'Setlist', count: service.setlist.length },
@@ -249,7 +252,7 @@ export default function ServiceDetail() {
         <div className="space-y-4">
           <Select label={isAr?'العضو':'Person'} value={selectedPerson} onChange={e=>setSelectedPerson(e.target.value)}>
             <option value="">{isAr?'اختر عضواً...':'Select person...'}</option>
-            {availablePeople.map(p=><option key={p.id} value={p.id}>{p.name} — {p.role}</option>)}
+            {availablePeople.map(p=><option key={p.id} value={p.id}>{p.name} — {((Array.isArray(p.roles) && p.roles.length>0) ? p.roles : (p.role?[p.role]:[])).join(', ')}</option>)}
           </Select>
           <Select label={isAr?'الدور في هذه الخدمة':'Role for this service'} value={selectedRole} onChange={e=>setSelectedRole(e.target.value)}>
             {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
@@ -275,7 +278,7 @@ export default function ServiceDetail() {
               ):subModal.subs.map(p=>(
                 <div key={p.id} className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
                   <Avatar name={p.name} size="sm"/>
-                  <div className="flex-1"><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{p.role}</div></div>
+                  <div className="flex-1"><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{((Array.isArray(p.roles) && p.roles.length>0) ? p.roles : (p.role?[p.role]:[])).join(', ')}</div></div>
                   <button onClick={()=>{addTeamMember(id,p.id,subModal.role);setSubModal(null)}}
                     className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-medium rounded-lg cursor-pointer hover:bg-emerald-600">
                     {t('addAsSub')}

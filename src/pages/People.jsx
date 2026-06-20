@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer } from 'lucide-react'
+import { Plus, Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
@@ -17,10 +17,18 @@ const DAYS_CONFIG = [
   { key:'wed' }, { key:'thu' }, { key:'fri' }, { key:'sat' },
 ]
 
+// A person may have `roles` (array, new) or just `role` (string, legacy) — always normalize to an array
+const getRoles = (person) =>
+  (Array.isArray(person?.roles) && person.roles.length > 0)
+    ? person.roles
+    : (person?.role ? [person.role] : [])
+
 // ── Person Card ─────────────────────────────────────────────
 function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
-  const phone    = person.whatsapp || person.phone
+  const phone     = person.whatsapp || person.phone
   const availDays = DAYS_CONFIG.filter(d => person.availability?.[d.key])
+  const roles     = getRoles(person)
+
   return (
     <Card className="p-4 group hover:shadow-md transition-all">
       <div className="flex items-start gap-3 mb-3">
@@ -40,7 +48,14 @@ function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
           </div>
         )}
       </div>
-      <Badge color={ROLE_COLOR[person.role] || 'slate'} size="sm">{person.role || '—'}</Badge>
+
+      {/* Multiple role badges */}
+      <div className="flex flex-wrap gap-1">
+        {roles.length > 0
+          ? roles.map(r => <Badge key={r} color={ROLE_COLOR[r] || 'slate'} size="sm">{r}</Badge>)
+          : <Badge color="slate" size="sm">—</Badge>}
+      </div>
+
       <div className="mt-3 space-y-1">
         {person.email && <div className="flex items-center gap-2 text-xs text-slate-500"><Mail size={11}/><span className="truncate">{person.email}</span></div>}
         {phone && <div className="flex items-center gap-2 text-xs text-slate-500" dir="ltr"><Phone size={11}/>{phone}</div>}
@@ -56,11 +71,11 @@ function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
   )
 }
 
-// ── Role Group View ─────────────────────────────────────────
+// ── Role Group View — a person appears under EVERY role they hold ──
 function ByRoleView({ people, isAdmin, onEdit, onDelete, t, isAr, ROLES }) {
   const grouped = useMemo(() => {
     const map = {}
-    ROLES.forEach(r => { map[r] = people.filter(p => p.role === r) })
+    ROLES.forEach(r => { map[r] = people.filter(p => getRoles(p).includes(r)) })
     return map
   }, [people, ROLES])
 
@@ -131,7 +146,12 @@ function RosterView({ people, t, isAr }) {
                       <span className="font-medium text-slate-800" dir="ltr">{p.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3"><Badge color={ROLE_COLOR[p.role] || 'slate'} size="xs">{p.role || '—'}</Badge></td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {getRoles(p).map(r => <Badge key={r} color={ROLE_COLOR[r] || 'slate'} size="xs">{r}</Badge>)}
+                      {getRoles(p).length === 0 && '—'}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-slate-500 text-xs">{POSITION_LABEL[p.position] || p.position || '—'}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs" dir="ltr">{p.whatsapp || p.phone || '—'}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs truncate max-w-[150px]">{p.email || '—'}</td>
@@ -191,6 +211,43 @@ function AvailabilityView({ people, t, isAr }) {
   )
 }
 
+// ── Multi-select role picker (pill grid, same pattern as availability days) ──
+function RolesPicker({ selected, onChange, ROLES, t, isAr }) {
+  const toggle = (role) => {
+    const has = selected.includes(role)
+    onChange(has ? selected.filter(r => r !== role) : [...selected, role])
+  }
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-2">
+        {isAr ? 'الأدوار' : 'Roles'} <span className="text-red-500">*</span>
+        <span className="text-xs text-slate-400 font-normal ms-1.5">
+          ({isAr ? 'يمكن اختيار أكثر من دور' : 'select one or more'})
+        </span>
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {ROLES.map(role => {
+          const on = selected.includes(role)
+          return (
+            <button key={role} type="button" onClick={() => toggle(role)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-all select-none ${
+                on
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50'
+              }`}>
+              {on && <Check size={11}/>}
+              {role}
+            </button>
+          )
+        })}
+      </div>
+      {selected.length === 0 && (
+        <p className="text-xs text-amber-500 mt-1.5">{isAr ? 'اختر دوراً واحداً على الأقل' : 'Select at least one role'}</p>
+      )}
+    </div>
+  )
+}
+
 // ── Edit Form ───────────────────────────────────────────────
 function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
   const POSITION_LABEL = {
@@ -228,15 +285,13 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
             className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:border-slate-300"/>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <Select label={t('role')} value={value.role || ''} onChange={e => onChange({ ...value, role: e.target.value })}>
-          <option value="">{isAr ? 'اختر الدور...' : 'Select role...'}</option>
-          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-        </Select>
-        <Select label={t('position')} value={value.position || 'Member'} onChange={e => onChange({ ...value, position: e.target.value })}>
-          {POSITIONS.map(p => <option key={p} value={p}>{POSITION_LABEL[p] || p}</option>)}
-        </Select>
-      </div>
+
+      {/* Multi-select roles */}
+      <RolesPicker selected={value.roles || []} onChange={roles => onChange({ ...value, roles })} ROLES={ROLES} t={t} isAr={isAr}/>
+
+      <Select label={t('position')} value={value.position || 'Member'} onChange={e => onChange({ ...value, position: e.target.value })}>
+        {POSITIONS.map(p => <option key={p} value={p}>{POSITION_LABEL[p] || p}</option>)}
+      </Select>
       <Select label={t('active')} value={value.status || 'active'} onChange={e => onChange({ ...value, status: e.target.value })}>
         <option value="active">{t('active')}</option>
         <option value="inactive">{t('inactive')}</option>
@@ -263,7 +318,7 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
 }
 
 // ── Main Page ───────────────────────────────────────────────
-const blank = { name:'', email:'', phone:'', whatsapp:'', role:'', position:'Member', status:'active', notes:'', availability:{} }
+const blank = { name:'', email:'', phone:'', whatsapp:'', roles:[], position:'Member', status:'active', notes:'', availability:{} }
 
 export default function People() {
   const { people, updatePerson, deletePerson, currentUser, ROLES, POSITIONS } = useStore()
@@ -284,8 +339,9 @@ export default function People() {
   const allFiltered = useMemo(() => {
     const q = search.toLowerCase()
     return people.filter(p => {
-      const matchQ      = !q || p.name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q) || p.role?.toLowerCase().includes(q)
-      const matchRole   = filterRole === 'all' || p.role === filterRole
+      const roles       = getRoles(p)
+      const matchQ      = !q || p.name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q) || roles.some(r => r.toLowerCase().includes(q))
+      const matchRole   = filterRole === 'all' || roles.includes(filterRole)
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
       return matchQ && matchRole && matchStatus
     }).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en'))
@@ -294,10 +350,11 @@ export default function People() {
   const activeCount   = people.filter(p => p.status === 'active').length
   const inactiveCount = people.filter(p => p.status === 'inactive').length
 
-  const openEdit = (p) => { setEditing(p.id); setForm({ ...p }); setShowForm(true) }
+  const openEdit = (p) => { setEditing(p.id); setForm({ ...p, roles: getRoles(p) }); setShowForm(true) }
 
   const handleSave = () => {
     if (!form.name || !editing) return
+    if (!form.roles || form.roles.length === 0) return
     updatePerson(editing, form)
     setShowForm(false); setEditing(null); setForm(blank)
   }
@@ -411,7 +468,7 @@ export default function People() {
         title={t('edit')} size="lg"
         footer={<>
           <Btn variant="secondary" onClick={() => setShowForm(false)}>{t('cancel')}</Btn>
-          <Btn onClick={handleSave}>{t('saveChanges')}</Btn>
+          <Btn onClick={handleSave} disabled={!form.roles || form.roles.length === 0}>{t('saveChanges')}</Btn>
         </>}>
         <EditForm value={form} onChange={setForm} ROLES={ROLES} POSITIONS={POSITIONS} t={t} isAr={isAr}/>
       </Modal>

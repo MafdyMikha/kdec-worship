@@ -100,7 +100,7 @@ export default function Profile() {
             {/* Name always in Latin */}
             <h2 className="font-display font-bold text-xl text-slate-800" dir="ltr">{person.name || currentUser?.name}</h2>
             <p className="text-slate-500 text-sm">
-              {person.role} · {POSITION_LABEL[person.position] || person.position || POSITION_LABEL.Member}
+              {((Array.isArray(person.roles) && person.roles.length>0) ? person.roles : (person.role?[person.role]:[])).join(' · ')} · {POSITION_LABEL[person.position] || person.position || POSITION_LABEL.Member}
             </p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <Badge color={person.status==='active' ? 'green' : 'slate'} size="sm">

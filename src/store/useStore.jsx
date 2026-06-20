@@ -61,21 +61,21 @@ const lastSun  = new Date(today);    lastSun.setDate(today.getDate() - ((today.g
 // ── 14 Team Members ───────────────────────────────────────
 const DEMO_PEOPLE = [
   // ── Admins ──
-  { id:'p1',  name:'مافدي حنا',       nameEn:'Mafdy Hanna',       email:'mafdy@kdec.org',      phone:'+20 100 111 0001', whatsapp:'+20 100 111 0001', role:'Worship Leader',  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'قائد التسبيح الرئيسي',  joinDate:'2020-01-15', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
-  { id:'p2',  name:'كريستين رمزي',   nameEn:'Christine Ramzy',   email:'christine@kdec.org',  phone:'+20 100 111 0002', whatsapp:'+20 100 111 0002', role:'Music Director',  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'مديرة موسيقية',         joinDate:'2019-06-01', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p1',  name:'مافدي حنا',       nameEn:'Mafdy Hanna',       email:'mafdy@kdec.org',      phone:'+20 100 111 0001', whatsapp:'+20 100 111 0001', role:'Worship Leader',roles:['Worship Leader','Pianist/Keys'],  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'قائد التسبيح الرئيسي',  joinDate:'2020-01-15', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p2',  name:'كريستين رمزي',   nameEn:'Christine Ramzy',   email:'christine@kdec.org',  phone:'+20 100 111 0002', whatsapp:'+20 100 111 0002', role:'Music Director',roles:['Music Director','Vocalist'],  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'مديرة موسيقية',         joinDate:'2019-06-01', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
   // ── Members ──
-  { id:'p3',  name:'سارة ميخائيل',   nameEn:'Sarah Mikhail',     email:'sarah@kdec.org',      phone:'+20 100 111 0003', whatsapp:'+20 100 111 0003', role:'Pianist/Keys',    position:'Leader',   status:'active', isAdmin:false, is_admin:false, notes:'بيانو رئيسي، تعزف من سنة ٢٠١٨', joinDate:'2020-03-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p4',  name:'داود سمير',      nameEn:'David Samir',       email:'david@kdec.org',      phone:'+20 100 111 0004', whatsapp:'+20 100 111 0004', role:'Acoustic Guitar', position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'جيتار أكوستيك',         joinDate:'2021-06-01', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p5',  name:'مريم جورج',      nameEn:'Mary George',       email:'mary@kdec.org',       phone:'+20 100 111 0005', whatsapp:'+20 100 111 0005', role:'Vocalist',        position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'ألتو — الصوت الأول',     joinDate:'2021-09-15', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p6',  name:'بطرس نجيب',      nameEn:'Peter Naguib',      email:'peter@kdec.org',      phone:'+20 100 111 0006', whatsapp:'+20 100 111 0006', role:'Bass Guitar',     position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'باس جيتار',              joinDate:'2022-01-20', availability:{sun:false,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p7',  name:'يوحنا فارس',     nameEn:'John Fares',        email:'john@kdec.org',       phone:'+20 100 111 0007', whatsapp:'+20 100 111 0007', role:'Drummer',         position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'طبول',                   joinDate:'2020-11-05', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p8',  name:'ريتا بشارة',     nameEn:'Rita Beshara',      email:'rita@kdec.org',       phone:'+20 100 111 0008', whatsapp:'+20 100 111 0008', role:'Vocalist',        position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'سوبرانو',                joinDate:'2023-02-14', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
-  { id:'p9',  name:'مرقس يوسف',      nameEn:'Mark Youssef',      email:'mark@kdec.org',       phone:'+20 100 111 0009', whatsapp:'+20 100 111 0009', role:'Sound Engineer',  position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'مهندس الصوت',            joinDate:'2021-04-22', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p10', name:'ناديا فريد',     nameEn:'Nadia Farid',       email:'nadia@kdec.org',      phone:'+20 100 111 0010', whatsapp:'+20 100 111 0010', role:'Projection',      position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'عرض وبروجكتر',           joinDate:'2023-07-01', availability:{sun:true,wed:false,fri:false,mon:false,tue:false,thu:false,sat:false},timeSlots:[], tags:[] },
-  { id:'p11', name:'هاني أسعد',      nameEn:'Hany Asaad',        email:'hany@kdec.org',       phone:'+20 100 111 0011', whatsapp:'+20 100 111 0011', role:'Electric Guitar', position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'جيتار كهربائي',          joinDate:'2022-08-10', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
-  { id:'p12', name:'مينا أنطون',     nameEn:'Mina Anton',        email:'mina@kdec.org',       phone:'+20 100 111 0012', whatsapp:'+20 100 111 0012', role:'Vocalist',        position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'تينور',                  joinDate:'2022-05-01', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p13', name:'فيفي وليم',      nameEn:'Fifi William',      email:'fifi@kdec.org',       phone:'+20 100 111 0013', whatsapp:'+20 100 111 0013', role:'Pianist/Keys',    position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'بيانو احتياطي',          joinDate:'2024-01-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
-  { id:'p14', name:'بولس شحاتة',    nameEn:'Boles Shehata',     email:'boles@kdec.org',      phone:'+20 100 111 0014', whatsapp:'+20 100 111 0014', role:'Camera',          position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'مصور',                   joinDate:'2024-03-15', availability:{sun:true,wed:false,fri:false,mon:false,tue:false,thu:false,sat:false},timeSlots:[], tags:[] },
+  { id:'p3',  name:'سارة ميخائيل',   nameEn:'Sarah Mikhail',     email:'sarah@kdec.org',      phone:'+20 100 111 0003', whatsapp:'+20 100 111 0003', role:'Pianist/Keys',roles:['Pianist/Keys'],    position:'Leader',   status:'active', isAdmin:false, is_admin:false, notes:'بيانو رئيسي، تعزف من سنة ٢٠١٨', joinDate:'2020-03-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p4',  name:'داود سمير',      nameEn:'David Samir',       email:'david@kdec.org',      phone:'+20 100 111 0004', whatsapp:'+20 100 111 0004', role:'Acoustic Guitar',roles:['Acoustic Guitar'], position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'جيتار أكوستيك',         joinDate:'2021-06-01', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p5',  name:'مريم جورج',      nameEn:'Mary George',       email:'mary@kdec.org',       phone:'+20 100 111 0005', whatsapp:'+20 100 111 0005', role:'Vocalist',roles:['Vocalist'],        position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'ألتو — الصوت الأول',     joinDate:'2021-09-15', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p6',  name:'بطرس نجيب',      nameEn:'Peter Naguib',      email:'peter@kdec.org',      phone:'+20 100 111 0006', whatsapp:'+20 100 111 0006', role:'Bass Guitar',roles:['Bass Guitar'],     position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'باس جيتار',              joinDate:'2022-01-20', availability:{sun:false,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p7',  name:'يوحنا فارس',     nameEn:'John Fares',        email:'john@kdec.org',       phone:'+20 100 111 0007', whatsapp:'+20 100 111 0007', role:'Drummer',roles:['Drummer'],         position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'طبول',                   joinDate:'2020-11-05', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p8',  name:'ريتا بشارة',     nameEn:'Rita Beshara',      email:'rita@kdec.org',       phone:'+20 100 111 0008', whatsapp:'+20 100 111 0008', role:'Vocalist',roles:['Vocalist'],        position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'سوبرانو',                joinDate:'2023-02-14', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p9',  name:'مرقس يوسف',      nameEn:'Mark Youssef',      email:'mark@kdec.org',       phone:'+20 100 111 0009', whatsapp:'+20 100 111 0009', role:'Sound Engineer',roles:['Sound Engineer','Projection'],  position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'مهندس الصوت',            joinDate:'2021-04-22', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p10', name:'ناديا فريد',     nameEn:'Nadia Farid',       email:'nadia@kdec.org',      phone:'+20 100 111 0010', whatsapp:'+20 100 111 0010', role:'Projection',roles:['Projection'],      position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'عرض وبروجكتر',           joinDate:'2023-07-01', availability:{sun:true,wed:false,fri:false,mon:false,tue:false,thu:false,sat:false},timeSlots:[], tags:[] },
+  { id:'p11', name:'هاني أسعد',      nameEn:'Hany Asaad',        email:'hany@kdec.org',       phone:'+20 100 111 0011', whatsapp:'+20 100 111 0011', role:'Electric Guitar',roles:['Electric Guitar'], position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'جيتار كهربائي',          joinDate:'2022-08-10', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p12', name:'مينا أنطون',     nameEn:'Mina Anton',        email:'mina@kdec.org',       phone:'+20 100 111 0012', whatsapp:'+20 100 111 0012', role:'Vocalist',roles:['Vocalist','Drummer'],        position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'تينور',                  joinDate:'2022-05-01', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p13', name:'فيفي وليم',      nameEn:'Fifi William',      email:'fifi@kdec.org',       phone:'+20 100 111 0013', whatsapp:'+20 100 111 0013', role:'Pianist/Keys',roles:['Pianist/Keys'],    position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'بيانو احتياطي',          joinDate:'2024-01-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p14', name:'بولس شحاتة',    nameEn:'Boles Shehata',     email:'boles@kdec.org',      phone:'+20 100 111 0014', whatsapp:'+20 100 111 0014', role:'Camera',roles:['Camera','Projection'],          position:'Volunteer',status:'active', isAdmin:false, is_admin:false, notes:'مصور',                   joinDate:'2024-03-15', availability:{sun:true,wed:false,fri:false,mon:false,tue:false,thu:false,sat:false},timeSlots:[], tags:[] },
 ]
 
 // ── 16 Songs — Arabic primary ─────────────────────────────
@@ -369,7 +369,7 @@ export function AppProvider({ children }) {
     loadAll()
   }
 
-  const normalizeProfile = (p) => ({ ...p, isAdmin: p.is_admin, joinDate: p.join_date, timeSlots: p.time_slots || [], tags: p.tags || [], availability: p.availability || {} })
+  const normalizeProfile = (p) => ({ ...p, isAdmin: p.is_admin, joinDate: p.join_date, timeSlots: p.time_slots || [], tags: p.tags || [], availability: p.availability || {}, roles: (p.roles && p.roles.length > 0) ? p.roles : (p.role ? [p.role] : []) })
   const normalizeSong    = (s) => ({ ...s, titleAr: s.title_ar||'', timeSignature: s.time_signature, ccliNumber: s.ccli_number||'', usageCount: s.usage_count||0, lastUsed: s.last_used, arrangements: s.arrangements||[], sequence: s.sequence||[], themes: s.themes||[] })
   const normalizeService = (s) => ({
     ...s,
@@ -472,15 +472,17 @@ export function AppProvider({ children }) {
       .update({ status: 'accepted', accepted_at: new Date().toISOString() })
       .eq('code', inviteCode)
 
-    // Update profile role if profile already exists
+    // Update profile role(s) if profile already exists
     if (data?.user?.id) {
+      const rolesArr = Array.isArray(inv.roles) && inv.roles.length > 0 ? inv.roles : (inv.role ? [inv.role] : [])
       await supabase
         .from('profiles')
         .upsert({
           id: data.user.id,
           name: name || email.split('@')[0],
           email,
-          role: inv.role || 'Member',
+          role: rolesArr[0] || 'Member',
+          roles: rolesArr.length > 0 ? rolesArr : ['Member'],
           status: 'active',
           is_admin: false,
         })
@@ -530,13 +532,15 @@ export function AppProvider({ children }) {
   }
 
   // ── INVITATIONS ─────────────────────────────────────────
-  const createInvitation = async (email, role, method) => {
+  const createInvitation = async (email, roles, method) => {
     const code = Math.random().toString(36).slice(2,10).toUpperCase()
+    const rolesArr = Array.isArray(roles) ? roles : [roles]
+    const primaryRole = rolesArr[0] || ''
     if (isDemoMode) {
-      const inv = { id:'inv_'+Date.now(), code, email, role, method, status:'pending', created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString(), created_at: new Date().toISOString() }
+      const inv = { id:'inv_'+Date.now(), code, email, role:primaryRole, roles:rolesArr, method, status:'pending', created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString(), created_at: new Date().toISOString() }
       setInvitations(prev => [inv, ...prev]); toast(`Invitation created for ${email}`); return inv
     }
-    const { data, error } = await supabase.from('invitations').insert({ code, email, role, method, created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString() }).select().single()
+    const { data, error } = await supabase.from('invitations').insert({ code, email, role:primaryRole, roles:rolesArr, method, created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString() }).select().single()
     if (!error) { setInvitations(prev => [data,...prev]); toast(`Invitation created for ${email}`); return data }
     toast('Failed to create invitation','error'); return null
   }
@@ -551,7 +555,14 @@ export function AppProvider({ children }) {
   // ── PEOPLE ──────────────────────────────────────────────
   const addPerson    = async ()      => toast('Invite members via the Invitations page','info')
   const updatePerson = async (id, data) => {
-    const updates = { name:data.name, phone:data.phone, whatsapp:data.whatsapp, role:data.role, position:data.position, status:data.status, notes:data.notes, availability:data.availability, isAdmin:data.position==='Admin', is_admin:data.position==='Admin' }
+    const rolesArr = Array.isArray(data.roles) && data.roles.length > 0 ? data.roles : (data.role ? [data.role] : [])
+    const updates = {
+      name: data.name, phone: data.phone, whatsapp: data.whatsapp,
+      role: rolesArr[0] || '',   // primary role kept for backward-compat badges/filters
+      roles: rolesArr,           // full set of roles/capabilities
+      position: data.position, status: data.status, notes: data.notes,
+      availability: data.availability, isAdmin: data.position === 'Admin', is_admin: data.position === 'Admin',
+    }
     if (isDemoMode) { setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated'); return }
     await supabase.from('profiles').update({ ...updates, is_admin:updates.isAdmin }).eq('id',id)
     setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated')

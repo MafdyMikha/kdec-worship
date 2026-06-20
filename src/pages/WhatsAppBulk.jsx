@@ -89,7 +89,10 @@ export default function WhatsAppBulk() {
       return activeMembers.filter(p => ids.has(p.id))
     }
     if (filterMode === 'role' && selectedRoles.size > 0) {
-      return activeMembers.filter(p => selectedRoles.has(p.role))
+      return activeMembers.filter(p => {
+        const roles = (Array.isArray(p.roles) && p.roles.length > 0) ? p.roles : (p.role ? [p.role] : [])
+        return roles.some(r => selectedRoles.has(r))
+      })
     }
     return activeMembers
   }, [filterMode, selectedSvc, selectedRoles, activeMembers])
@@ -228,7 +231,7 @@ export default function WhatsAppBulk() {
                     <input type="checkbox" className="sr-only" checked={selectedRoles.has(role)} onChange={() => toggleRole(role)}/>
                     <Badge color={ROLE_COLOR[role] || 'slate'} size="xs">{role}</Badge>
                     <span className="text-xs text-slate-400 ml-auto">
-                      {activeMembers.filter(p => p.role === role).length}
+                      {activeMembers.filter(p => ((Array.isArray(p.roles) && p.roles.length > 0) ? p.roles : (p.role ? [p.role] : [])).includes(role)).length}
                     </span>
                   </label>
                 ))}
@@ -388,7 +391,9 @@ export default function WhatsAppBulk() {
                       {/* Name always in English (Latin) */}
                       <div className="font-semibold text-slate-800 text-sm truncate" dir="ltr">{person.name}</div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <Badge color={ROLE_COLOR[person.role] || 'slate'} size="xs">{person.role}</Badge>
+                        {((Array.isArray(person.roles) && person.roles.length > 0) ? person.roles : (person.role ? [person.role] : [])).map(r => (
+                          <Badge key={r} color={ROLE_COLOR[r] || 'slate'} size="xs">{r}</Badge>
+                        ))}
                         {phone && (
                           <span className="text-xs text-slate-400" dir="ltr">{phone}</span>
                         )}

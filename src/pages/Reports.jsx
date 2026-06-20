@@ -37,7 +37,10 @@ export default function Reports() {
   const subRate      = totalAsgn > 0 ? Math.round((declined  / totalAsgn) * 100) : 0
 
   const roleCounts = {}
-  people.forEach(p => { if (p.role) roleCounts[p.role] = (roleCounts[p.role]||0) + 1 })
+  people.forEach(p => {
+    const roles = (Array.isArray(p.roles) && p.roles.length > 0) ? p.roles : (p.role ? [p.role] : [])
+    roles.forEach(r => { roleCounts[r] = (roleCounts[r]||0) + 1 })
+  })
   const roles   = Object.entries(roleCounts).sort((a,b) => b[1] - a[1]).slice(0, 8)
   const maxRole = roles[0]?.[1] || 1
 

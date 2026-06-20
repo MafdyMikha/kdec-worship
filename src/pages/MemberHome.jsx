@@ -41,7 +41,10 @@ function ExcuseModal({ open, onClose, onSubmit, serviceName, isAr }) {
 
 function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
   const [note, setNote] = useState('')
-  const subs = people.filter(p=>p.status==='active'&&p.role===myRole&&!service?.team.find(t=>t.personId===p.id))
+  const subs = people.filter(p => {
+    const roles = (Array.isArray(p.roles) && p.roles.length > 0) ? p.roles : (p.role ? [p.role] : [])
+    return p.status === 'active' && roles.includes(myRole) && !service?.team.find(t => t.personId === p.id)
+  })
   return (
     <Modal open={open} onClose={onClose} title={isAr?'طلب بديل':'Request Substitute'} size="md"
       footer={<><Btn variant="secondary" onClick={onClose}>{isAr?'إلغاء':'Cancel'}</Btn><Btn onClick={()=>{onSubmit(note);onClose()}}>{isAr?'إرسال الطلب':'Send Request'}</Btn></>}>
@@ -63,7 +66,7 @@ function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
                 <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold">
                   {p.name.split(' ').map(w=>w[0]).join('').slice(0,2)}
                 </div>
-                <div><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{p.role}</div></div>
+                <div><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{((Array.isArray(p.roles) && p.roles.length>0) ? p.roles : (p.role?[p.role]:[])).join(', ')}</div></div>
               </div>
             ))}
           </div>
@@ -116,7 +119,7 @@ export default function MemberHome() {
           <h2 className="font-display text-2xl font-bold mb-1">
             {isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0]}! 🎵` : `Welcome, ${currentUser?.name?.split(' ')[0]}! 🎵`}
           </h2>
-          <p className="text-white/80 text-sm">{currentUser?.role}</p>
+          <p className="text-white/80 text-sm">{((Array.isArray(currentUser?.roles) && currentUser.roles.length>0) ? currentUser.roles : (currentUser?.role?[currentUser.role]:[])).join(' · ')}</p>
           {nextSvc && (
             <div className="mt-4 flex items-center gap-2">
               <TimeUntil dateStr={nextSvc.date} timeStr={nextSvc.time} isAr={isAr}/>

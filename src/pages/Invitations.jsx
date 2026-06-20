@@ -14,7 +14,7 @@ export default function Invitations() {
   const { isAr, t } = useLang()
   const { invitations, createInvitation, cancelInvitation, currentUser, ROLES } = useStore()
   const [showAdd, setShowAdd] = useState(false)
-  const [form,    setForm]    = useState({ email:'', role:'Vocalist', method:'whatsapp', phone:'' })
+  const [form,    setForm]    = useState({ email:'', roles:['Vocalist'], method:'whatsapp', phone:'' })
   const [created, setCreated] = useState(null)
   const [copied,  setCopied]  = useState(null)
 
@@ -28,9 +28,9 @@ export default function Invitations() {
   )
 
   const handleCreate = async () => {
-    if (!form.email) return
-    const inv = await createInvitation(form.email, form.role, form.method)
-    if (inv) { setCreated({...inv, phone:form.phone}); setShowAdd(false); setForm({email:'',role:'Vocalist',method:'whatsapp',phone:''}) }
+    if (!form.email || !form.roles || form.roles.length === 0) return
+    const inv = await createInvitation(form.email, form.roles, form.method)
+    if (inv) { setCreated({...inv, phone:form.phone}); setShowAdd(false); setForm({email:'',roles:['Vocalist'],method:'whatsapp',phone:''}) }
   }
 
   const getInviteUrl = (code) => `${window.location.origin}?invite=${code}`
@@ -121,7 +121,7 @@ export default function Invitations() {
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-slate-800 text-sm">{inv.email}</div>
                   <div className="text-xs text-slate-400 mt-0.5">
-                    {inv.role} · {isAr?'تنتهي':'expires'} {inv.expires_at?.slice(0,10)}
+                    {(Array.isArray(inv.roles) && inv.roles.length > 0 ? inv.roles : [inv.role]).filter(Boolean).join(' · ')} · {isAr?'تنتهي':'expires'} {inv.expires_at?.slice(0,10)}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -149,7 +149,7 @@ export default function Invitations() {
               <div className="flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-slate-700 text-sm">{inv.email}</div>
-                  <div className="text-xs text-slate-400">{inv.role} · {inv.created_at?.slice(0,10)}</div>
+                  <div className="text-xs text-slate-400">{(Array.isArray(inv.roles) && inv.roles.length > 0 ? inv.roles : [inv.role]).filter(Boolean).join(' · ')} · {inv.created_at?.slice(0,10)}</div>
                 </div>
                 <Badge color={STATUS_COLOR[inv.status]||'slate'} size="xs">{STATUS_LABEL[inv.status]||inv.status}</Badge>
               </div>
@@ -163,14 +163,39 @@ export default function Invitations() {
         title={isAr?'إرسال دعوة جديدة':'Send New Invitation'} size="sm"
         footer={<>
           <Btn variant="secondary" onClick={()=>setShowAdd(false)}>{t('cancel')}</Btn>
-          <Btn onClick={handleCreate} disabled={!form.email}>{isAr?'إنشاء الدعوة':'Create Invitation'}</Btn>
+          <Btn onClick={handleCreate} disabled={!form.email || form.roles.length === 0}>{isAr?'إنشاء الدعوة':'Create Invitation'}</Btn>
         </>}>
         <div className="space-y-4">
           <Input label={t('email')} required type="email" placeholder="member@email.com"
             value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>
-          <Select label={t('role')} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))}>
-            {ROLES.map(r=><option key={r}>{r}</option>)}
-          </Select>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              {isAr ? 'الأدوار' : 'Roles'} <span className="text-red-500">*</span>
+              <span className="text-xs text-slate-400 font-normal ms-1.5">
+                ({isAr ? 'يمكن اختيار أكثر من دور' : 'select one or more'})
+              </span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {ROLES.map(role => {
+                const on = form.roles.includes(role)
+                return (
+                  <button key={role} type="button"
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      roles: f.roles.includes(role) ? f.roles.filter(r => r !== role) : [...f.roles, role]
+                    }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-all select-none ${
+                      on ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50'
+                    }`}>
+                    {role}
+                  </button>
+                )
+              })}
+            </div>
+            {form.roles.length === 0 && (
+              <p className="text-xs text-amber-500 mt-1.5">{isAr ? 'اختر دوراً واحداً على الأقل' : 'Select at least one role'}</p>
+            )}
+          </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               {isAr?'طريقة الإرسال':'Send via'}

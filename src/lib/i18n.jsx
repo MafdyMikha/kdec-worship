@@ -60,8 +60,6 @@ export const T = {
   email:            { ar:'البريد الإلكتروني',     en:'Email'                  },
   password:         { ar:'كلمة المرور',           en:'Password'               },
   name:             { ar:'الاسم',                  en:'Name'                  },
-  demoMode:         { ar:'وضع تجريبي',             en:'Demo Mode'             },
-  anyPassword:      { ar:'أي كلمة مرور تعمل في الوضع التجريبي', en:'Any password works in demo mode' },
 
   // ── Dashboard ────────────────────────────────────────────
   welcomeBack:      { ar:'أهلاً بك 👋',           en:'Welcome back 👋'        },

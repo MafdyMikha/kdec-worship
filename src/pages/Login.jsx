@@ -1,22 +1,11 @@
 import { useState } from 'react'
-import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle, CheckCircle, Info, Zap, ArrowLeft, KeyRound } from 'lucide-react'
+import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle, CheckCircle, ArrowLeft, KeyRound } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { KDEC_LOGO } from '../assets/kdecLogo.js'
 
-const DEMO_ACCOUNTS = [
-  { email:'mafdy@kdec.org',     label:'Mafdy Hanna',    role:'Worship Leader · Admin', color:'bg-indigo-600', isAdmin:true  },
-  { email:'christine@kdec.org', label:'Christine Ramzy', role:'Music Director · Admin', color:'bg-violet-600', isAdmin:true  },
-  { email:'sarah@kdec.org',     label:'Sarah Mikhail',   role:'Pianist/Keys',           color:'bg-sky-500',    isAdmin:false },
-  { email:'peter@kdec.org',     label:'Peter Naguib',    role:'Bass Guitar',            color:'bg-teal-500',   isAdmin:false },
-  { email:'john@kdec.org',      label:'John Fares',      role:'Drummer',                color:'bg-orange-500', isAdmin:false },
-  { email:'mary@kdec.org',      label:'Mary George',     role:'Vocalist',               color:'bg-pink-500',   isAdmin:false },
-  { email:'mark@kdec.org',      label:'Mark Youssef',    role:'Sound Engineer',         color:'bg-slate-500',  isAdmin:false },
-  { email:'rita@kdec.org',      label:'Rita Beshara',    role:'Vocalist',               color:'bg-rose-500',   isAdmin:false },
-]
-
 export default function Login({ inviteCode }) {
-  const { login, registerWithInvite, forgotPassword, isDemoMode } = useStore()
+  const { login, registerWithInvite, forgotPassword } = useStore()
   const { lang, setLang, isAr } = useLang()
 
   // mode: 'login' | 'register' | 'forgot' | 'forgot-sent'
@@ -36,19 +25,12 @@ export default function Login({ inviteCode }) {
     if (result?.error) setError(result.error)
   }
 
-  const handleQuickLogin = async (email) => {
-    setLoading(true); setError('')
-    const result = await login(email, 'demo')
-    setLoading(false)
-    if (result?.error) setError(result.error)
-  }
-
   // ── Register ─────────────────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault(); setError('')
-    if (!form.name.trim())                           { setError('Please enter your full name'); return }
-    if (form.password.length < 6)                   { setError('Password must be at least 6 characters'); return }
-    if (form.password !== form.confirmPassword)     { setError('Passwords do not match'); return }
+    if (!form.name.trim())                       { setError('Please enter your full name'); return }
+    if (form.password.length < 6)               { setError('Password must be at least 6 characters'); return }
+    if (form.password !== form.confirmPassword) { setError('Passwords do not match'); return }
     setLoading(true)
     const result = await registerWithInvite(inviteCode, form.email, form.password, form.name)
     setLoading(false)
@@ -98,58 +80,6 @@ export default function Login({ inviteCode }) {
 
           <div className="px-8 py-6 space-y-5">
 
-            {/* ── DEMO MODE BANNER ── */}
-            {isDemoMode && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap size={15} className="text-amber-600 flex-shrink-0"/>
-                  <span className="text-sm font-semibold text-amber-800">
-                    {isAr ? 'وضع تجريبي' : 'Demo Mode'}
-                  </span>
-                  <span className="ms-auto text-xs text-amber-500">
-                    {isAr ? 'أي كلمة مرور تعمل' : 'any password works'}
-                  </span>
-                </div>
-                <p className="text-xs text-amber-700 mb-3">
-                  {isAr ? 'اضغط على أي حساب لتسجيل الدخول فوراً' : 'Tap any account to log in instantly'}
-                </p>
-                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-1.5">
-                  {isAr ? '🔑 مسؤولون' : '🔑 Admins'}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5 mb-3">
-                  {DEMO_ACCOUNTS.filter(a => a.isAdmin).map(acc => (
-                    <button key={acc.email} onClick={() => handleQuickLogin(acc.email)} disabled={loading}
-                      className="flex items-center gap-2 p-2.5 bg-white border border-amber-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer transition-all text-left">
-                      <div className={`w-8 h-8 ${acc.color} rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                        {acc.label.split(' ').map(w=>w[0]).join('').slice(0,2)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-800 truncate">{acc.label}</div>
-                        <div className="text-xs text-slate-400 truncate">{acc.role}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-1.5">
-                  {isAr ? '🎵 أعضاء الفريق' : '🎵 Team Members'}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {DEMO_ACCOUNTS.filter(a => !a.isAdmin).map(acc => (
-                    <button key={acc.email} onClick={() => handleQuickLogin(acc.email)} disabled={loading}
-                      className="flex items-center gap-2 p-2 bg-white border border-amber-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 cursor-pointer transition-all text-left">
-                      <div className={`w-7 h-7 ${acc.color} rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
-                        {acc.label.split(' ').map(w=>w[0]).join('').slice(0,2)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-slate-700 truncate">{acc.label.split(' ')[0]}</div>
-                        <div className="text-xs text-slate-400 truncate">{acc.role}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Invite banner */}
             {inviteCode && mode === 'register' && (
               <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
@@ -189,21 +119,17 @@ export default function Login({ inviteCode }) {
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-sm font-medium text-slate-700">
                       {isAr ? 'كلمة المرور' : 'Password'}
-                      {isDemoMode && <span className="text-slate-400 font-normal ms-1">({isAr ? 'أي كلمة مرور' : 'any password'})</span>}
                     </label>
-                    {/* Forgot password link */}
-                    {!isDemoMode && (
-                      <button type="button" onClick={() => { setMode('forgot'); setError('') }}
-                        className="text-xs text-indigo-600 hover:underline cursor-pointer font-medium">
-                        {isAr ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
-                      </button>
-                    )}
+                    <button type="button" onClick={() => { setMode('forgot'); setError('') }}
+                      className="text-xs text-indigo-600 hover:underline cursor-pointer font-medium">
+                      {isAr ? 'نسيت كلمة المرور؟' : 'Forgot password?'}
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
                     <input type={showPass ? 'text' : 'password'} value={form.password}
                       onChange={e => set('password', e.target.value)}
-                      placeholder="••••••••" required={!isDemoMode}
+                      placeholder="••••••••" required
                       className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
                     <button type="button" onClick={() => setShowPass(!showPass)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer">
@@ -352,7 +278,7 @@ export default function Login({ inviteCode }) {
             )}
 
             <p className="text-center text-xs text-slate-400 pb-2">
-              {isDemoMode ? (isAr ? 'وضع تجريبي — البيانات محفوظة في المتصفح' : 'Demo mode — data saved in browser') : (isAr ? 'الوصول بالدعوة فقط' : 'Access by invitation only')}
+              {isAr ? 'الوصول بالدعوة فقط' : 'Access by invitation only'}
             </p>
           </div>
         </div>

@@ -156,17 +156,6 @@ export default function Settings() {
             ))}
           </div>
           <Btn variant="secondary" onClick={handleExport} icon={<Download size={14}/>}>{t('exportBackup')}</Btn>
-          <Btn variant="secondary" onClick={() => {
-            if (!confirm(isAr ? 'سيتم إعادة تعيين جميع البيانات إلى البيانات التجريبية الأصلية. هل أنت متأكد؟' : 'This will reset all data to the original demo data. Are you sure?')) return
-            localStorage.removeItem('kdec_people')
-            localStorage.removeItem('kdec_songs')
-            localStorage.removeItem('kdec_services')
-            localStorage.removeItem('kdec_announcements')
-            localStorage.removeItem('kdec_demo_user')
-            window.location.reload()
-          }} className="text-amber-600 border-amber-200 hover:bg-amber-50">
-            🔄 {isAr ? 'إعادة تعيين البيانات التجريبية' : 'Reset Demo Data'}
-          </Btn>
           <p className="text-xs text-slate-500">
             {isAr
               ? 'البيانات محفوظة في Supabase PostgreSQL. النسخ اليومية متاحة في الخطة المدفوعة.'
