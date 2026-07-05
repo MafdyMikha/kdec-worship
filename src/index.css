@@ -118,3 +118,70 @@
 .dark .shadow-xl          {box-shadow:0 20px 48px rgba(0,0,0,.55) !important}
 .dark .shadow-lg          {box-shadow:0 8px 24px rgba(0,0,0,.45) !important}
 .dark .shadow-sm          {box-shadow:0 1px 4px rgba(0,0,0,.3) !important}
+
+/* ── Mobile / Phone optimizations ─────────────────────── */
+
+/* Safe area for devices with home indicator (iPhone) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Tap highlight — remove default blue flash on iOS */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Better touch scrolling */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Minimum touch target size — 44px (Apple HIG standard) */
+@media (max-width: 768px) {
+  button, a[role="button"], [role="button"] {
+    min-height: 36px;
+  }
+
+  /* Larger nav tap targets on mobile */
+  nav a, nav button {
+    min-height: 44px;
+  }
+
+  /* Stack grids to single column on small phones */
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Card padding tighter on mobile */
+  .card-base {
+    padding: 1rem !important;
+  }
+
+  /* Tables scroll horizontally */
+  table {
+    font-size: 0.8rem;
+  }
+
+  /* Modals full-width on mobile */
+  .modal-box, [class*="max-w-"] {
+    max-width: calc(100vw - 1.5rem) !important;
+  }
+
+  /* Input font size >= 16px prevents iOS zoom on focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Phone-size breakpoint helpers */
+@media (max-width: 480px) {
+  .grid-cols-2 {
+    grid-template-columns: repeat(1, 1fr);
+  }
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

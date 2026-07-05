@@ -159,7 +159,7 @@ export default function Events() {
                       <div className="bg-amber-400 h-full transition-all" style={{width:`${total>0?(counts.maybe/total)*100:0}%`}}/>
                       <div className="bg-red-400 h-full transition-all" style={{width:`${total>0?(counts.not_attending/total)*100:0}%`}}/>
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
                       {['attending','not_attending','maybe'].map(resp => {
                         const c = RESPONSE_CONFIG[resp]
                         const isSelected = myResp === resp
@@ -205,7 +205,7 @@ export default function Events() {
             </div>
             <Input label={t('englishTitle')} value={form.titleEn} onChange={e=>setForm(f=>({...f,titleEn:e.target.value}))} placeholder="Youth Conference 2026"/>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Input label={t('startDate')} required type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
             <Input label={t('endDate')} type="date" value={form.endDate} onChange={e=>setForm(f=>({...f,endDate:e.target.value}))}/>
             <Input label={t('time')} type="time" value={form.time} onChange={e=>setForm(f=>({...f,time:e.target.value}))}/>

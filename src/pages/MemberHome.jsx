@@ -108,7 +108,7 @@ export default function MemberHome() {
     <div className="space-y-6 max-w-5xl animate-fade-in">
 
       {/* Hero card */}
-      <div className={`rounded-2xl p-6 text-white bg-gradient-to-br ${colors?.bg||'from-indigo-500 to-violet-600'} relative overflow-hidden`}>
+      <div className={`rounded-2xl p-4 md:p-6 text-white bg-gradient-to-br ${colors?.bg||'from-indigo-500 to-violet-600'} relative overflow-hidden`}>
         <div className="absolute inset-0 opacity-10">
           <InstrumentDisplay role={currentUser?.role} animated size="lg"/>
         </div>
@@ -128,9 +128,9 @@ export default function MemberHome() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-2 md:grid-cols-3 gap-6">
         {/* My upcoming services */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="col-span-2 lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-semibold text-slate-800">{isAr?'خدماتي القادمة':'My Upcoming Services'}</h3>
             <button onClick={()=>navigate('/schedule')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer">

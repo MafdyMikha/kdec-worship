@@ -147,7 +147,7 @@ export default function Settings() {
       {/* Data */}
       <Section title={t('dataBackup')} icon={<Database size={18}/>}>
         <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-3 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
             {STATS.map(([l,v])=>(
               <div key={l} className="bg-slate-50 rounded-xl p-3">
                 <div className="text-xl font-display font-bold text-indigo-600">{v}</div>

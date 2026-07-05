@@ -88,7 +88,7 @@ export default function Reports() {
       {tab === 'overview' && (
         <div className="space-y-5">
           {/* Main KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label={t('servicesLabel')}  value={services.length}     icon={<Calendar size={20}/>}   color="blue"/>
             <StatCard label={t('activeMembers')}   value={activePeople.length} icon={<Users size={20}/>}      color="indigo"/>
             <StatCard label={t('songLibrary')}     value={songs.length}        icon={<Music2 size={20}/>}     color="purple"/>
@@ -96,7 +96,7 @@ export default function Reports() {
           </div>
 
           {/* Secondary KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: t('practiceRate'),     value: `${practiceRate}%`, color: 'text-emerald-600' },
               { label: t('practiceStats'),    value: servicesWithPractice.length, color: 'text-violet-600' },
@@ -261,7 +261,7 @@ export default function Reports() {
           </Card>
 
           {/* All members service record */}
-          <Card className="p-5 lg:col-span-2">
+          <Card className="p-5 col-span-2 lg:col-span-2">
             <h3 className="font-display font-semibold text-slate-800 mb-4">{t('serviceHistory')}</h3>
             <div className="space-y-2">
               {svcCountPerPerson.map(({ person, count, confirmed: conf }) => {
@@ -295,7 +295,7 @@ export default function Reports() {
       {tab === 'services' && (
         <div className="space-y-5">
           {/* Big numbers */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-2 md:grid-cols-3 gap-4">
             {[
               { label: isAr?'إجمالي الخدمات':'Total Services',   value: services.length,                                    color:'text-indigo-600' },
               { label: t('completed'),                             value: services.filter(s=>s.status==='completed').length,  color:'text-emerald-600'},
@@ -328,7 +328,7 @@ export default function Reports() {
           {/* Practice stats */}
           <Card className="p-5">
             <h3 className="font-display font-semibold text-slate-800 mb-4">{t('practiceStats')}</h3>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
               {[
                 { label: isAr?'خدمات بها بروفة':'Services with practice', value: servicesWithPractice.length, bg:'bg-emerald-50', color:'text-emerald-600' },
                 { label: isAr?'حضور البروفة':'Practice attendees',         value: practiceAttending,            bg:'bg-indigo-50',  color:'text-indigo-600'  },
@@ -345,7 +345,7 @@ export default function Reports() {
           {/* Setlist stats */}
           <Card className="p-5">
             <h3 className="font-display font-semibold text-slate-800 mb-3">{t('setlistStats')}</h3>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
               {[
                 { label: t('avgSongs'),    value: services.length > 0 ? Math.round(services.reduce((s,svc) => s+(svc.setlist?.length||0),0)/services.length) : 0 },
                 { label: t('totalSlots'),  value: services.reduce((s,svc) => s+(svc.setlist?.length||0), 0) },

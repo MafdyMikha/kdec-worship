@@ -121,7 +121,7 @@ export default function Profile() {
 
       {/* Info tab */}
       {tab==='profile' && (
-        <Card className="p-6 space-y-4">
+        <Card className="p-4 md:p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -166,7 +166,7 @@ export default function Profile() {
 
       {/* Availability tab */}
       {tab==='availability' && (
-        <Card className="p-6 space-y-5">
+        <Card className="p-4 md:p-6 space-y-5">
           <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
             <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600"><Calendar size={18}/></div>
             <div>
@@ -211,7 +211,7 @@ export default function Profile() {
             </div>
             {addingSlot ? (
               <div className="border border-indigo-200 rounded-xl p-3 space-y-2 bg-indigo-50/40">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">{isAr?'اليوم':'Day'}</label>
                     <select value={slotForm.day} onChange={e=>setSlotForm(f=>({...f,day:e.target.value}))}
@@ -252,7 +252,7 @@ export default function Profile() {
 
       {/* Security tab */}
       {tab==='security' && (
-        <Card className="p-6 space-y-4">
+        <Card className="p-4 md:p-6 space-y-4">
           <h3 className="font-semibold text-slate-700">{t('changePassword')}</h3>
           {passError && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-600">{passError}</div>}
           <div className="relative">

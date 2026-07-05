@@ -45,16 +45,16 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label={t('activeMembers')}   value={activePeople}    icon={<Users size={20}/>}       color="indigo"/>
         <StatCard label={t('songLibrary')}      value={songs.length}    icon={<Music2 size={20}/>}      color="purple"/>
         <StatCard label={t('upcomingServices')} value={upcoming.length} icon={<Calendar size={20}/>}    color="blue"/>
         <StatCard label={t('pendingResponses')}      value={pendingTotal}    icon={<AlertCircle size={20}/>} color="amber"/>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 md:grid-cols-3 gap-6">
         {/* Upcoming list */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="col-span-2 lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-semibold text-slate-800">{t('upcomingServices')}</h3>
             <button onClick={() => navigate('/services')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer">

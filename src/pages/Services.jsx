@@ -35,7 +35,7 @@ function RecurrencePicker({ value, onChange, isAr }) {
         <div className="space-y-3 pl-1 animate-slide-up">
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{isAr?'التكرار':'Frequency'}</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {Object.entries(FREQ).map(([k,label]) => (
                 <button key={k} type="button" onClick={() => set({ frequency:k })}
                   className={`py-2.5 text-sm font-medium rounded-xl border cursor-pointer transition-all ${(value?.frequency||'weekly')===k?'bg-indigo-600 text-white border-indigo-600':'border-slate-200 text-slate-600 hover:border-indigo-300'}`}>

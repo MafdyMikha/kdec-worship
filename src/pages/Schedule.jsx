@@ -80,14 +80,14 @@ export default function Schedule() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <button onClick={() => setCurrent(subMonths(current, 1))}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer transition-colors">
+            className="p-3 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer touch-manipulation transition-colors">
             {isAr ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
           </button>
           <h2 className="font-display font-bold text-xl text-slate-800 w-52 text-center">
             {monthLabel}
           </h2>
           <button onClick={() => setCurrent(addMonths(current, 1))}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer transition-colors">
+            className="p-3 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer touch-manipulation transition-colors">
             {isAr ? <ChevronLeft size={18}/> : <ChevronRight size={18}/>}
           </button>
           <button onClick={() => setCurrent(new Date())}
@@ -108,7 +108,7 @@ export default function Schedule() {
 
       {/* ── Month / Calendar view ───────────────────────── */}
       {view === 'month' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
           {/* Weekday headers */}
           <div className="grid grid-cols-7 border-b border-slate-100">
             {WEEKDAYS.map(day => (

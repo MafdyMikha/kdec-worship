@@ -91,7 +91,7 @@ function ByRoleView({ people, isAdmin, onEdit, onDelete, t, isAr, ROLES }) {
               <span className="text-sm text-slate-400">{members.length} {t('membersLabel')}</span>
               <div className="flex-1 h-px bg-slate-100"/>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 md:grid-cols-4 gap-3">
               {members.map(p => (
                 <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} t={t} isAr={isAr}/>
               ))}
@@ -370,7 +370,7 @@ export default function People() {
     <div className="max-w-7xl space-y-5 animate-fade-in">
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
           { label: t('totalMembers'),  value: people.length,        color: 'bg-indigo-50 text-indigo-700'  },
           { label: t('activeMembers'), value: activeCount,           color: 'bg-emerald-50 text-emerald-700'},
@@ -437,7 +437,7 @@ export default function People() {
             <EmptyState icon={<Users size={28}/>} title={t('noPeople')}
               action={isAdmin && <Btn onClick={() => navigate('/invitations')} icon={<UserPlus size={16}/>}>{t('inviteMember')}</Btn>}/>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 md:grid-cols-4 gap-4">
               {allFiltered.map(p => (
                 <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={openEdit} onDelete={setDeleteTarget} t={t} isAr={isAr}/>
               ))}

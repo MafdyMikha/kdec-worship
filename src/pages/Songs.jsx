@@ -37,7 +37,7 @@ function SongForm({ value, onChange, isAr }) {
         <Input label={isAr?'المؤلف':'Author'} placeholder="KDEC Worship" value={value.author||''} onChange={e=>onChange({...value,author:e.target.value})}/>
         <Input label="CCLI" placeholder="4348399" value={value.ccliNumber||''} onChange={e=>onChange({...value,ccliNumber:e.target.value})}/>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Select label={isAr?'الطبقة الأصلية':'Original Key'} value={value.key||'G'} onChange={e=>onChange({...value,key:e.target.value})}>
           {KEYS.map(k=><option key={k} value={k}>{k}</option>)}
         </Select>

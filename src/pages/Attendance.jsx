@@ -61,7 +61,7 @@ function ExcuseLimitEditor({ lateMins, onLateMins, excuseLimit, excusePeriod, on
               <span className="flex-1 text-center font-bold text-slate-800 text-lg">{excuseLimit}</span>
               <button onClick={() => onExcuseLimit(l => Math.min(20,l+1))} className="w-8 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer text-lg font-bold">+</button>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
               {Object.entries(PERIODS).map(([key, label]) => (
                 <button key={key} onClick={() => onExcusePeriod(key)}
                   className={`py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-all ${excusePeriod===key?'bg-indigo-600 text-white border-indigo-600':'border-slate-200 text-slate-600 hover:border-indigo-300'}`}>
@@ -411,7 +411,7 @@ export default function Attendance() {
       {/* Report tab */}
       {tab==='report' && isAdmin && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label={isAr?'إجمالي الجلسات':'Total Sessions'}      value={sessions.length}                      icon={<QrCode size={20}/>}      color="indigo"/>
             <StatCard label={isAr?'إجمالي التسجيلات':'Total Records'}     value={Object.values(records).flat().length} icon={<CheckCircle size={20}/>}  color="green"/>
             <StatCard label={isAr?'جلسات نشطة':'Active Sessions'}          value={activeSessions.length}                icon={<RefreshCw size={20}/>}    color="blue"/>
@@ -533,7 +533,7 @@ export default function Attendance() {
             <label className="block text-sm font-medium text-slate-700 mb-2">
               {t('sessionType')} <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {SESSION_TYPES.map(st => (
                 <button key={st.key} type="button"
                   onClick={() => setCreateForm(f => ({ ...f, label: st.key }))}
@@ -626,7 +626,7 @@ export default function Attendance() {
                 <label className="block text-xs font-medium text-slate-500 mb-2">
                   {isAr ? 'التكرار' : 'Frequency'}
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {[
                     ['daily',    isAr ? 'يومياً'    : 'Daily'    ],
                     ['weekly',   isAr ? 'أسبوعياً'  : 'Weekly'   ],

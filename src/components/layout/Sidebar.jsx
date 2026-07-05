@@ -44,7 +44,7 @@ export default function Sidebar() {
   const nav = isAdmin ? adminNav : memberNav
 
   return (
-    <aside className={`${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 bg-slate-900 flex flex-col transition-all duration-300 relative`}>
+    <aside className={`${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 bg-slate-900 flex-col transition-all duration-300 relative hidden md:flex`}>
       {/* Logo */}
       <div className={`flex items-center gap-3 px-4 py-4 border-b border-slate-800 ${collapsed ? 'justify-center' : ''}`}>
         <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-1 shadow-lg">

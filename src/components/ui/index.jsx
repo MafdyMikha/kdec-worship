@@ -3,20 +3,20 @@ import { useEffect } from 'react'
 
 // Button
 export function Btn({ children, onClick, variant = 'primary', size = 'md', className = '', disabled, type = 'button', icon }) {
-  const base = 'inline-flex items-center gap-2 font-medium rounded-lg cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
+  const base = 'inline-flex items-center gap-2 font-medium rounded-lg cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95'
   const variants = {
-    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm',
+    primary:   'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm',
     secondary: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm',
-    ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-800',
-    danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
-    success: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
-    outline: 'border border-indigo-200 text-indigo-700 hover:bg-indigo-50',
+    ghost:     'text-slate-600 hover:bg-slate-100 hover:text-slate-800',
+    danger:    'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+    success:   'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
+    outline:   'border border-indigo-200 text-indigo-700 hover:bg-indigo-50',
   }
   const sizes = {
-    xs: 'px-2.5 py-1.5 text-xs',
-    sm: 'px-3 py-2 text-sm',
-    md: 'px-4 py-2.5 text-sm',
-    lg: 'px-5 py-3 text-base',
+    xs: 'px-2.5 py-1.5 text-xs min-h-[32px]',
+    sm: 'px-3 py-2 text-sm min-h-[36px]',
+    md: 'px-4 py-2.5 text-sm min-h-[40px]',
+    lg: 'px-5 py-3 text-base min-h-[48px]',
   }
   return (
     <button type={type} onClick={onClick} disabled={disabled}
@@ -72,17 +72,21 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }) {
   const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', full: 'max-w-6xl' }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className={`relative w-full ${sizes[size]} bg-white rounded-2xl shadow-modal animate-scale-in max-h-[90vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
-          <h2 className="text-lg font-display font-semibold text-slate-800">{title}</h2>
+      <div className={`relative w-full ${sizes[size]} bg-white sm:rounded-2xl rounded-t-2xl shadow-modal animate-slide-up sm:animate-scale-in max-h-[92vh] flex flex-col`}>
+        {/* Drag handle — mobile only */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
+          <div className="w-10 h-1 bg-slate-200 rounded-full"/>
+        </div>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex-shrink-0">
+          <h2 className="text-base sm:text-lg font-display font-semibold text-slate-800">{title}</h2>
           <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer">
             <X size={18} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <div className="px-6 py-4 border-t border-slate-100 flex-shrink-0 flex justify-end gap-3">{footer}</div>}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5">{children}</div>
+        {footer && <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-100 flex-shrink-0 flex justify-end gap-2 sm:gap-3">{footer}</div>}
       </div>
     </div>
   )
@@ -129,7 +133,7 @@ export function Textarea({ label, required, error, className = '', ...props }) {
 export function Card({ children, className = '', onClick, hover = false }) {
   return (
     <div onClick={onClick}
-      className={`bg-white rounded-xl border border-slate-200/80 shadow-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer' : ''} transition-all ${className}`}>
+      className={`bg-white rounded-xl border border-slate-200/80 shadow-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer' : ''} transition-all ${className}`}>
       {children}
     </div>
   )
