@@ -1,8 +1,10 @@
 import { X, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useLang } from '../../lib/i18n.jsx'
 
 // Button
-export function Btn({ children, onClick, variant = 'primary', size = 'md', className = '', disabled, type = 'button', icon }) {
+export function Btn({ children, onClick, variant = 'primary', size = 'md', className = '', disabled, type = 'button', icon, ...props }) {
   const base = 'inline-flex items-center gap-2 font-medium rounded-lg cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95'
   const variants = {
     primary:   'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm',
@@ -19,7 +21,7 @@ export function Btn({ children, onClick, variant = 'primary', size = 'md', class
     lg: 'px-5 py-3 text-base min-h-[48px]',
   }
   return (
-    <button type={type} onClick={onClick} disabled={disabled}
+    <button type={type} onClick={onClick} disabled={disabled} {...props}
       className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}>
       {icon && <span className="flex-shrink-0">{icon}</span>}
       {children}
@@ -28,7 +30,7 @@ export function Btn({ children, onClick, variant = 'primary', size = 'md', class
 }
 
 // Badge
-export function Badge({ children, color = 'slate', size = 'sm' }) {
+export function Badge({ children, color = 'slate', size = 'sm', className='' }) {
   const colors = {
     slate: 'bg-slate-100 text-slate-700',
     indigo: 'bg-indigo-100 text-indigo-700',
@@ -41,7 +43,7 @@ export function Badge({ children, color = 'slate', size = 'sm' }) {
     pink: 'bg-pink-100 text-pink-700',
   }
   const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-0.5 text-xs', md: 'px-2.5 py-1 text-sm' }
-  return <span className={`inline-flex items-center font-medium rounded-full ${colors[color]} ${sizes[size]}`}>{children}</span>
+  return <span className={`inline-flex items-center font-medium rounded-full ${colors[color]} ${sizes[size]} ${className}`}>{children}</span>
 }
 
 // Avatar
@@ -55,14 +57,63 @@ export function Avatar({ name, size = 'md', color }) {
 
 // Modal
 export function Modal({ open, onClose, title, children, size = 'md', footer }) {
+  const { t } = useLang()
+  const titleId = useId()
+  const dialogRef = useRef(null)
+
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
-    return () => { document.body.style.overflow = '' }
+    if (!open) return undefined
+    const previousFocus = document.activeElement
+    const appRoot = document.getElementById('root')
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    if (appRoot) {
+      appRoot.inert = true
+      appRoot.setAttribute('aria-hidden', 'true')
+    }
+
+    const dialog = dialogRef.current
+    const firstFocusable = dialog?.querySelector(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    )
+    ;(firstFocusable || dialog)?.focus()
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      if (appRoot) {
+        appRoot.inert = false
+        appRoot.removeAttribute('aria-hidden')
+      }
+      if (previousFocus instanceof HTMLElement) previousFocus.focus()
+    }
   }, [open])
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose?.() }
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose?.()
+        return
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return
+      const focusable = [...dialogRef.current.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+      )].filter(element => element instanceof HTMLElement && element.offsetParent !== null)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialogRef.current.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
     if (open) window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
@@ -71,68 +122,92 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }) {
 
   const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl', full: 'max-w-6xl' }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className={`relative w-full ${sizes[size]} bg-white sm:rounded-2xl rounded-t-2xl shadow-modal animate-slide-up sm:animate-scale-in max-h-[92vh] flex flex-col`}>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`relative w-full ${sizes[size]} bg-white sm:rounded-2xl rounded-t-2xl shadow-modal animate-slide-up sm:animate-scale-in max-h-[92vh] flex flex-col`}>
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
           <div className="w-10 h-1 bg-slate-200 rounded-full"/>
         </div>
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex-shrink-0">
-          <h2 className="text-base sm:text-lg font-display font-semibold text-slate-800">{title}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer">
+          <h2 id={titleId} className="text-base sm:text-lg font-display font-semibold text-slate-800">{title}</h2>
+          <button onClick={onClose} aria-label={t('close')} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer">
             <X size={18} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5">{children}</div>
         {footer && <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-100 flex-shrink-0 flex justify-end gap-2 sm:gap-3">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
 // Form components
-export function Label({ children, required }) {
-  return <label className="block text-sm font-medium text-slate-700 mb-1.5">{children}{required && <span className="text-red-500 ml-1">*</span>}</label>
+export function Label({ children, required, htmlFor }) {
+  return <label htmlFor={htmlFor} className="block text-sm font-medium text-slate-700 mb-1.5">{children}{required && <span className="text-red-500 ms-1" aria-hidden="true">*</span>}</label>
 }
 
 export function Input({ label, required, error, className = '', ...props }) {
+  const generatedId = useId()
+  const id = props.id || generatedId
+  const errorId = `${id}-error`
   return (
     <div className={className}>
-      {label && <Label required={required}>{label}</Label>}
-      <input className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${error ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} {...props} />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {label && <Label htmlFor={id} required={required}>{label}</Label>}
+      <input id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${error ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} {...props} />
+      {error && <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
     </div>
   )
 }
 
 export function Select({ label, required, error, children, className = '', ...props }) {
+  const generatedId = useId()
+  const id = props.id || generatedId
+  const errorId = `${id}-error`
   return (
     <div className={className}>
-      {label && <Label required={required}>{label}</Label>}
-      <select className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none bg-white ${error ? 'border-red-300' : 'border-slate-200 hover:border-slate-300'}`} {...props}>
+      {label && <Label htmlFor={id} required={required}>{label}</Label>}
+      <select id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none bg-white ${error ? 'border-red-300' : 'border-slate-200 hover:border-slate-300'}`} {...props}>
         {children}
       </select>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
     </div>
   )
 }
 
 export function Textarea({ label, required, error, className = '', ...props }) {
+  const generatedId = useId()
+  const id = props.id || generatedId
+  const errorId = `${id}-error`
   return (
     <div className={className}>
-      {label && <Label required={required}>{label}</Label>}
-      <textarea className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none ${error ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} rows={3} {...props} />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {label && <Label htmlFor={id} required={required}>{label}</Label>}
+      <textarea id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none ${error ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} rows={3} {...props} />
+      {error && <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
     </div>
   )
 }
 
 // Card
 export function Card({ children, className = '', onClick, hover = false }) {
+  const handleKeyDown = onClick
+    ? event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onClick(event)
+        }
+      }
+    : undefined
   return (
-    <div onClick={onClick}
+    <div onClick={onClick} onKeyDown={handleKeyDown} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
       className={`bg-white rounded-xl border border-slate-200/80 shadow-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer' : ''} transition-all ${className}`}>
       {children}
     </div>
@@ -157,6 +232,7 @@ export function SearchInput({ value, onChange, placeholder = 'Search...', classN
     <div className={`relative ${className}`}>
       <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        aria-label={placeholder}
         className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white placeholder:text-slate-400 hover:border-slate-300 transition-all" />
     </div>
   )
@@ -172,7 +248,7 @@ export function StatusDot({ status }) {
 export function Notifications({ items }) {
   const icons = { success: <CheckCircle size={16} className="text-emerald-500" />, error: <AlertCircle size={16} className="text-red-500" />, info: <Info size={16} className="text-blue-500" />, warning: <AlertTriangle size={16} className="text-amber-500" /> }
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-live="polite" aria-atomic="true">
       {items.map(n => (
         <div key={n.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-modal border border-slate-100 animate-slide-up min-w-64">
           {icons[n.type] || icons.success}
@@ -185,15 +261,31 @@ export function Notifications({ items }) {
 
 // Tabs
 export function Tabs({ tabs, active, onChange }) {
+  const onKeyDown = event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')]
+    const currentIndex = buttons.indexOf(document.activeElement)
+    if (currentIndex < 0) return
+    event.preventDefault()
+    let nextIndex = currentIndex
+    if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = buttons.length - 1
+    else if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % buttons.length
+    else nextIndex = (currentIndex - 1 + buttons.length) % buttons.length
+    buttons[nextIndex].focus()
+    buttons[nextIndex].click()
+  }
   return (
-    <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit">
-      {tabs.map(t => (
-        <button key={t.value} onClick={() => onChange(t.value)}
-          className={`px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-all ${active === t.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          {t.label}
-          {t.count !== undefined && <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${active === t.value ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>{t.count}</span>}
-        </button>
-      ))}
+    <div className="max-w-full overflow-x-auto">
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-max min-w-full sm:min-w-0" role="tablist" onKeyDown={onKeyDown}>
+        {tabs.map(tab => (
+          <button key={tab.value} role="tab" aria-selected={active === tab.value} tabIndex={active === tab.value ? 0 : -1} onClick={() => onChange(tab.value)}
+            className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-all ${active === tab.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            {tab.label}
+            {tab.count !== undefined && <span className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs ${active === tab.value ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>{tab.count}</span>}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -220,11 +312,32 @@ export function StatCard({ label, value, icon, trend, color = 'indigo' }) {
 }
 
 // Confirm dialog
-export function ConfirmDialog({ open, onClose, onConfirm, title, message }) {
+export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, confirmVariant='danger' }) {
+  const { t } = useLang()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    if (!open) { setPending(false); setError('') }
+  }, [open])
+  const handleConfirm = async () => {
+    if (pending) return
+    setPending(true)
+    setError('')
+    try {
+      const result = await onConfirm()
+      if (result?.error) setError(result.error)
+      else onClose()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The action could not be completed.')
+    } finally {
+      setPending(false)
+    }
+  }
   return (
-    <Modal open={open} onClose={onClose} title={title} size="sm"
-      footer={<><Btn variant="secondary" onClick={onClose}>إلغاء</Btn><Btn variant="danger" onClick={() => { onConfirm(); onClose() }}>Delete</Btn></>}>
+    <Modal open={open} onClose={pending ? () => {} : onClose} title={title} size="sm"
+      footer={<><Btn variant="secondary" onClick={onClose} disabled={pending}>{t('cancel')}</Btn><Btn variant={confirmVariant} onClick={handleConfirm} disabled={pending}>{pending ? '…' : (confirmLabel||t('delete'))}</Btn></>}>
       <p className="text-slate-600 text-sm">{message}</p>
+      {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
     </Modal>
   )
 }

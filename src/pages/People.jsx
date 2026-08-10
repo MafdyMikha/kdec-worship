@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer, Check } from 'lucide-react'
+import { Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
@@ -24,7 +24,7 @@ const getRoles = (person) =>
     : (person?.role ? [person.role] : [])
 
 // ── Person Card ─────────────────────────────────────────────
-function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
+function PersonCard({ person, isAdmin, currentUserId, onEdit, onDelete, t }) {
   const phone     = person.whatsapp || person.phone
   const availDays = DAYS_CONFIG.filter(d => person.availability?.[d.key])
   const roles     = getRoles(person)
@@ -35,16 +35,18 @@ function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
         <Avatar name={person.name} size="md"/>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            {/* Name always Latin/English */}
-            <span className="font-semibold text-slate-800 truncate" dir="ltr">{person.name}</span>
-            <StatusDot status={person.status}/>
+            <span className="font-semibold text-slate-800 truncate" dir="auto">{person.name}</span>
+            <span aria-hidden="true"><StatusDot status={person.status}/></span>
+            <span className="sr-only">{person.status === 'active' ? t('active') : person.status === 'inactive' ? t('inactive') : t('onLeave')}</span>
           </div>
           <div className="text-xs text-slate-400">{person.position || t('member') || 'Member'}</div>
         </div>
         {isAdmin && (
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onEdit(person)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer"><Edit2 size={13}/></button>
-            <button onClick={() => onDelete(person.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={13}/></button>
+          <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+            <button type="button" onClick={() => onEdit(person)} aria-label={`${t('edit')} ${person.name}`}
+              className="w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer"><Edit2 size={14} aria-hidden="true"/></button>
+            {person.id!==currentUserId && <button type="button" onClick={() => onDelete(person.id)} aria-label={`${t('delete')} ${person.name}`}
+              className="w-9 h-9 inline-flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={14} aria-hidden="true"/></button>}
           </div>
         )}
       </div>
@@ -72,7 +74,7 @@ function PersonCard({ person, isAdmin, onEdit, onDelete, t, isAr }) {
 }
 
 // ── Role Group View — a person appears under EVERY role they hold ──
-function ByRoleView({ people, isAdmin, onEdit, onDelete, t, isAr, ROLES }) {
+function ByRoleView({ people, isAdmin, currentUserId, onEdit, onDelete, t, ROLES }) {
   const grouped = useMemo(() => {
     const map = {}
     ROLES.forEach(r => { map[r] = people.filter(p => getRoles(p).includes(r)) })
@@ -91,9 +93,9 @@ function ByRoleView({ people, isAdmin, onEdit, onDelete, t, isAr, ROLES }) {
               <span className="text-sm text-slate-400">{members.length} {t('membersLabel')}</span>
               <div className="flex-1 h-px bg-slate-100"/>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {members.map(p => (
-                <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={onEdit} onDelete={onDelete} t={t} isAr={isAr}/>
+                <PersonCard key={p.id} person={p} isAdmin={isAdmin} currentUserId={currentUserId} onEdit={onEdit} onDelete={onDelete} t={t}/>
               ))}
             </div>
           </div>
@@ -123,16 +125,17 @@ function RosterView({ people, t, isAr }) {
       </div>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[900px] text-sm">
+            <caption className="sr-only">{isAr ? 'قائمة أعضاء فريق التسبيح' : 'Worship team member roster'}</caption>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">#</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('name')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('role')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('position')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('phone')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('email')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('active')}</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">#</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('name')}</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('role')}</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('position')}</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('phone')}</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('email')}</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('active')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -142,8 +145,7 @@ function RosterView({ people, t, isAr }) {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Avatar name={p.name} size="xs"/>
-                      {/* Name always Latin */}
-                      <span className="font-medium text-slate-800" dir="ltr">{p.name}</span>
+                      <span className="font-medium text-slate-800" dir="auto">{p.name}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -170,36 +172,37 @@ function RosterView({ people, t, isAr }) {
 }
 
 // ── Availability Grid View ──────────────────────────────────
-function AvailabilityView({ people, t, isAr }) {
+function AvailabilityView({ people, t }) {
   const DAYS = DAYS_CONFIG.map(d => ({ ...d, label: t(d.key) }))
   const active = people.filter(p => p.status === 'active')
 
   return (
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[680px] text-sm">
+          <caption className="sr-only">{t('availabilityView')}</caption>
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 sticky left-0 bg-slate-50">{t('name')}</th>
+              <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 sticky start-0 z-10 bg-slate-50">{t('name')}</th>
               {DAYS.map(d => (
-                <th key={d.key} className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{d.label}</th>
+                <th key={d.key} scope="col" className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{d.label}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {active.map(p => (
               <tr key={p.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 sticky left-0 bg-white">
+                <th scope="row" className="px-4 py-3 sticky start-0 z-10 bg-white text-start">
                   <div className="flex items-center gap-2">
                     <Avatar name={p.name} size="xs"/>
-                    <span className="text-sm font-medium text-slate-700 whitespace-nowrap" dir="ltr">{p.name}</span>
+                    <span className="text-sm font-medium text-slate-700 whitespace-nowrap" dir="auto">{p.name}</span>
                   </div>
-                </td>
+                </th>
                 {DAYS.map(d => (
                   <td key={d.key} className="px-3 py-3 text-center">
                     {p.availability?.[d.key]
-                      ? <span className="inline-flex w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full items-center justify-center text-xs">✓</span>
-                      : <span className="inline-flex w-6 h-6 bg-slate-100 rounded-full items-center justify-center text-xs text-slate-300">—</span>}
+                      ? <span aria-label={`${d.label}: ${t('active')}`} className="inline-flex w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full items-center justify-center text-xs">✓</span>
+                      : <span aria-label={`${d.label}: —`} className="inline-flex w-6 h-6 bg-slate-100 rounded-full items-center justify-center text-xs text-slate-500">—</span>}
                   </td>
                 ))}
               </tr>
@@ -212,24 +215,24 @@ function AvailabilityView({ people, t, isAr }) {
 }
 
 // ── Multi-select role picker (pill grid, same pattern as availability days) ──
-function RolesPicker({ selected, onChange, ROLES, t, isAr }) {
+function RolesPicker({ selected, onChange, ROLES, isAr }) {
   const toggle = (role) => {
     const has = selected.includes(role)
     onChange(has ? selected.filter(r => r !== role) : [...selected, role])
   }
   return (
-    <div>
-      <label className="block text-sm font-medium text-slate-700 mb-2">
+    <fieldset>
+      <legend className="block text-sm font-medium text-slate-700 mb-2">
         {isAr ? 'الأدوار' : 'Roles'} <span className="text-red-500">*</span>
         <span className="text-xs text-slate-400 font-normal ms-1.5">
           ({isAr ? 'يمكن اختيار أكثر من دور' : 'select one or more'})
         </span>
-      </label>
+      </legend>
       <div className="flex flex-wrap gap-2">
         {ROLES.map(role => {
           const on = selected.includes(role)
           return (
-            <button key={role} type="button" onClick={() => toggle(role)}
+            <button key={role} type="button" onClick={() => toggle(role)} aria-pressed={on}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-all select-none ${
                 on
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
@@ -242,14 +245,14 @@ function RolesPicker({ selected, onChange, ROLES, t, isAr }) {
         })}
       </div>
       {selected.length === 0 && (
-        <p className="text-xs text-amber-500 mt-1.5">{isAr ? 'اختر دوراً واحداً على الأقل' : 'Select at least one role'}</p>
+        <p className="text-xs text-amber-700 mt-1.5" role="alert">{isAr ? 'اختر دوراً واحداً على الأقل' : 'Select at least one role'}</p>
       )}
-    </div>
+    </fieldset>
   )
 }
 
 // ── Edit Form ───────────────────────────────────────────────
-function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
+function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr, protectAuthorization=false }) {
   const POSITION_LABEL = {
     Leader: isAr ? 'قائد' : 'Leader',
     Member: isAr ? 'عضو' : 'Member',
@@ -258,52 +261,41 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
   }
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            {t('fullName')} <span className="text-red-500">*</span>
-          </label>
-          <input value={value.name || ''} onChange={e => onChange({ ...value, name: e.target.value })}
-            placeholder="John Mikhail" dir="ltr"
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
-          <p className="text-xs text-slate-400 mt-1">{isAr ? 'الاسم بالأحرف اللاتينية' : 'Latin characters preferred'}</p>
-        </div>
-        <Input label={t('email')} type="email" placeholder="john@kdec.org"
-          value={value.email || ''} onChange={e => onChange({ ...value, email: e.target.value })}/>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input label={t('fullName')} required value={value.name || ''} onChange={e => onChange({ ...value, name: e.target.value })}
+          placeholder={isAr ? 'الاسم الكامل' : 'Full name'} dir="auto" autoComplete="name"/>
+        <Input label={t('email')} type="email" value={value.email || ''} readOnly
+          title={isAr?'يُدار بريد تسجيل الدخول من Supabase Authentication':'Sign-in email is managed in Supabase Authentication'} dir="ltr" className="bg-slate-50 text-slate-500"/>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('phone')}</label>
-          <input value={value.phone || ''} onChange={e => onChange({ ...value, phone: e.target.value })}
-            placeholder="+20 100 000 0000" dir="ltr"
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('whatsapp')}</label>
-          <input value={value.whatsapp || ''} onChange={e => onChange({ ...value, whatsapp: e.target.value })}
-            placeholder="+20 100 000 0000" dir="ltr"
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:border-slate-300"/>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input label={t('phone')} type="tel" value={value.phone || ''} onChange={e => onChange({ ...value, phone: e.target.value })}
+          placeholder="+20 100 000 0000" dir="ltr" autoComplete="tel" inputMode="tel"/>
+        <Input label={t('whatsapp')} type="tel" value={value.whatsapp || ''} onChange={e => onChange({ ...value, whatsapp: e.target.value })}
+          placeholder="+20 100 000 0000" dir="ltr" inputMode="tel"/>
       </div>
 
       {/* Multi-select roles */}
-      <RolesPicker selected={value.roles || []} onChange={roles => onChange({ ...value, roles })} ROLES={ROLES} t={t} isAr={isAr}/>
+      <RolesPicker selected={value.roles || []} onChange={roles => onChange({ ...value, roles })} ROLES={ROLES} isAr={isAr}/>
 
-      <Select label={t('position')} value={value.position || 'Member'} onChange={e => onChange({ ...value, position: e.target.value })}>
+      <Select label={t('position')} value={value.position || 'Member'} disabled={protectAuthorization}
+        title={protectAuthorization ? (isAr?'لا يمكنك تغيير صلاحيات حسابك أثناء تسجيل الدخول':'You cannot change your signed-in authorization') : undefined}
+        onChange={e => onChange({ ...value, position: e.target.value })}>
         {POSITIONS.map(p => <option key={p} value={p}>{POSITION_LABEL[p] || p}</option>)}
       </Select>
-      <Select label={t('active')} value={value.status || 'active'} onChange={e => onChange({ ...value, status: e.target.value })}>
+      <Select label={t('active')} value={value.status || 'active'} disabled={protectAuthorization}
+        title={protectAuthorization ? (isAr?'لا يمكنك تعطيل حسابك أثناء تسجيل الدخول':'You cannot deactivate your signed-in account') : undefined}
+        onChange={e => onChange({ ...value, status: e.target.value })}>
         <option value="active">{t('active')}</option>
         <option value="inactive">{t('inactive')}</option>
         <option value="on-leave">{t('onLeave')}</option>
       </Select>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">{t('availableDays')}</label>
+      <fieldset>
+        <legend className="block text-sm font-medium text-slate-700 mb-2">{t('availableDays')}</legend>
         <div className="flex gap-2 flex-wrap">
           {DAYS_CONFIG.map(d => {
             const on = !!value.availability?.[d.key]
             return (
-              <button key={d.key} type="button"
+              <button key={d.key} type="button" aria-pressed={on}
                 onClick={() => onChange({ ...value, availability: { ...value.availability, [d.key]: !on } })}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-all ${on ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-500 hover:border-indigo-300'}`}>
                 {t(d.key)}
@@ -311,7 +303,7 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr }) {
             )
           })}
         </div>
-      </div>
+      </fieldset>
       <Textarea label={t('notes')} placeholder={isAr ? 'أي ملاحظات...' : 'Any notes...'} value={value.notes || ''} onChange={e => onChange({ ...value, notes: e.target.value })}/>
     </div>
   )
@@ -351,12 +343,14 @@ export default function People() {
   const inactiveCount = people.filter(p => p.status === 'inactive').length
 
   const openEdit = (p) => { setEditing(p.id); setForm({ ...p, roles: getRoles(p) }); setShowForm(true) }
+  const closeEdit = () => { setShowForm(false); setEditing(null); setForm(blank) }
 
-  const handleSave = () => {
-    if (!form.name || !editing) return
+  const handleSave = async () => {
+    if (!form.name?.trim() || !editing) return
     if (!form.roles || form.roles.length === 0) return
-    updatePerson(editing, form)
-    setShowForm(false); setEditing(null); setForm(blank)
+    if (editing===currentUser?.id && form.status!=='active') return
+    const result = await updatePerson(editing, { ...form, name: form.name.trim() })
+    if (!result?.error) closeEdit()
   }
 
   const SUB_TABS = [
@@ -370,7 +364,7 @@ export default function People() {
     <div className="max-w-7xl space-y-5 animate-fade-in">
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: t('totalMembers'),  value: people.length,        color: 'bg-indigo-50 text-indigo-700'  },
           { label: t('activeMembers'), value: activeCount,           color: 'bg-emerald-50 text-emerald-700'},
@@ -385,17 +379,8 @@ export default function People() {
 
       {/* Sub-page tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
-          {SUB_TABS.map(tab => (
-            <button key={tab.value} onClick={() => setSubTab(tab.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all ${
-                subTab === tab.value
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}>
-              {tab.label}
-            </button>
-          ))}
+        <div className="min-w-0 max-w-full">
+          <Tabs tabs={SUB_TABS} active={subTab} onChange={setSubTab}/>
         </div>
         {isAdmin && (
           <Btn onClick={() => navigate('/invitations')} icon={<UserPlus size={16}/>}>{t('inviteMember')}</Btn>
@@ -406,23 +391,29 @@ export default function People() {
       {(subTab === 'all' || subTab === 'byRole') && (
         <div className="flex items-center gap-3 flex-wrap">
           <SearchInput value={search} onChange={setSearch}
-            placeholder={isAr ? 'ابحث في الأعضاء...' : 'Search members...'} className="w-60"/>
-          <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-            className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            placeholder={isAr ? 'ابحث في الأعضاء...' : 'Search members...'} className="w-full sm:w-60"/>
+          <label htmlFor="people-role-filter" className="sr-only">{t('allRoles')}</label>
+          <select id="people-role-filter" value={filterRole} onChange={e => setFilterRole(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="all">{t('allRoles')}</option>
             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-            className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <label htmlFor="people-status-filter" className="sr-only">{isAr ? 'تصفية حسب الحالة' : 'Filter by status'}</label>
+          <select id="people-status-filter" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="active">{t('active')}</option>
             <option value="inactive">{t('inactive')}</option>
             <option value="on-leave">{t('onLeave')}</option>
             <option value="all">{t('all')}</option>
           </select>
           {subTab === 'all' && (
-            <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg ml-auto">
-              <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}><Grid3X3 size={15}/></button>
-              <button onClick={() => setViewMode('list')} className={`p-1.5 rounded cursor-pointer transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}><List size={15}/></button>
+            <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg sm:ms-auto" role="group" aria-label={isAr ? 'طريقة العرض' : 'View mode'}>
+              <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'}
+                aria-label={isAr ? 'عرض شبكي' : 'Grid view'}
+                className={`w-9 h-9 inline-flex items-center justify-center rounded cursor-pointer transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}><Grid3X3 size={15} aria-hidden="true"/></button>
+              <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'}
+                aria-label={isAr ? 'عرض قائمة' : 'List view'}
+                className={`w-9 h-9 inline-flex items-center justify-center rounded cursor-pointer transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}><List size={15} aria-hidden="true"/></button>
             </div>
           )}
         </div>
@@ -437,9 +428,9 @@ export default function People() {
             <EmptyState icon={<Users size={28}/>} title={t('noPeople')}
               action={isAdmin && <Btn onClick={() => navigate('/invitations')} icon={<UserPlus size={16}/>}>{t('inviteMember')}</Btn>}/>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {allFiltered.map(p => (
-                <PersonCard key={p.id} person={p} isAdmin={isAdmin} onEdit={openEdit} onDelete={setDeleteTarget} t={t} isAr={isAr}/>
+                <PersonCard key={p.id} person={p} isAdmin={isAdmin} currentUserId={currentUser?.id} onEdit={openEdit} onDelete={setDeleteTarget} t={t}/>
               ))}
             </div>
           ) : (
@@ -450,7 +441,7 @@ export default function People() {
 
       {/* BY ROLE */}
       {subTab === 'byRole' && (
-        <ByRoleView people={allFiltered} isAdmin={isAdmin} onEdit={openEdit} onDelete={setDeleteTarget} t={t} isAr={isAr} ROLES={ROLES}/>
+        <ByRoleView people={allFiltered} isAdmin={isAdmin} currentUserId={currentUser?.id} onEdit={openEdit} onDelete={setDeleteTarget} t={t} ROLES={ROLES}/>
       )}
 
       {/* ROSTER — printable */}
@@ -460,21 +451,22 @@ export default function People() {
 
       {/* AVAILABILITY */}
       {subTab === 'availability' && (
-        <AvailabilityView people={people} t={t} isAr={isAr}/>
+        <AvailabilityView people={people} t={t}/>
       )}
 
       {/* Edit modal */}
-      <Modal open={showForm} onClose={() => { setShowForm(false); setEditing(null) }}
+      <Modal open={showForm} onClose={closeEdit}
         title={t('edit')} size="lg"
         footer={<>
-          <Btn variant="secondary" onClick={() => setShowForm(false)}>{t('cancel')}</Btn>
-          <Btn onClick={handleSave} disabled={!form.roles || form.roles.length === 0}>{t('saveChanges')}</Btn>
+          <Btn variant="secondary" onClick={closeEdit}>{t('cancel')}</Btn>
+          <Btn onClick={handleSave} disabled={!form.name?.trim() || !form.roles || form.roles.length === 0}>{t('saveChanges')}</Btn>
         </>}>
-        <EditForm value={form} onChange={setForm} ROLES={ROLES} POSITIONS={POSITIONS} t={t} isAr={isAr}/>
+        <EditForm value={form} onChange={setForm} ROLES={ROLES} POSITIONS={POSITIONS} t={t} isAr={isAr}
+          protectAuthorization={editing===currentUser?.id && isAdmin}/>
       </Modal>
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}
-        onConfirm={() => { deletePerson(deleteTarget); setDeleteTarget(null) }}
+        onConfirm={async() => { const result=await deletePerson(deleteTarget); if(!result?.error)setDeleteTarget(null); return result }}
         title={isAr ? 'تعطيل العضو' : 'Deactivate Member'}
         message={isAr ? 'سيتم تغيير حالة العضو إلى غير نشط.' : 'Member status will be set to inactive.'}/>
     </div>

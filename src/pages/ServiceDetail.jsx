@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Trash2, Users, Edit2, Check, X, Save, Repeat, RefreshC
 import { format, parseISO } from 'date-fns'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
+import { canManageWorship } from '../lib/permissions.js'
 import { Btn, Badge, Avatar, Modal, Select, Textarea, Card, StatusDot, ConfirmDialog } from '../components/ui'
 import WhatsAppNotify from '../components/WhatsAppNotify'
 import PracticeTab from '../components/PracticeTab'
@@ -12,7 +13,7 @@ import SetlistTab from '../components/SetlistTab'
 export default function ServiceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { services, people, currentUser, updateService, updateRecurringService, deleteService, deleteRecurringService, generateMoreOccurrences, addTeamMember, updateTeamMemberStatus, removeTeamMember, ROLES } = useStore()
+  const { services, people, currentUser, updateService, deleteService, deleteRecurringService, generateMoreOccurrences, addTeamMember, updateTeamMemberStatus, removeTeamMember, requestSubstitute, ROLES } = useStore()
   const { t, isAr } = useLang()
 
   const [tab,             setTab]            = useState('setlist')
@@ -26,9 +27,7 @@ export default function ServiceDetail() {
   const [showDeleteScope, setShowDeleteScope]= useState(false)
   const [subModal,        setSubModal]       = useState(null)
 
-  const isAdmin  = currentUser?.isAdmin || currentUser?.is_admin
-  const isLeader = ['Worship Leader','Music Director'].includes(currentUser?.role)
-  const canEdit  = isAdmin || isLeader
+  const canEdit  = canManageWorship(currentUser)
   const service  = services.find(s => s.id === id)
 
   if (!service) return (
@@ -50,11 +49,12 @@ export default function ServiceDetail() {
   const SVC_STATUS = isAr
     ? { scheduled:'مجدولة', completed:'مكتملة', cancelled:'ملغاة', draft:'مسودة' }
     : { scheduled:'Scheduled', completed:'Completed', cancelled:'Cancelled', draft:'Draft' }
+  const SVC_STATUS_COLOR = { scheduled:'blue', completed:'green', cancelled:'red', draft:'slate' }
 
-  const handleAddPerson = () => {
+  const handleAddPerson = async () => {
     if (!selectedPerson) return
-    addTeamMember(id, selectedPerson, selectedRole)
-    setShowAddPerson(false); setSelectedPerson(''); setSelectedRole(ROLES[0])
+    const result = await addTeamMember(id, selectedPerson, selectedRole)
+    if (!result?.error) { setShowAddPerson(false); setSelectedPerson(''); setSelectedRole(ROLES[0]) }
   }
 
   const getSubs = (role) => people.filter(p => {
@@ -71,27 +71,27 @@ export default function ServiceDetail() {
 
   const DEL_SCOPES = isAr
     ? [
-        { value:'this',            label:'هذه الخدمة فقط',     desc:'حذف هذا التكرار فقط'           },
-        { value:'this_and_future', label:'هذه والقادمة',        desc:'حذف هذا وكل التكرارات القادمة' },
-        { value:'all',             label:'كل السلسلة',          desc:'حذف جميع تكرارات هذه الخدمة'   },
+        { value:'this',            label:'هذه الخدمة فقط',     desc:'إلغاء هذا التكرار فقط'           },
+        { value:'this_and_future', label:'هذه والقادمة',        desc:'إلغاء هذا وكل التكرارات القادمة' },
+        { value:'all',             label:'كل السلسلة',          desc:'إلغاء جميع تكرارات هذه الخدمة'   },
       ]
     : [
-        { value:'this',            label:'This service only',   desc:'Delete just this occurrence'   },
-        { value:'this_and_future', label:'This and following',  desc:'Delete this and future ones'   },
-        { value:'all',             label:'All in series',       desc:'Delete every occurrence'       },
+        { value:'this',            label:'This service only',   desc:'Cancel just this occurrence'   },
+        { value:'this_and_future', label:'This and following',  desc:'Cancel this and future ones'   },
+        { value:'all',             label:'All in series',       desc:'Cancel every occurrence'       },
       ]
 
   return (
     <div className="max-w-5xl space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <button onClick={() => navigate('/services')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer mt-1">
+        <button onClick={() => navigate('/services')} aria-label={isAr?'العودة للخدمات':'Back to services'} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer mt-1">
           <ArrowLeft size={18}/>
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <Badge color="blue" size="xs">{service.type}</Badge>
-            <Badge color={service.status==='completed'?'green':'blue'} size="xs">{SVC_STATUS[service.status]||service.status}</Badge>
+            <Badge color={SVC_STATUS_COLOR[service.status]||'slate'} size="xs">{SVC_STATUS[service.status]||service.status}</Badge>
           </div>
           <h2 className="font-display font-bold text-xl text-slate-800">{service.title}</h2>
           <p className="text-sm text-slate-500">{format(parseISO(service.date),'EEEE, d MMMM yyyy')} · {service.time}</p>
@@ -100,9 +100,9 @@ export default function ServiceDetail() {
           {canEdit && (
             <Btn variant="secondary" size="sm"
               onClick={() => service.recurrenceGroupId ? setShowDeleteScope(true) : setConfirmDelete(true)}
-              icon={<Trash2 size={14}/>}>{t('delete')}</Btn>
+              icon={<Trash2 size={14}/>}>{isAr?'إلغاء':'Cancel'}</Btn>
           )}
-          <WhatsAppNotify service={service}/>
+          {canEdit&&<WhatsAppNotify service={service}/>}
         </div>
       </div>
 
@@ -139,9 +139,9 @@ export default function ServiceDetail() {
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 gap-1 overflow-x-auto">
+      <div className="flex border-b border-slate-200 gap-1 overflow-x-auto" role="tablist" aria-label={isAr?'تفاصيل الخدمة':'Service details'}>
         {TABS.map(tabItem => (
-          <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+          <button key={tabItem.key} role="tab" aria-selected={tab===tabItem.key} onClick={() => setTab(tabItem.key)}
             className={`flex items-center gap-1.5 pb-3 px-1 text-sm font-medium cursor-pointer transition-all border-b-2 -mb-px whitespace-nowrap mr-5 ${tab===tabItem.key?'border-indigo-600 text-indigo-600':'border-transparent text-slate-500 hover:text-slate-700'}`}>
             {tabItem.label}
             {tabItem.count!==undefined&&<span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{tabItem.count}</span>}
@@ -151,7 +151,7 @@ export default function ServiceDetail() {
       </div>
 
       {/* Setlist */}
-      {tab==='setlist' && <SetlistTab service={service} canEdit={canEdit}/>}
+      {tab==='setlist' && <SetlistTab key={service.id} service={service} canEdit={canEdit}/>}
 
       {/* Team */}
       {tab==='team' && (
@@ -190,14 +190,14 @@ export default function ServiceDetail() {
                             {(canEdit||isMe)&&status!=='confirmed'&&(
                               <button onClick={()=>updateTeamMemberStatus(id,personId,'confirmed')} className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded cursor-pointer" title={t('confirmed')}><Check size={14}/></button>
                             )}
-                            {(canEdit||isMe)&&status!=='declined'&&(
+                            {canEdit&&status!=='declined'&&(
                               <button onClick={()=>updateTeamMemberStatus(id,personId,'declined')} className="p-1.5 text-red-400 hover:bg-red-50 rounded cursor-pointer" title={t('declined')}><X size={14}/></button>
                             )}
                             {(isMe||canEdit)&&status==='confirmed'&&subs.length>0&&(
-                              <button onClick={()=>setSubModal({personId,person,role,subs})} className="p-1.5 text-violet-500 hover:bg-violet-50 rounded cursor-pointer" title={t('findSub')}><Users size={14}/></button>
+                              <button onClick={()=>setSubModal({personId,person,role,subs})} aria-label={t('findSub')} className="p-1.5 text-violet-500 hover:bg-violet-50 rounded cursor-pointer" title={t('findSub')}><Users size={14}/></button>
                             )}
                             {canEdit&&(
-                              <button onClick={()=>removeTeamMember(id,personId)} className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={14}/></button>
+                              <button onClick={()=>removeTeamMember(id,personId)} aria-label={isAr?'إزالة العضو':'Remove member'} className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={14}/></button>
                             )}
                           </div>
                         </div>
@@ -220,7 +220,7 @@ export default function ServiceDetail() {
       )}
 
       {/* Practice */}
-      {tab==='practice' && <PracticeTab service={service}/>}
+      {tab==='practice' && <PracticeTab key={service.id} service={service} canEdit={canEdit}/>}
 
       {/* Notes */}
       {tab==='notes' && (
@@ -237,7 +237,7 @@ export default function ServiceDetail() {
             <div className="space-y-3">
               <Textarea label={isAr?'الملاحظات':'Notes'} value={notesVal} onChange={e=>setNotesVal(e.target.value)} rows={6}/>
               <div className="flex gap-2">
-                <Btn size="sm" onClick={()=>{updateService(id,{notes:notesVal});setEditingNotes(false)}} icon={<Save size={14}/>}>{t('save')}</Btn>
+                <Btn size="sm" onClick={async()=>{const result=await updateService(id,{notes:notesVal});if(!result?.error)setEditingNotes(false)}} icon={<Save size={14}/>}>{t('save')}</Btn>
                 <Btn variant="ghost" size="sm" onClick={()=>setEditingNotes(false)}>{t('cancel')}</Btn>
               </div>
             </div>
@@ -246,7 +246,7 @@ export default function ServiceDetail() {
       )}
 
       {/* Add person modal */}
-      <Modal open={showAddPerson} onClose={()=>setShowAddPerson(false)}
+      <Modal open={canEdit&&showAddPerson} onClose={()=>setShowAddPerson(false)}
         title={isAr?'إضافة عضو للفريق':'Add Team Member'} size="sm"
         footer={<><Btn variant="secondary" onClick={()=>setShowAddPerson(false)}>{t('cancel')}</Btn><Btn onClick={handleAddPerson} disabled={!selectedPerson}>{isAr?'إضافة':'Add'}</Btn></>}>
         <div className="space-y-4">
@@ -264,7 +264,7 @@ export default function ServiceDetail() {
       {subModal&&(
         <Modal open={!!subModal} onClose={()=>setSubModal(null)}
           title={isAr?'طلب بديل':'Request Substitute'} size="sm"
-          footer={<><Btn variant="secondary" onClick={()=>setSubModal(null)}>{t('cancel')}</Btn><Btn onClick={()=>setSubModal(null)}>{isAr?'إرسال الطلب':'Send Request'}</Btn></>}>
+          footer={<><Btn variant="secondary" onClick={()=>setSubModal(null)}>{t('cancel')}</Btn>{!canEdit&&<Btn onClick={async()=>{const result=await requestSubstitute(id,subModal.role);if(!result?.error)setSubModal(null)}}>{isAr?'إرسال طلب عام':'Send General Request'}</Btn>}</>}>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
               {isAr?'إيجاد بديل لـ':'Find substitute for'} <strong>{subModal.person?.name}</strong> {isAr?'في دور':'as'} <strong>{subModal.role}</strong>
@@ -279,9 +279,12 @@ export default function ServiceDetail() {
                 <div key={p.id} className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
                   <Avatar name={p.name} size="sm"/>
                   <div className="flex-1"><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{((Array.isArray(p.roles) && p.roles.length>0) ? p.roles : (p.role?[p.role]:[])).join(', ')}</div></div>
-                  <button onClick={()=>{addTeamMember(id,p.id,subModal.role);setSubModal(null)}}
+                  <button onClick={async()=>{const result=canEdit
+                    ? await addTeamMember(id,p.id,subModal.role)
+                    : await requestSubstitute(id,subModal.role,`${isAr?'البديل المفضل':'Preferred substitute'}: ${p.name}`)
+                    if(!result?.error)setSubModal(null)}}
                     className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-medium rounded-lg cursor-pointer hover:bg-emerald-600">
-                    {t('addAsSub')}
+                    {canEdit?t('addAsSub'):(isAr?'طلب هذا البديل':'Request this substitute')}
                   </button>
                 </div>
               ))}
@@ -291,17 +294,18 @@ export default function ServiceDetail() {
       )}
 
       {/* Delete confirm */}
-      <ConfirmDialog open={confirmDelete} onClose={()=>setConfirmDelete(false)}
-        onConfirm={()=>{deleteService(id);navigate('/services')}}
-        title={isAr?'حذف الخدمة':'Delete Service'}
-        message={isAr?`هل أنت متأكد من حذف "${service.title}"؟`:`Delete "${service.title}"? This cannot be undone.`}/>
+      <ConfirmDialog open={canEdit&&confirmDelete} onClose={()=>setConfirmDelete(false)}
+        onConfirm={async()=>{const result=await deleteService(id);if(!result?.error)navigate('/services');return result}}
+        title={isAr?'إلغاء الخدمة':'Cancel Service'}
+        confirmLabel={isAr?'إلغاء الخدمة':'Cancel service'}
+        message={isAr?`سيتم إلغاء "${service.title}" مع الحفاظ على سجلها.`:`Cancel "${service.title}" while preserving its history?`}/>
 
       {/* Recurring delete scope */}
-      <Modal open={showDeleteScope} onClose={()=>setShowDeleteScope(false)}
-        title={isAr?'حذف خدمة متكررة':'Delete Recurring Service'} size="sm"
+      <Modal open={canEdit&&showDeleteScope} onClose={()=>setShowDeleteScope(false)}
+        title={isAr?'إلغاء خدمة متكررة':'Cancel Recurring Service'} size="sm"
         footer={<>
           <Btn variant="secondary" onClick={()=>setShowDeleteScope(false)}>{t('cancel')}</Btn>
-          <Btn variant="danger" onClick={()=>{deleteRecurringService(id,deleteScope);navigate('/services')}}>{t('delete')}</Btn>
+          <Btn variant="danger" onClick={async()=>{const result=await deleteRecurringService(id,deleteScope);if(!result?.error)navigate('/services')}}>{isAr?'إلغاء':'Cancel'}</Btn>
         </>}>
         <div className="space-y-3">
           <p className="text-sm text-slate-500">{isAr?'هذه الخدمة جزء من سلسلة متكررة.':'This service is part of a recurring series.'}</p>

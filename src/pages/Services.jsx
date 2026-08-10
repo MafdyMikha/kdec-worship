@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar, Music2, Users, CheckCircle, Clock, ChevronRight, Repeat } from 'lucide-react'
-import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
+import { canManageWorship } from '../lib/permissions.js'
 import { Card, Btn, Badge, SearchInput, Tabs, Modal, Input, Select, Textarea, EmptyState } from '../components/ui'
 
 const SERVICE_TYPES_AR = ['خدمة أحد','ليلة صلاة','فعالية خاصة','خدمة شباب','عيد القيامة','عيد الميلاد','بروفة']
@@ -14,7 +15,7 @@ const FREQ_EN = { weekly:'Weekly', biweekly:'Every 2 weeks', monthly:'Monthly' }
 
 function RecurrencePicker({ value, onChange, isAr }) {
   const on  = value?.enabled || false
-  const set = (p) => onChange({ enabled:on, frequency:'weekly', count:8, endDate:'', copyTeam:true, copySetlist:false, ...value, ...p })
+  const set = (p) => onChange({ enabled:on, frequency:'weekly', count:8, endDate:'', ...value, ...p })
   const FREQ = isAr ? FREQ_AR : FREQ_EN
   return (
     <div className="space-y-3">
@@ -26,7 +27,7 @@ function RecurrencePicker({ value, onChange, isAr }) {
             <div className="text-xs text-slate-400">{isAr?'إنشاء التكرارات تلقائياً':'Auto-create recurring occurrences'}</div>
           </div>
         </div>
-        <button type="button" onClick={() => set({ enabled:!on })}
+        <button type="button" role="switch" aria-checked={on} aria-label={isAr?'تكرار هذه الخدمة':'Repeat this service'} onClick={() => set({ enabled:!on })}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${on?'bg-indigo-600':'bg-slate-200'}`}>
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on?'translate-x-6':'translate-x-1'}`}/>
         </button>
@@ -48,7 +49,7 @@ function RecurrencePicker({ value, onChange, isAr }) {
             <div>
               <label className="block text-xs text-slate-500 mb-1">{isAr?'عدد التكرارات':'Occurrences'}</label>
               <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden">
-                <button type="button" onClick={() => set({ count:Math.max(1,(value?.count||8)-1) })} className="px-3 py-2.5 text-slate-500 hover:bg-slate-100 cursor-pointer text-lg font-bold">−</button>
+                <button type="button" onClick={() => set({ count:Math.max(2,(value?.count||8)-1) })} className="px-3 py-2.5 text-slate-500 hover:bg-slate-100 cursor-pointer text-lg font-bold">−</button>
                 <span className="flex-1 text-center text-sm font-semibold text-slate-800">{value?.count||8}</span>
                 <button type="button" onClick={() => set({ count:Math.min(52,(value?.count||8)+1) })} className="px-3 py-2.5 text-slate-500 hover:bg-slate-100 cursor-pointer text-lg font-bold">+</button>
               </div>
@@ -57,18 +58,6 @@ function RecurrencePicker({ value, onChange, isAr }) {
               <label className="block text-xs text-slate-500 mb-1">{isAr?'أو ينتهي في':'Or end by'}</label>
               <input type="date" value={value?.endDate||''} onChange={e => set({ endDate:e.target.value })}
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{isAr?'نسخ من الخدمة الأولى':'Copy from first service'}</label>
-            <div className="flex gap-3">
-              {[['copyTeam','👥 '+( isAr?'نسخ الفريق':'Copy Team'),isAr?'نفس الأعضاء':'Same members'],
-                ['copySetlist','🎵 '+(isAr?'نسخ القائمة':'Copy Setlist'),isAr?'نفس الترانيم':'Same songs']].map(([k,lbl,desc]) => (
-                <label key={k} className={`flex-1 flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${value?.[k]?'bg-indigo-50 border-indigo-300':'border-slate-200 hover:border-slate-300'}`}>
-                  <input type="checkbox" checked={value?.[k]||false} onChange={e => set({ [k]:e.target.checked })} className="mt-0.5 w-4 h-4 text-indigo-600 rounded"/>
-                  <div><div className="text-sm font-medium text-slate-700">{lbl}</div><div className="text-xs text-slate-400">{desc}</div></div>
-                </label>
-              ))}
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-indigo-600 bg-indigo-50 px-3 py-2.5 rounded-xl">
@@ -88,7 +77,9 @@ function ServiceRow({ svc, services, navigate, isAr }) {
   const statusLabels = isAr
     ? { scheduled:'مجدولة', completed:'مكتملة', cancelled:'ملغاة', draft:'مسودة' }
     : { scheduled:'Scheduled', completed:'Completed', cancelled:'Cancelled', draft:'Draft' }
-  const groupSize = svc.recurrenceGroupId ? services.filter(s=>s.recurrenceGroupId===svc.recurrenceGroupId).length : 0
+  const groupMembers = svc.recurrenceGroupId ? services.filter(s=>s.recurrenceGroupId===svc.recurrenceGroupId).sort((a,b)=>a.date.localeCompare(b.date)) : []
+  const groupSize = groupMembers.length
+  const groupPosition = groupMembers.findIndex(service=>service.id===svc.id)+1
   return (
     <Card hover onClick={() => navigate(`/services/${svc.id}`)} className="p-5">
       <div className="flex items-start gap-4">
@@ -102,9 +93,9 @@ function ServiceRow({ svc, services, navigate, isAr }) {
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Badge color="blue" size="xs">{svc.type}</Badge>
             <Badge color={statusColors[svc.status]||'slate'} size="xs">{statusLabels[svc.status]||svc.status}</Badge>
-            {svc.recurrenceGroupId && (
+            {groupSize>1 && (
               <span className="flex items-center gap-1 text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200 font-medium">
-                <Repeat size={10}/> #{(svc.recurrenceIndex||0)+1} {isAr?'من':'of'} {groupSize}
+                <Repeat size={10}/> #{groupPosition} {isAr?'من':'of'} {groupSize}
               </span>
             )}
           </div>
@@ -123,7 +114,7 @@ function ServiceRow({ svc, services, navigate, isAr }) {
   )
 }
 
-function RecurringGroup({ members, navigate, services, isAr }) {
+function RecurringGroup({ members, navigate, isAr }) {
   const [open, setOpen] = useState(false)
   const sorted = [...members].sort((a,b)=>parseISO(a.date)-parseISO(b.date))
   const first  = sorted[0]; const last = sorted[sorted.length-1]
@@ -169,10 +160,10 @@ function RecurringGroup({ members, navigate, services, isAr }) {
   )
 }
 
-const blankForm = { title:'', date:format(new Date(),'yyyy-MM-dd'), time:'10:00', type:'', notes:'', recurrence:{ enabled:false, frequency:'weekly', count:8, endDate:'', copyTeam:true, copySetlist:false } }
+const blankForm = { title:'', date:format(new Date(),'yyyy-MM-dd'), time:'10:00', type:'', notes:'', recurrence:{ enabled:false, frequency:'weekly', count:8, endDate:'' } }
 
 export default function Services() {
-  const { services, addService } = useStore()
+  const { services, addService, currentUser } = useStore()
   const { t, isAr } = useLang()
   const navigate = useNavigate()
   const [tab,     setTab]     = useState('upcoming')
@@ -180,26 +171,30 @@ export default function Services() {
   const [grouped, setGrouped] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [form,    setForm]    = useState({ ...blankForm, type: isAr?'خدمة أحد':'Sunday Service' })
-  const today = new Date()
+  const todayKey = format(new Date(),'yyyy-MM-dd')
+  const canManage = canManageWorship(currentUser)
 
   const SERVICE_TYPES = isAr ? SERVICE_TYPES_AR : SERVICE_TYPES_EN
 
   const filtered = services.filter(s => {
     const q = search.toLowerCase()
     const matchQ = s.title.toLowerCase().includes(q) || s.type.toLowerCase().includes(q)
-    const d = parseISO(s.date)
-    if (tab==='upcoming') return matchQ && isAfter(d,addDays(today,-1)) && s.status!=='completed'
-    if (tab==='past')     return matchQ && (isBefore(d,today)||s.status==='completed')
+    if (tab==='upcoming') return matchQ && s.date>=todayKey && s.status!=='completed' && s.status!=='cancelled'
+    if (tab==='past')     return matchQ && (s.date<todayKey||s.status==='completed'||s.status==='cancelled')
     return matchQ
   }).sort((a,b)=>tab==='past'?parseISO(b.date)-parseISO(a.date):parseISO(a.date)-parseISO(b.date))
 
-  const upcomingCount  = services.filter(s=>isAfter(parseISO(s.date),addDays(today,-1))&&s.status!=='completed').length
-  const recurringCount = [...new Set(services.filter(s=>s.recurrenceGroupId).map(s=>s.recurrenceGroupId))].length
+  const upcomingCount  = services.filter(s=>s.date>=todayKey&&s.status!=='completed'&&s.status!=='cancelled').length
+  const recurringCount = [...new Set(services.filter(s=>s.recurrenceGroupId).map(s=>s.recurrenceGroupId))]
+    .filter(groupId=>services.filter(service=>service.recurrenceGroupId===groupId).length>1).length
 
   const handleAdd = async () => {
     if (!form.title || !form.date) return
-    await addService({ ...form, status:'scheduled' })
-    setShowAdd(false); setForm({ ...blankForm, type: isAr?'خدمة أحد':'Sunday Service' })
+    const result = await addService({ ...form, status:'scheduled' })
+    if (!result?.error) {
+      setShowAdd(false)
+      setForm({ ...blankForm, type: isAr?'خدمة أحد':'Sunday Service' })
+    }
   }
 
   const renderList = () => {
@@ -207,8 +202,8 @@ export default function Services() {
     const seen = new Set(); const rows = []
     filtered.forEach(svc => {
       const gid = svc.recurrenceGroupId
-      if (!gid) { rows.push(<ServiceRow key={svc.id} svc={svc} services={services} navigate={navigate} isAr={isAr}/>); return }
-      if (!seen.has(gid)) { seen.add(gid); rows.push(<RecurringGroup key={gid} members={filtered.filter(s=>s.recurrenceGroupId===gid)} navigate={navigate} services={services} isAr={isAr}/>) }
+      if (!gid || services.filter(service=>service.recurrenceGroupId===gid).length<2) { rows.push(<ServiceRow key={svc.id} svc={svc} services={services} navigate={navigate} isAr={isAr}/>); return }
+      if (!seen.has(gid)) { seen.add(gid); rows.push(<RecurringGroup key={gid} members={filtered.filter(s=>s.recurrenceGroupId===gid)} navigate={navigate} isAr={isAr}/>) }
     })
     return rows
   }
@@ -221,13 +216,14 @@ export default function Services() {
           { label:t('past'),     value:'past' },
           { label:t('all'),      value:'all' },
         ]} active={tab} onChange={setTab}/>
-        <div className="flex items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder={isAr?'ابحث في الخدمات...':'Search services...'} className="w-52"/>
+        <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
+          <SearchInput value={search} onChange={setSearch} placeholder={isAr?'ابحث في الخدمات...':'Search services...'} className="min-w-0 flex-1 sm:w-52 sm:flex-none"/>
           <button onClick={()=>setGrouped(!grouped)} title={isAr?'تجميع المتكررة':'Group recurring'}
+            aria-label={isAr?'تجميع الخدمات المتكررة':'Group recurring services'} aria-pressed={grouped}
             className={`p-2.5 rounded-lg border cursor-pointer transition-all ${grouped?'bg-violet-50 border-violet-300 text-violet-600':'border-slate-200 text-slate-400 hover:border-slate-300'}`}>
             <Repeat size={16}/>
           </button>
-          <Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>
+          {canManage&&<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>}
         </div>
       </div>
 
@@ -241,11 +237,11 @@ export default function Services() {
         ? <EmptyState icon={<Calendar size={28}/>}
             title={isAr?'لا توجد خدمات':'No services found'}
             description={tab==='upcoming'?(isAr?'لا توجد خدمات قادمة.':'No upcoming services.'):(isAr?'لا توجد نتائج.':'No results.')}
-            action={<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>}/>
+            action={canManage?<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>:null}/>
         : <div className="space-y-3">{renderList()}</div>
       }
 
-      <Modal open={showAdd} onClose={()=>setShowAdd(false)} title={isAr?'إنشاء خدمة جديدة':'Create New Service'} size="lg"
+      <Modal open={canManage&&showAdd} onClose={()=>setShowAdd(false)} title={isAr?'إنشاء خدمة جديدة':'Create New Service'} size="lg"
         footer={<>
           <Btn variant="secondary" onClick={()=>setShowAdd(false)}>{t('cancel')}</Btn>
           <Btn onClick={handleAdd} disabled={!form.title||!form.date} icon={form.recurrence?.enabled?<Repeat size={14}/>:<Plus size={14}/>}>

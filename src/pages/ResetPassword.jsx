@@ -5,7 +5,7 @@ import { useLang } from '../lib/i18n.jsx'
 import { KDEC_LOGO } from '../assets/kdecLogo.js'
 
 export default function ResetPassword() {
-  const { updatePassword } = useStore()
+  const { updatePassword, finishPasswordRecovery } = useStore()
   const { isAr } = useLang()
 
   const [password,  setPassword]  = useState('')
@@ -60,7 +60,7 @@ export default function ResetPassword() {
                 </div>
 
                 {error && (
-                  <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                  <div role="alert" className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
                     <AlertCircle size={15} className="flex-shrink-0 mt-0.5"/>
                     <span>{error}</span>
                   </div>
@@ -68,16 +68,17 @@ export default function ResetPassword() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="relative">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label htmlFor="recovery-password" className="block text-sm font-medium text-slate-700 mb-1.5">
                       {isAr ? 'كلمة المرور الجديدة' : 'New Password'}
                     </label>
                     <div className="relative">
                       <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
-                      <input type={showPass ? 'text' : 'password'} value={password}
+                      <input id="recovery-password" name="new-password" type={showPass ? 'text' : 'password'} value={password}
                         onChange={e => setPassword(e.target.value)}
-                        placeholder="••••••••" required
+                        placeholder="••••••••" required minLength={6} autoComplete="new-password"
                         className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
-                      <button type="button" onClick={() => setShowPass(!showPass)}
+                      <button type="button" onClick={() => setShowPass(!showPass)} aria-pressed={showPass}
+                        aria-label={showPass?(isAr?'إخفاء كلمة المرور':'Hide password'):(isAr?'إظهار كلمة المرور':'Show password')}
                         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer">
                         {showPass ? <EyeOff size={15}/> : <Eye size={15}/>}
                       </button>
@@ -85,11 +86,11 @@ export default function ResetPassword() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    <label htmlFor="recovery-confirm" className="block text-sm font-medium text-slate-700 mb-1.5">
                       {isAr ? 'تأكيد كلمة المرور' : 'Confirm Password'}
                     </label>
-                    <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
-                      placeholder="••••••••" required
+                    <input id="recovery-confirm" name="confirm-password" type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
+                      placeholder="••••••••" required minLength={6} autoComplete="new-password"
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
                   </div>
 
@@ -115,7 +116,7 @@ export default function ResetPassword() {
                     {isAr ? 'يمكنك الآن استخدام كلمة المرور الجديدة لتسجيل الدخول' : 'You can now use your new password to sign in'}
                   </p>
                 </div>
-                <button onClick={() => window.location.href = '/'}
+                <button onClick={() => { finishPasswordRecovery(); window.location.assign('/') }}
                   className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold rounded-xl cursor-pointer hover:from-indigo-700 transition-all">
                   {isAr ? 'الذهاب للتطبيق' : 'Go to App'}
                 </button>

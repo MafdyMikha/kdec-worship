@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { GripVertical, Trash2, Music2, Edit2, Check, X, Plus, MessageSquare, Globe } from 'lucide-react'
+import { GripVertical, Trash2, Music2, Edit2, Check, X, Plus, MessageSquare, Globe, ArrowUp, ArrowDown } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { Card, Badge, Btn, Modal, Select, Input } from '../components/ui'
+import { Card, Badge, Btn, Modal, Select, Input, SearchInput } from '../components/ui'
 
 const KEYS = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Am','Dm','Em','Gm','Bm']
 
@@ -23,7 +23,7 @@ function KeyEditor({ value, onChange }) {
   const [editing, setEditing] = useState(false)
   const [local, setLocal] = useState(value || 'G')
   if (!editing) return (
-    <button onClick={() => setEditing(true)}
+    <button onClick={() => setEditing(true)} aria-label="Edit song key"
       className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 rounded text-xs font-medium cursor-pointer transition-all">
       {value || '—'} <Edit2 size={9}/>
     </button>
@@ -34,8 +34,8 @@ function KeyEditor({ value, onChange }) {
         className="px-2 py-0.5 border border-indigo-300 rounded text-xs focus:outline-none bg-white">
         {KEYS.map(k => <option key={k}>{k}</option>)}
       </select>
-      <button onClick={() => { onChange(local); setEditing(false) }} className="p-1 text-emerald-500 cursor-pointer"><Check size={13}/></button>
-      <button onClick={() => setEditing(false)} className="p-1 text-slate-400 cursor-pointer"><X size={13}/></button>
+      <button onClick={() => { onChange(local); setEditing(false) }} aria-label="Save song key" className="p-1 text-emerald-500 cursor-pointer"><Check size={13}/></button>
+      <button onClick={() => setEditing(false)} aria-label="Cancel key edit" className="p-1 text-slate-400 cursor-pointer"><X size={13}/></button>
     </div>
   )
 }
@@ -75,8 +75,8 @@ function NotesBlock({ block, onUpdate, onDelete, canEdit, isAr }) {
             <p className="text-sm leading-relaxed" dir="auto">{block.text || <span className="opacity-40 italic">{isAr?'فارغ':'Empty'}</span>}</p>
             {canEdit && (
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                <button onClick={()=>setEditing(true)} className="p-1 hover:bg-white/60 rounded cursor-pointer"><Edit2 size={11}/></button>
-                <button onClick={onDelete} className="p-1 hover:bg-white/60 rounded cursor-pointer"><Trash2 size={11}/></button>
+                <button onClick={()=>setEditing(true)} aria-label={isAr?'تعديل الملاحظة':'Edit block'} className="p-1 hover:bg-white/60 rounded cursor-pointer"><Edit2 size={11}/></button>
+                <button onClick={onDelete} aria-label={isAr?'حذف الملاحظة':'Delete block'} className="p-1 hover:bg-white/60 rounded cursor-pointer"><Trash2 size={11}/></button>
               </div>
             )}
           </div>
@@ -86,7 +86,7 @@ function NotesBlock({ block, onUpdate, onDelete, canEdit, isAr }) {
   )
 }
 
-function SongRow({ item, idx, canEdit, onRemove, onUpdateKey, dragOver, onDragStart, onDragOver, onDrop, isAr }) {
+function SongRow({ item, idx, total, canEdit, onRemove, onUpdateKey, onMoveUp, onMoveDown, dragOver, onDragStart, onDragOver, onDrop, isAr }) {
   const [showEn, setShowEn] = useState(false)
   const song = item.song
   const hasEn = !!(song?.titleEn && song.titleEn.trim())
@@ -101,7 +101,7 @@ function SongRow({ item, idx, canEdit, onRemove, onUpdateKey, dragOver, onDragSt
 
       <div className="flex items-center gap-1 flex-shrink-0 mt-1">
         <span className="text-slate-300 w-5 text-center text-sm font-mono">{idx+1}</span>
-        {canEdit && <button className="text-slate-200 hover:text-slate-400 cursor-grab active:cursor-grabbing p-0.5"><GripVertical size={15}/></button>}
+        {canEdit && <span className="text-slate-300 cursor-grab p-0.5" aria-hidden="true"><GripVertical size={15}/></span>}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -110,7 +110,7 @@ function SongRow({ item, idx, canEdit, onRemove, onUpdateKey, dragOver, onDragSt
             <div className="flex items-start gap-2 flex-wrap mb-1.5">
               <span className="font-bold text-slate-800 text-base leading-snug" dir="rtl">{song.title}</span>
               {hasEn && (
-                <button onClick={()=>setShowEn(v=>!v)}
+                <button onClick={()=>setShowEn(v=>!v)} aria-pressed={showEn} aria-label={isAr?'إظهار العنوان الإنجليزي':'Show English title'}
                   className={`flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border cursor-pointer transition-all mt-0.5 ${showEn?'bg-indigo-600 text-white border-indigo-600':'bg-white text-indigo-400 border-indigo-200 hover:border-indigo-400 hover:text-indigo-600'}`}>
                   <Globe size={9}/> EN
                 </button>
@@ -124,7 +124,7 @@ function SongRow({ item, idx, canEdit, onRemove, onUpdateKey, dragOver, onDragSt
                 : <Badge color="slate" size="xs">{item.key||song.key}</Badge>}
               {song.bpm && <span className="text-xs text-slate-400">{song.bpm} BPM</span>}
               {song.timeSignature && song.timeSignature!=='4/4' && <span className="text-xs text-slate-400">{song.timeSignature}</span>}
-              {song.author && <span className="text-xs text-slate-300">· {song.author}</span>}
+              {song.author && <span className="text-xs text-slate-500">· {song.author}</span>}
             </div>
 
             {song.sequence?.length>0 && (
@@ -142,17 +142,18 @@ function SongRow({ item, idx, canEdit, onRemove, onUpdateKey, dragOver, onDragSt
       </div>
 
       {canEdit && (
-        <button onClick={()=>onRemove(item.id)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-all flex-shrink-0 mt-0.5">
-          <Trash2 size={14}/>
-        </button>
+        <div className="flex flex-col gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+          <button onClick={onMoveUp} disabled={idx===0} aria-label={isAr?'تحريك لأعلى':'Move song up'} className="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-20"><ArrowUp size={13}/></button>
+          <button onClick={onMoveDown} disabled={idx===total-1} aria-label={isAr?'تحريك لأسفل':'Move song down'} className="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-20"><ArrowDown size={13}/></button>
+          <button onClick={()=>onRemove(item.id)} aria-label={isAr?'إزالة الترنيمة':'Remove song'} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13}/></button>
+        </div>
       )}
     </div>
   )
 }
 
 export default function SetlistTab({ service, canEdit=true }) {
-  const { songs, addToSetlist, removeFromSetlist, reorderSetlist } = useStore()
+  const { songs, addToSetlist, removeFromSetlist, reorderSetlist, updateSetlistBlocks } = useStore()
   const { isAr, t } = useLang()
 
   const [showAddSong,   setShowAddSong]   = useState(false)
@@ -163,16 +164,16 @@ export default function SetlistTab({ service, canEdit=true }) {
   const [dragIdx,       setDragIdx]       = useState(null)
   const [dragOver,      setDragOver]      = useState(null)
   const [showBlockMenu, setShowBlockMenu] = useState(null)
-  const [blocks,        setBlocks]        = useState({})
+  const [blocks,        setBlocks]        = useState(() => service.setlistBlocks || {})
 
   const sortedSetlist = [...service.setlist]
     .sort((a,b)=>a.order-b.order)
     .map(item=>({...item, song:songs.find(s=>s.id===item.songId)||item.song}))
 
-  const filteredSongs = songs.filter(s => {
+  const filteredSongs = songs.filter(s => s.status!=='inactive').filter(s => {
     if (!songSearch) return !service.setlist.find(i=>i.songId===s.id)
     const q = songSearch.toLowerCase()
-    return (s.title.includes(songSearch)||(s.titleEn||'').toLowerCase().includes(q)||(s.author||'').toLowerCase().includes(q))
+    return ((s.title||'').toLowerCase().includes(q)||(s.titleEn||'').toLowerCase().includes(q)||(s.author||'').toLowerCase().includes(q))
       && !service.setlist.find(i=>i.songId===s.id)
   })
 
@@ -186,11 +187,13 @@ export default function SetlistTab({ service, canEdit=true }) {
     setDragIdx(null); setDragOver(null)
   }
   const handleUpdateKey=(item,newKey)=>{ reorderSetlist(service.id,sortedSetlist.map(i=>i.id===item.id?{...i,key:newKey}:i)) }
-  const handleAddSong=()=>{ if(!selectedSong)return; addToSetlist(service.id,selectedSong.id,songKey||selectedSong.key,songNotes); setShowAddSong(false);setSelectedSong(null);setSongKey('');setSongNotes('');setSongSearch('') }
+  const moveItem=(from,to)=>{ if(to<0||to>=sortedSetlist.length)return; const list=[...sortedSetlist]; const [item]=list.splice(from,1); list.splice(to,0,item); reorderSetlist(service.id,list.map((entry,index)=>({...entry,order:index+1}))) }
+  const handleAddSong=async()=>{ if(!selectedSong)return; const result=await addToSetlist(service.id,selectedSong.id,songKey||selectedSong.key,songNotes); if(!result?.error){setShowAddSong(false);setSelectedSong(null);setSongKey('');setSongNotes('');setSongSearch('')} }
 
-  const addBlock=(afterIdx,type)=>{ const key=`after_${afterIdx}`; setBlocks(b=>({...b,[key]:[...(b[key]||[]),{id:Date.now(),type,text:''}]})); setShowBlockMenu(null) }
-  const updateBlock=(afterIdx,blockId,data)=>{ const key=`after_${afterIdx}`; setBlocks(b=>({...b,[key]:(b[key]||[]).map(bl=>bl.id===blockId?data:bl)})) }
-  const deleteBlock=(afterIdx,blockId)=>{ const key=`after_${afterIdx}`; setBlocks(b=>({...b,[key]:(b[key]||[]).filter(bl=>bl.id!==blockId)})) }
+  const commitBlocks = async next => { const previous=blocks; setBlocks(next); const result=await updateSetlistBlocks(service.id,next); if(result?.error)setBlocks(previous) }
+  const addBlock=(afterItemId,type)=>{ const key=`after_${afterItemId}`; const nextIndex=(blocks[key]||[]).reduce((max,block)=>Math.max(max,Number(String(block.id).split('_').pop())||0),0)+1; commitBlocks({...blocks,[key]:[...(blocks[key]||[]),{id:`block_${afterItemId}_${nextIndex}`,type,text:''}]}); setShowBlockMenu(null) }
+  const updateBlock=(afterItemId,blockId,data)=>{ const key=`after_${afterItemId}`; commitBlocks({...blocks,[key]:(blocks[key]||[]).map(block=>block.id===blockId?data:block)}) }
+  const deleteBlock=(afterItemId,blockId)=>{ const key=`after_${afterItemId}`; commitBlocks({...blocks,[key]:(blocks[key]||[]).filter(block=>block.id!==blockId)}) }
 
   const BLOCK_TYPES = isAr
     ? [['note','📝 ملاحظة'],['prayer','🙏 صلاة'],['reading','📖 قراءة'],['break','⏸ استراحة']]
@@ -218,16 +221,17 @@ export default function SetlistTab({ service, canEdit=true }) {
       {sortedSetlist.map((item,idx)=>(
         <div key={item.id}>
           <SongRow
-            item={item} idx={idx} canEdit={canEdit} dragOver={dragOver} isAr={isAr}
+            item={item} idx={idx} total={sortedSetlist.length} canEdit={canEdit} dragOver={dragOver} isAr={isAr}
             onRemove={(id)=>removeFromSetlist(service.id,id)}
             onUpdateKey={handleUpdateKey}
+            onMoveUp={()=>moveItem(idx,idx-1)} onMoveDown={()=>moveItem(idx,idx+1)}
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDrop={handleDrop}/>
 
-          {(blocks[`after_${idx}`]||[]).map(bl=>(
+          {(blocks[`after_${item.id}`]||[]).map(bl=>(
             <div key={bl.id} className="ml-8 mt-2">
               <NotesBlock block={bl} canEdit={canEdit} isAr={isAr}
-                onUpdate={(data)=>updateBlock(idx,bl.id,data)}
-                onDelete={()=>deleteBlock(idx,bl.id)}/>
+                onUpdate={(data)=>updateBlock(item.id,bl.id,data)}
+                onDelete={()=>deleteBlock(item.id,bl.id)}/>
             </div>
           ))}
 
@@ -236,7 +240,7 @@ export default function SetlistTab({ service, canEdit=true }) {
               {showBlockMenu===idx ? (
                 <div className="flex gap-1.5 flex-wrap py-1 animate-slide-up">
                   {BLOCK_TYPES.map(([type,label])=>(
-                    <button key={type} onClick={()=>addBlock(idx,type)}
+                    <button key={type} onClick={()=>addBlock(item.id,type)}
                       className="px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg hover:border-slate-300 hover:bg-slate-50 cursor-pointer text-slate-600 transition-all">
                       {label}
                     </button>
@@ -245,7 +249,7 @@ export default function SetlistTab({ service, canEdit=true }) {
                 </div>
               ) : (
                 <button onClick={()=>setShowBlockMenu(idx)}
-                  className="flex items-center gap-1 text-xs text-slate-300 hover:text-slate-500 cursor-pointer transition-all py-0.5">
+                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 cursor-pointer transition-all py-1">
                   <Plus size={10}/> <MessageSquare size={10}/> {t('addBlock')}
                 </button>
               )}
@@ -262,15 +266,14 @@ export default function SetlistTab({ service, canEdit=true }) {
           <Btn onClick={handleAddSong} disabled={!selectedSong}>{isAr?'إضافة للقائمة':'Add to Setlist'}</Btn>
         </>}>
         <div className="space-y-4">
-          <input value={songSearch} onChange={e=>{setSongSearch(e.target.value);setSelectedSong(null)}}
-            placeholder={isAr?'ابحث بالعربي أو الإنجليزي أو اسم المؤلف...':'Search by title, English title or author...'} dir="auto"
-            className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
+          <SearchInput value={songSearch} onChange={value=>{setSongSearch(value);setSelectedSong(null)}}
+            placeholder={isAr?'ابحث بالعربي أو الإنجليزي أو اسم المؤلف...':'Search by title, English title or author...'} className="w-full"/>
 
           <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
             {filteredSongs.length===0 && <p className="text-slate-400 text-sm text-center py-6">{isAr?'لا توجد نتائج':'No results'}</p>}
             {filteredSongs.map(s=>(
-              <div key={s.id} onClick={()=>{setSelectedSong(s);setSongKey(s.key)}}
-                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-all ${selectedSong?.id===s.id?'border-indigo-300 bg-indigo-50':'border-transparent hover:bg-slate-50'}`}>
+              <button type="button" key={s.id} onClick={()=>{setSelectedSong(s);setSongKey(s.key)}} aria-pressed={selectedSong?.id===s.id}
+                className={`w-full text-start flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-all ${selectedSong?.id===s.id?'border-indigo-300 bg-indigo-50':'border-transparent hover:bg-slate-50'}`}>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-slate-800 text-sm" dir="rtl">{s.title}</div>
                   {s.titleEn && <div className="text-xs text-slate-400 italic">{s.titleEn}</div>}
@@ -280,7 +283,7 @@ export default function SetlistTab({ service, canEdit=true }) {
                   <Badge color="slate" size="xs">{s.key}</Badge>
                   {selectedSong?.id===s.id && <Check size={15} className="text-indigo-600"/>}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
 

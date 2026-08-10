@@ -4,6 +4,7 @@ import { formatDistanceToNow, parseISO, isValid } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
+import { canManageWorship } from '../lib/permissions.js'
 import { Card, Btn, Badge, Avatar, Modal, Input, Textarea, Select, EmptyState, ConfirmDialog } from '../components/ui'
 
 const blank = { title:'', content:'', priority:'normal' }
@@ -14,7 +15,7 @@ export default function Announcements() {
   const [showAdd,      setShowAdd]      = useState(false)
   const [form,         setForm]         = useState(blank)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const isAdmin = currentUser?.isAdmin || currentUser?.is_admin
+  const canManage = canManageWorship(currentUser)
 
   const PRIORITY_CONFIG = {
     high:   { color:'red',   icon:<AlertCircle size={16}/>,   label: isAr?'عاجل':'Urgent',  border:'border-l-red-400'   },
@@ -22,10 +23,10 @@ export default function Announcements() {
     low:    { color:'slate', icon:<AlertTriangle size={16}/>,  label: isAr?'منخفض':'Low',    border:'border-l-slate-300' },
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.title || !form.content) return
-    addAnnouncement(form)
-    setShowAdd(false); setForm(blank)
+    const result = await addAnnouncement(form)
+    if (!result?.error) { setShowAdd(false); setForm(blank) }
   }
 
   const getAuthor = (a) => {
@@ -38,7 +39,7 @@ export default function Announcements() {
     try {
       const d = parseISO(dateStr)
       if (isValid(d)) return formatDistanceToNow(d, { addSuffix:true, locale: isAr ? arLocale : undefined })
-    } catch {}
+    } catch { return dateStr }
     return dateStr
   }
 
@@ -48,7 +49,7 @@ export default function Announcements() {
         <p className="text-slate-500 text-sm">
           {announcements.length} {isAr ? 'إعلان' : 'announcements'}
         </p>
-        {isAdmin && (
+        {canManage && (
           <Btn onClick={() => setShowAdd(true)} icon={<Plus size={16}/>}>{t('newAnnouncement')}</Btn>
         )}
       </div>
@@ -57,13 +58,13 @@ export default function Announcements() {
         <EmptyState icon={<Megaphone size={28}/>}
           title={t('noAnnouncements')}
           description={isAr ? 'انشر إعلاناً لإبقاء فريق التسبيح على اطلاع.' : 'Post an announcement to keep the worship team informed.'}
-          action={isAdmin ? <Btn onClick={() => setShowAdd(true)} icon={<Plus size={16}/>}>{t('newAnnouncement')}</Btn> : null}/>
+          action={canManage ? <Btn onClick={() => setShowAdd(true)} icon={<Plus size={16}/>}>{t('newAnnouncement')}</Btn> : null}/>
       ) : (
         <div className="space-y-3">
           {announcements.map(a => {
             const config = PRIORITY_CONFIG[a.priority] || PRIORITY_CONFIG.normal
             const author = getAuthor(a)
-            const canDelete = isAdmin || a.author_id === currentUser?.id || a.author === currentUser?.id
+            const canDelete = canManage || a.author_id === currentUser?.id || a.author === currentUser?.id
             return (
               <Card key={a.id} className={`p-5 border-l-4 ${config.border} group`}>
                 <div className="flex items-start justify-between gap-3">
@@ -117,7 +118,7 @@ export default function Announcements() {
       </Modal>
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}
-        onConfirm={() => { deleteAnnouncement(deleteTarget); setDeleteTarget(null) }}
+        onConfirm={async() => { const result=await deleteAnnouncement(deleteTarget); if(!result?.error)setDeleteTarget(null); return result }}
         title={isAr ? 'حذف الإعلان' : 'Delete Announcement'}
         message={isAr ? 'هل أنت متأكد من حذف هذا الإعلان؟' : 'Are you sure you want to delete this announcement?'}/>
     </div>

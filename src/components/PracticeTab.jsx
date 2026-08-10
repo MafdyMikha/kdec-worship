@@ -2,15 +2,15 @@ import { useState } from 'react'
 import { Dumbbell, Plus, Check, X, Clock, MapPin, Edit2, Save, AlertCircle, Trash2, CheckCircle, HelpCircle } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { Card, Btn, Badge, Avatar, Textarea } from '../components/ui'
+import { Card, Btn, Badge, Avatar, Textarea, Input } from '../components/ui'
 import { format, parseISO } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 
-export default function PracticeTab({ service }) {
+export default function PracticeTab({ service, canEdit=false }) {
   const { people, setPractice, updatePracticeAttendance } = useStore()
-  const { isAr, t, lang } = useLang()
+  const { isAr, t } = useLang()
   const practice = service.practice
-  const [editing, setEditing] = useState(!practice?.enabled)
+  const [editing, setEditing] = useState(canEdit && !practice?.enabled)
   const [form, setForm] = useState({
     date:     practice?.date     || '',
     time:     practice?.time     || '18:00',
@@ -37,15 +37,17 @@ export default function PracticeTab({ service }) {
   const absent    = team.filter(tm=>tm.practiceStatus==='absent').length
   const pending   = team.filter(tm=>tm.practiceStatus==='pending').length
 
-  const save = () => {
+  const save = async () => {
     if (!form.date) return
-    setPractice(service.id, {...form, enabled:true, attendance:practice?.attendance||[]})
-    setEditing(false)
+    const result = await setPractice(service.id, {...form, enabled:true, attendance:practice?.attendance||[]})
+    if (!result?.error) setEditing(false)
   }
-  const remove = () => {
-    setPractice(service.id, {enabled:false})
-    setForm({date:'',time:'18:00',location:isAr?'قاعة الكنيسة':'Church Hall',notes:''})
-    setEditing(true)
+  const remove = async () => {
+    const result = await setPractice(service.id, {enabled:false})
+    if (!result?.error) {
+      setForm({date:'',time:'18:00',location:isAr?'قاعة الكنيسة':'Church Hall',notes:''})
+      setEditing(true)
+    }
   }
 
   if (!practice?.enabled && !editing) return (
@@ -57,13 +59,13 @@ export default function PracticeTab({ service }) {
       <p className="text-sm text-slate-500 mb-5">
         {isAr ? 'أضف جلسة بروفة لمتابعة الحضور بشكل منفصل.' : 'Add a practice session to track attendance separately.'}
       </p>
-      <Btn onClick={()=>setEditing(true)} icon={<Plus size={16}/>}>{t('schedulePractice')}</Btn>
+      {canEdit&&<Btn onClick={()=>setEditing(true)} icon={<Plus size={16}/>}>{t('schedulePractice')}</Btn>}
     </Card>
   )
 
   return (
     <div className="space-y-4">
-      {editing ? (
+      {editing && canEdit ? (
         <Card className="p-5 border-2 border-emerald-200">
           <div className="flex items-center gap-2 mb-5">
             <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
@@ -74,28 +76,12 @@ export default function PracticeTab({ service }) {
             </h3>
           </div>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  {t('date')} <span className="text-red-500">*</span>
-                </label>
-                <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:border-slate-300"/>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('time')}</label>
-                <input type="time" value={form.time} onChange={e=>setForm(f=>({...f,time:e.target.value}))}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:border-slate-300"/>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label={t('date')} required type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
+              <Input label={t('time')} type="time" value={form.time} onChange={e=>setForm(f=>({...f,time:e.target.value}))}/>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
-                <MapPin size={12}/>{t('location')}
-              </label>
-              <input value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))}
-                placeholder={isAr ? 'قاعة الكنيسة، غرفة التدريب...' : 'Church hall, rehearsal room...'}
-                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:border-slate-300"/>
-            </div>
+            <Input label={t('location')} value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))}
+              placeholder={isAr?'قاعة الكنيسة، غرفة التدريب...':'Church hall, rehearsal room...'}/>
             <Textarea label={t('practiceNotes')} value={form.notes}
               onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
               placeholder={isAr ? 'محاور البروفة، الترانيم المطلوبة...' : 'Focus areas, songs to rehearse...'} rows={3}/>
@@ -141,15 +127,16 @@ export default function PracticeTab({ service }) {
                   )}
                 </div>
               </div>
-              <div className="flex gap-1 flex-shrink-0">
+              {canEdit&&<div className="flex gap-1 flex-shrink-0">
                 <button onClick={()=>{setForm({date:practice.date||'',time:practice.time||'18:00',location:practice.location||'',notes:practice.notes||''});setEditing(true)}}
+                  aria-label={isAr?'تعديل البروفة':'Edit practice'}
                   className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer">
                   <Edit2 size={15}/>
                 </button>
-                <button onClick={remove} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">
+                <button onClick={remove} aria-label={isAr?'إزالة البروفة':'Remove practice'} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer">
                   <Trash2 size={15}/>
                 </button>
-              </div>
+              </div>}
             </div>
             {team.length > 0 && (
               <div className="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -170,12 +157,13 @@ export default function PracticeTab({ service }) {
                       <div className="text-xs text-slate-400">{m.role}</div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {Object.entries(STATUSES).map(([st,cfg])=>(
+                      {canEdit ? Object.entries(STATUSES).map(([st,cfg])=>(
                         <button key={st} onClick={()=>updatePracticeAttendance(service.id,m.personId,st)}
+                          aria-pressed={m.practiceStatus===st} aria-label={cfg.label}
                           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-all select-none ${m.practiceStatus===st?cfg.bg:'border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'}`}>
                           {cfg.icon}<span className="hidden sm:inline">{cfg.label}</span>
                         </button>
-                      ))}
+                      )) : <Badge color={m.practiceStatus==='attending'?'green':m.practiceStatus==='absent'?'red':m.practiceStatus==='maybe'?'yellow':'slate'} size="xs">{STATUSES[m.practiceStatus]?.label||(isAr?'لم يرد':'Pending')}</Badge>}
                     </div>
                   </div>
                 </Card>

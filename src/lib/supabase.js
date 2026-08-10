@@ -1,12 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
+import { resolveRuntimeConfig } from './runtimeConfig.js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+const config = resolveRuntimeConfig(import.meta.env)
 
-export const hasSupabase = !!(url && key && url.includes('supabase.co'))
+export const hasSupabase = config.hasSupabase
+export const isDemoMode = config.isDemoMode
+export const hasValidConfiguration = config.hasValidConfiguration
 
 export const supabase = hasSupabase
-  ? createClient(url, key, {
+  ? createClient(config.supabaseUrl, config.supabaseKey, {
       auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
     })
   : null

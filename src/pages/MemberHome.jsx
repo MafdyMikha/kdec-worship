@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Calendar, CheckCircle, AlertCircle, ChevronRight, Music2, Users, X } from 'lucide-react'
-import { format, parseISO, isAfter, addDays, differenceInMinutes, differenceInHours } from 'date-fns'
+import { format, parseISO, differenceInMinutes, differenceInHours } from 'date-fns'
 import { ar } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
@@ -28,7 +28,7 @@ function ExcuseModal({ open, onClose, onSubmit, serviceName, isAr }) {
     <Modal open={open} onClose={onClose} title={isAr?'تقديم عذر':'Submit Excuse'} size="sm"
       footer={<>
         <Btn variant="secondary" onClick={onClose}>{isAr?'إلغاء':'Cancel'}</Btn>
-        <Btn variant="danger" onClick={()=>{ if(reason.trim()){onSubmit(reason);onClose()} }} disabled={!reason.trim()}>{isAr?'إرسال العذر':'Send Excuse'}</Btn>
+        <Btn variant="danger" onClick={async()=>{ if(!reason.trim())return; const result=await onSubmit(reason); if(!result?.error){setReason('');onClose()} }} disabled={!reason.trim()}>{isAr?'إرسال العذر':'Send Excuse'}</Btn>
       </>}>
       <div className="space-y-4">
         <p className="text-sm text-slate-600">{isAr?'تقديم عذر عن:':'Excuse for:'} <strong>{serviceName}</strong></p>
@@ -47,7 +47,7 @@ function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
   })
   return (
     <Modal open={open} onClose={onClose} title={isAr?'طلب بديل':'Request Substitute'} size="md"
-      footer={<><Btn variant="secondary" onClick={onClose}>{isAr?'إلغاء':'Cancel'}</Btn><Btn onClick={()=>{onSubmit(note);onClose()}}>{isAr?'إرسال الطلب':'Send Request'}</Btn></>}>
+      footer={<><Btn variant="secondary" onClick={onClose}>{isAr?'إلغاء':'Cancel'}</Btn><Btn onClick={async()=>{const result=await onSubmit(note);if(!result?.error){setNote('');onClose()}}}>{isAr?'إرسال الطلب':'Send Request'}</Btn></>}>
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           {isAr
@@ -78,8 +78,11 @@ function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
 }
 
 export default function MemberHome() {
-  const { isAr, t, lang } = useLang()
-  const { currentUser, services, people, songs, updateTeamMemberStatus } = useStore()
+  const { isAr } = useLang()
+  const {
+    currentUser, services, people, songs, excuseRequests, substituteRequests,
+    updateTeamMemberStatus, submitExcuse, requestSubstitute,
+  } = useStore()
   const navigate   = useNavigate()
   const [excuseModal, setExcuseModal] = useState(null)
   const [subModal,    setSubModal]    = useState(null)
@@ -89,15 +92,14 @@ export default function MemberHome() {
 
   // My upcoming assignments
   const myServices = services
-    .filter(s => s.team.find(t=>t.personId===currentUser?.id) && isAfter(parseISO(s.date), addDays(today,-1)))
+    .filter(s => s.status !== 'cancelled' && s.team.find(t=>t.personId===currentUser?.id) && s.date>=format(today,'yyyy-MM-dd'))
     .sort((a,b)=>parseISO(a.date)-parseISO(b.date))
 
   const nextSvc   = myServices[0]
-  const myEntry   = nextSvc?.team.find(t=>t.personId===currentUser?.id)
   const colors    = INSTRUMENT_COLORS[currentUser?.role] || INSTRUMENT_COLORS['Vocalist']
 
   // Top songs
-  const topSongs  = [...songs].sort((a,b)=>(b.usageCount||0)-(a.usageCount||0)).slice(0,5)
+  const topSongs  = songs.filter(s => s.status !== 'inactive').sort((a,b)=>(b.usageCount||0)-(a.usageCount||0)).slice(0,5)
 
   const STATUS_COLORS = { confirmed:'green', pending:'yellow', declined:'red' }
   const STATUS_LABEL  = isAr
@@ -128,9 +130,9 @@ export default function MemberHome() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* My upcoming services */}
-        <div className="col-span-2 lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-semibold text-slate-800">{isAr?'خدماتي القادمة':'My Upcoming Services'}</h3>
             <button onClick={()=>navigate('/schedule')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer">
@@ -145,8 +147,16 @@ export default function MemberHome() {
             </Card>
           ) : myServices.slice(0,4).map(svc => {
             const entry = svc.team.find(t=>t.personId===currentUser?.id)
+            const responseLocked = excuseRequests.some(request => (
+              request.service_id===svc.id && request.person_id===currentUser?.id && ['pending','approved'].includes(request.status)
+            )) || substituteRequests.some(request => (
+              request.service_id===svc.id && request.requester_id===currentUser?.id && ['open','filled'].includes(request.status)
+            ))
+            const committedSubstitute = substituteRequests.some(request => (
+              request.service_id===svc.id && request.substitute_id===currentUser?.id && request.status==='filled'
+            ))
             return (
-              <Card key={svc.id} hover onClick={()=>navigate(`/services/${svc.id}`)} className="p-4">
+              <Card key={svc.id} className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0 w-14 text-center bg-slate-50 rounded-xl py-2">
                     <div className="text-xs font-medium text-slate-400">{format(parseISO(svc.date),'MMM',{locale})}</div>
@@ -154,27 +164,38 @@ export default function MemberHome() {
                     <div className="text-xs text-slate-400">{format(parseISO(svc.date),'EEE',{locale})}</div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-display font-semibold text-slate-800">{svc.title}</h4>
+                    <h4 className="font-display font-semibold text-slate-800">
+                      <button onClick={()=>navigate(`/services/${svc.id}`)} className="text-start hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
+                        {svc.title}
+                      </button>
+                    </h4>
                     <div className="flex items-center gap-3 text-sm text-slate-500 mt-1 flex-wrap">
                       <span className="flex items-center gap-1"><Clock size={12}/>{svc.time}</span>
                       <span className="flex items-center gap-1"><Music2 size={12}/>{svc.setlist.length} {isAr?'ترنيمة':'songs'}</span>
                       {entry && <Badge color={STATUS_COLORS[entry.status]||'slate'} size="xs">{STATUS_LABEL[entry.status]||entry.status}</Badge>}
                     </div>
                     {entry && (
-                      <div className="flex gap-2 mt-3" onClick={e=>e.stopPropagation()}>
-                        {entry.status!=='confirmed' && (
+                      <div className="flex gap-2 mt-3">
+                        {entry.status!=='confirmed' && !responseLocked && (
                           <Btn variant="success" size="xs" onClick={()=>updateTeamMemberStatus(svc.id,currentUser.id,'confirmed')}>
                             <CheckCircle size={12}/> {isAr?'تأكيد':'Confirm'}
                           </Btn>
                         )}
-                        {entry.status!=='declined' && (
+                        {responseLocked && <button type="button" onClick={()=>navigate('/requests')}
+                          className="text-xs text-amber-700 underline underline-offset-2 cursor-pointer">
+                          {isAr?'راجع الطلبات':'Review requests'}
+                        </button>}
+                        {entry.status!=='declined' && !committedSubstitute && (
                           <Btn variant="secondary" size="xs" onClick={()=>setExcuseModal(svc)}>
                             <X size={12}/> {isAr?'اعتذار':'Excuse'}
                           </Btn>
                         )}
-                        <Btn variant="outline" size="xs" onClick={()=>setSubModal(svc)}>
+                        {!committedSubstitute && <Btn variant="outline" size="xs" onClick={()=>setSubModal(svc)}>
                           <Users size={12}/> {isAr?'بديل':'Sub'}
-                        </Btn>
+                        </Btn>}
+                        {committedSubstitute && <span className="text-xs font-medium text-indigo-600">
+                          {isAr?'مُعيّن كبديل':'Assigned substitute'}
+                        </span>}
                       </div>
                     )}
                   </div>
@@ -224,13 +245,13 @@ export default function MemberHome() {
       <ExcuseModal
         open={!!excuseModal} onClose={()=>setExcuseModal(null)}
         serviceName={excuseModal?.title||''}
-        onSubmit={()=>updateTeamMemberStatus(excuseModal?.id,currentUser?.id,'declined')}
+        onSubmit={reason=>submitExcuse(excuseModal?.id,reason)}
         isAr={isAr}
       />
       <SubModal
         open={!!subModal} onClose={()=>setSubModal(null)}
-        service={subModal} myRole={currentUser?.role}
-        people={people} onSubmit={()=>{}} isAr={isAr}
+        service={subModal} myRole={subModal?.team.find(entry=>entry.personId===currentUser?.id)?.role||currentUser?.role}
+        people={people} onSubmit={note=>requestSubstitute(subModal?.id,subModal?.team.find(entry=>entry.personId===currentUser?.id)?.role||currentUser?.role,note)} isAr={isAr}
       />
     </div>
   )

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- translations and the language provider intentionally share one public module */
 import { createContext, useContext, useState, useEffect } from 'react'
 
 export const T = {
@@ -16,6 +17,7 @@ export const T = {
   profile:          { ar:'ملفي الشخصي',           en:'My Profile'             },
   invitations:      { ar:'الدعوات',               en:'Invitations'            },
   whatsappBulk:     { ar:'واتساب الجماعي',        en:'WhatsApp'               },
+  requests:         { ar:'الطلبات',               en:'Requests'               },
 
   // ── Common actions ───────────────────────────────────────
   save:             { ar:'حفظ',                   en:'Save'                   },
@@ -103,6 +105,7 @@ export const T = {
   team:             { ar:'الفريق',                 en:'Team'                   },
   teamDirectory:    { ar:'دليل الفريق',            en:'Team Directory'          },
   addMember:        { ar:'إضافة عضو',              en:'Add Member'             },
+  member:           { ar:'عضو',                    en:'Member'                 },
   inviteMember:     { ar:'دعوة عضو',               en:'Invite Member'          },
   noTeamYet:        { ar:'لا يوجد أعضاء في الفريق',en:'No team members'        },
   role:             { ar:'الدور',                  en:'Role'                   },
@@ -113,6 +116,7 @@ export const T = {
   requestSub:       { ar:'طلب بديل',               en:'Request Substitute'     },
   availableSubs:    { ar:'البدائل المتاحة',         en:'Available Substitutes'  },
   noSubs:           { ar:'لا يوجد بدائل بنفس الدور',en:'No substitutes with same role' },
+  addAsSub:         { ar:'إضافة كبديل',             en:'Add as substitute'      },
   active:           { ar:'نشط',                   en:'Active'                  },
   inactive:         { ar:'غير نشط',               en:'Inactive'               },
   onLeave:          { ar:'إجازة',                  en:'On Leave'               },
@@ -130,6 +134,7 @@ export const T = {
   totalMembers:     { ar:'إجمالي الأعضاء',         en:'Total Members'          },
   activeMembers:    { ar:'الأعضاء النشطون',        en:'Active Members'          },
   noMembersRole:    { ar:'لا يوجد أعضاء في هذا الدور',en:'No members in this role'},
+  addTimeSlot:      { ar:'إضافة وقت',               en:'Add time slot'          },
 
   // ── Practice ─────────────────────────────────────────────
   practice:         { ar:'البروفة',                en:'Practice'               },

@@ -29,10 +29,9 @@ const TYPE_COLOR = {
 const DEFAULT_COLOR = 'bg-slate-100 text-slate-600 border-slate-200'
 
 export default function Schedule() {
-  const { isAr, t, lang } = useLang()
+  const { isAr } = useLang()
   const { services, currentUser } = useStore()
   const navigate  = useNavigate()
-  const isAdmin   = currentUser?.isAdmin || currentUser?.is_admin
   const [current, setCurrent] = useState(new Date())
   const [view,    setView]    = useState('month')
 
@@ -78,17 +77,19 @@ export default function Schedule() {
 
       {/* ── Header row ─────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 min-w-0 w-full sm:w-auto">
           <button onClick={() => setCurrent(subMonths(current, 1))}
-            className="p-3 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer touch-manipulation transition-colors">
-            {isAr ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
+            aria-label={isAr ? 'الشهر السابق' : 'Previous month'}
+            className="p-3 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer touch-manipulation transition-colors flex-shrink-0">
+            {isAr ? <ChevronRight size={18} aria-hidden="true"/> : <ChevronLeft size={18} aria-hidden="true"/>}
           </button>
-          <h2 className="font-display font-bold text-xl text-slate-800 w-52 text-center">
+          <h2 className="font-display font-bold text-base sm:text-xl text-slate-800 flex-1 min-w-0 sm:w-52 sm:flex-none text-center truncate">
             {monthLabel}
           </h2>
           <button onClick={() => setCurrent(addMonths(current, 1))}
-            className="p-3 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer touch-manipulation transition-colors">
-            {isAr ? <ChevronLeft size={18}/> : <ChevronRight size={18}/>}
+            aria-label={isAr ? 'الشهر التالي' : 'Next month'}
+            className="p-3 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer touch-manipulation transition-colors flex-shrink-0">
+            {isAr ? <ChevronLeft size={18} aria-hidden="true"/> : <ChevronRight size={18} aria-hidden="true"/>}
           </button>
           <button onClick={() => setCurrent(new Date())}
             className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 cursor-pointer transition-colors">
@@ -108,46 +109,56 @@ export default function Schedule() {
 
       {/* ── Month / Calendar view ───────────────────────── */}
       {view === 'month' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 border-b border-slate-100">
-            {WEEKDAYS.map(day => (
-              <div key={day} className="py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                {day}
+        <div>
+          <p className="sm:hidden text-xs text-slate-500 mb-2">
+            {isAr ? 'مرّر أفقياً لعرض التقويم كاملاً.' : 'Scroll horizontally to view the full calendar.'}
+          </p>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto"
+            role="region" aria-label={`${monthLabel} ${isAr ? 'تقويم الخدمات' : 'service calendar'}`} tabIndex={0}>
+            <div className="min-w-[700px]">
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 border-b border-slate-100">
+                {WEEKDAYS.map(day => (
+                  <div key={day} className="py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    {day}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Day cells */}
-          <div className="grid grid-cols-7">
-            {days.map((day, idx) => {
-              const dayServices = services.filter(s => isSameDay(parseISO(s.date), day))
-              const inMonth     = isSameMonth(day, current)
-              const todayFlag   = isToday(day)
-              return (
-                <div key={idx}
-                  className={`min-h-24 p-2 border-b border-r border-slate-100 last:border-r-0 ${!inMonth ? 'bg-slate-50/60' : ''}`}>
-                  {/* Day number */}
-                  <div className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium mb-1.5 ${
-                    todayFlag   ? 'bg-indigo-600 text-white' :
-                    inMonth     ? 'text-slate-700' :
-                    'text-slate-300'
-                  }`}>
-                    {format(day, 'd')}
-                  </div>
-                  {/* Service chips */}
-                  <div className="space-y-0.5">
-                    {dayServices.map(svc => (
-                      <div key={svc.id}
-                        onClick={() => navigate(`/services/${svc.id}`)}
-                        className={`text-xs px-1.5 py-0.5 rounded border cursor-pointer truncate font-medium hover:opacity-75 transition-all ${TYPE_COLOR[svc.type] || DEFAULT_COLOR}`}>
-                        {svc.time} {svc.title}
+              {/* Day cells */}
+              <div className="grid grid-cols-7">
+                {days.map((day, idx) => {
+                  const dayServices = services.filter(s => isSameDay(parseISO(s.date), day))
+                  const inMonth     = isSameMonth(day, current)
+                  const todayFlag   = isToday(day)
+                  return (
+                    <div key={idx}
+                      className={`min-h-24 p-2 border-b border-r border-slate-100 last:border-r-0 ${!inMonth ? 'bg-slate-50/60' : ''}`}>
+                      {/* Day number */}
+                      <time dateTime={format(day, 'yyyy-MM-dd')} aria-current={todayFlag ? 'date' : undefined}
+                        className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium mb-1.5 ${
+                          todayFlag   ? 'bg-indigo-600 text-white' :
+                          inMonth     ? 'text-slate-700' :
+                          'text-slate-300'
+                        }`}>
+                        {format(day, 'd')}
+                      </time>
+                      {/* Service chips */}
+                      <div className="space-y-0.5">
+                        {dayServices.map(svc => (
+                          <button key={svc.id} type="button"
+                            onClick={() => navigate(`/services/${svc.id}`)}
+                            title={`${svc.time} ${svc.title}`}
+                            className={`block w-full text-start text-xs px-1.5 py-0.5 rounded border cursor-pointer truncate font-medium hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all ${TYPE_COLOR[svc.type] || DEFAULT_COLOR}`}>
+                            {svc.time} {svc.title}
+                          </button>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -218,7 +229,7 @@ export default function Schedule() {
                     </div>
                   </div>
 
-                  <ChevronRight size={16} className={`text-slate-300 flex-shrink-0 ${isAr ? 'rotate-180' : ''}`}/>
+                  <ChevronRight size={16} aria-hidden="true" className={`text-slate-300 flex-shrink-0 ${isAr ? 'rotate-180' : ''}`}/>
                 </div>
               </Card>
             )

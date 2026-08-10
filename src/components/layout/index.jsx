@@ -3,11 +3,10 @@ import Header from './Header'
 import MobileNav from './MobileNav'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
-import { Notifications } from '../ui'
 import { useLocation } from 'react-router-dom'
 
 export default function Layout({ children }) {
-  const { notifications, currentUser } = useStore()
+  const { currentUser } = useStore()
   const { t, isAr } = useLang()
   const { pathname } = useLocation()
   const isAdmin = currentUser?.isAdmin || currentUser?.is_admin
@@ -26,7 +25,9 @@ export default function Layout({ children }) {
     '/profile':      'profile',
     '/invitations':  'invitations',
     '/attendance':   'attendance',
+    '/checkin':      'attendance',
     '/events':       'events',
+    '/requests':     'requests',
     '/whatsapp':     'whatsappBulk',
   }
 
@@ -35,7 +36,7 @@ export default function Layout({ children }) {
   const title = t(key)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="flex h-screen h-dvh overflow-hidden bg-slate-50" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Sidebar — desktop only */}
       <Sidebar/>
 
@@ -53,7 +54,6 @@ export default function Layout({ children }) {
       {/* Mobile bottom navigation */}
       <MobileNav/>
 
-      <Notifications items={notifications}/>
     </div>
   )
 }

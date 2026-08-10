@@ -1,83 +1,123 @@
-# KDEC Worship Platform v2 — Setup Guide
+# Supabase setup
 
-## Quick Start
+This guide configures the persistent backend for KDEC Worship. Demo mode is browser-local and does not require Supabase.
+
+## 1. Create a project
+
+Create a Supabase project in a region close to the team. Save the project URL and public anonymous key from **Project Settings → API**.
+
+Do not put the service-role key in this application. Vite exposes every `VITE_*` variable to browser users.
+
+## 2. Apply the database schema
+
+For a new project, open **SQL Editor**, paste the complete contents of `supabase-schema-FULL.sql`, and run it once. That file is the authoritative fresh-install schema and includes multi-role columns, triggers, Row Level Security, and the currently planned tables.
+
+For an existing project:
+
+1. Take a database backup.
+2. Review and run `MIGRATION_security_data_integrity.sql` in **SQL Editor**. Do not rerun the fresh-install file over a deployed database.
+3. Read the SQL Editor output. The migration is rerunnable and preserves legacy rows, but it deliberately emits a warning and skips a unique index when duplicate historical attendance, recurrence position/date, pending-excuse, open-substitute, or filled-substitute-candidate rows need manual reconciliation. It also warns instead of guessing when legacy recurrence cadence metadata is ambiguous or conflicting.
+4. After cleaning any warned-about rows, rerun the migration and confirm that it completes without warnings.
+5. Validate any constraints left `NOT VALID` after legacy cleanup, for example with `alter table public.excuses validate constraint excuse_exactly_one_target_check;`.
+
+`MIGRATION_multi_role.sql` only adds and backfills the legacy `roles` columns. It does not apply the later authorization hardening or synchronize the rest of an older database.
+
+The security migration supersedes `MIGRATION_multi_role.sql`; do not run both on a newly upgraded database. It adds/backfills the multi-role fields itself.
+
+Attendance QR tokens are secrets. Only administrators may select the base `attendance_sessions` table. Authenticated active members resolve one active, unexpired token through `get_attendance_session(text)` and check in/out through `check_in_attendance(text)` and `check_out_attendance(uuid)`. Direct member inserts or timestamp edits on `attendance_records` are intentionally denied.
+
+Attendance, excuse, substitute, and assignment-response rows are audit-bearing workflow state. Members answer an assignment through `respond_to_service_assignment(uuid, text)` with `confirmed` or `declined`; direct member updates to `service_team` are denied. Members submit service excuses through `submit_service_excuse(uuid, text)`, which declines their matching team assignment before creating the pending excuse in the same transaction; direct authenticated inserts into `excuses` are denied. Worship managers fill an open substitute request through `fill_substitute_request(uuid, uuid)`, which reuses only a compatible pending/confirmed candidate assignment (or creates a missing pending one), declines the requester, and stamps the resolution atomically. Members can cancel their own pending/open requests, while worship managers review or cancel them. These operations accept only scheduled, non-past services using the organization timezone. Physical deletion of services, events, attendance sessions/records, excuses, and substitute requests is intentionally unavailable to authenticated clients—cancel/close them instead. Identity, workflow state, reviewer/resolver, and timestamps are enforced by database triggers.
+
+Worship managers extend an existing recurring service group through `generate_service_occurrences(uuid, uuid, jsonb)`. The source group must persist one consistent `recurrence_frequency` of `weekly`, `biweekly`, or `monthly`. The occurrence payload is a nonempty array of at most 52 objects with `date` and `recurrence_index` plus optional `title`, `time`, `type`, `notes`, and a matching `recurrence_frequency`. The database validates and locks the group/source, copies the server-owned frequency, creates every service under the authenticated manager, and copies the source team as pending in one transaction.
+
+## 3. Configure the application
+
+Create `.env.local` at the repository root:
+
+```dotenv
+VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR-PUBLIC-ANON-KEY
+VITE_DEMO_MODE=false
+```
+
+Restart the Vite server after changing environment variables.
+
+Configuration behavior is intentional:
+
+- Development and production both default to live mode and fail closed when credentials are missing or still contain placeholders.
+- `VITE_DEMO_MODE=true` enables browser-only demo mode only during local development and only when live credentials are absent.
+- A production build can never enter demo mode, even if a stale demo environment variable remains configured.
+
+## 4. Configure Auth URLs
+
+In **Authentication → URL Configuration**:
+
+- set the Site URL to the deployed application origin;
+- add the local development origin while testing;
+- allow the deployed `/reset-password` recovery URL.
+
+The hosting provider must rewrite application routes to `index.html`. This repository already supplies the Vercel rewrite in `vercel.json`.
+
+## 5. Bootstrap the first administrator
+
+Use the trusted Supabase dashboard for the first account:
+
+1. Create or invite the user under **Authentication → Users**.
+2. Confirm that the signup trigger created its `profiles` row.
+3. In **Table Editor → profiles**, set `status` to `active`, `is_admin` to `true`, and `position` to `Admin`.
+4. Set an appropriate primary `role` and matching JSON `roles` array.
+
+This manual step is only for the first trusted administrator. Create subsequent accounts through application invitations so the invitation email, role, expiry, and one-time redemption checks are applied.
+
+## 6. Production verification
+
+Before inviting the team, verify all of the following:
+
+- the administrator can sign in and reload persisted data;
+- a new invitation works only for its intended email and cannot be reused;
+- an ordinary member cannot change their role, status, position, or admin flag;
+- the last active administrator cannot be demoted, deactivated, or stripped of administrator status, including by concurrent updates;
+- an inactive member cannot continue into the application;
+- permitted users can create a song and service and see both after reload;
+- an ordinary member cannot perform manager-only database mutations;
+- an ordinary member cannot list attendance QR tokens or insert/edit an attendance record directly;
+- a valid attendance QR resolves only while active and unexpired, a non-repeatable service QR works only on that service's organization-local calendar date, repeated scans are idempotent, capacity is enforced, the configured local-time grace period determines `late` status, and checkout affects only the signed-in member;
+- cancelling a service deactivates every linked attendance session, cancels its pending excuses and open substitute requests in the same transaction, and its old QR can no longer resolve or check in;
+- setlist inserts, removals, and song/service reassignment recompute `songs.usage_count`, while `last_used` tracks the latest linked non-cancelled service date and refreshes after relevant service changes;
+- cancelled events and events whose effective end date has passed in the organization timezone reject new or changed responses;
+- duplicate pending excuses, duplicate open substitute requests, and reuse of one filled candidate for multiple requests in the same service are rejected;
+- `respond_to_service_assignment` rejects direct/member-cross-account writes, past or non-scheduled services, confirmation while an active excuse or filled replacement exists, and decline by a filled substitute;
+- `submit_service_excuse` rejects an unassigned member or past/non-scheduled service, declines the caller's assignment and creates the pending excuse in one transaction, and direct authenticated excuse inserts are denied;
+- a member cannot submit an excuse for another member, request a substitute for an assignment they do not hold, or mark either request approved/filled;
+- a filled substitute cannot request their own replacement for that service, and assignments linked to an active excuse, open/filled requester request, or filled substitute cannot be deleted before the workflow is resolved;
+- pending and approved excuses obey the configured total/monthly/weekly active allowance in the organization timezone, including a zero limit that blocks all new excuses; rejected/cancelled requests do not consume it;
+- `fill_substitute_request` rejects non-managers, closed requests, past/non-scheduled services, invalid/self/duplicate substitutes, and conflicting candidate assignments; it never overwrites an existing candidate role or declined status;
+- `generate_service_occurrences` rejects invalid, stale, duplicate, past, empty, oversized, or frequency-inconsistent occurrence payloads and leaves no partial services or copied assignments when any row fails;
+- invalid organization timezones are rejected and the singleton settings row remains `id = 1`;
+- password recovery returns to `/reset-password` on the deployed origin;
+- a direct link such as `/services/<id>` loads instead of returning a hosting 404.
+
+Use browser developer tools and Supabase logs when a write fails. Do not convert a Row Level Security failure into an optimistic success message.
+
+## Deploy
+
+Install all dependencies, including build-time development dependencies, then build:
 
 ```bash
-npm install
-npm run dev          # http://localhost:5173
+npm ci
+npm test
+npm run lint
+npm run build
 ```
 
-## Supabase Setup (5 steps)
+Publish `dist/` and configure the two Supabase variables in the hosting environment. Vercel is configured by `vercel.json`. For another static host, add an equivalent SPA fallback to `index.html`.
 
-### 1. Create project
-Go to supabase.com → New Project → choose Europe (Frankfurt) region
+## Troubleshooting
 
-### 2. Run full schema
-Supabase Dashboard → SQL Editor → paste `supabase-schema-FULL.sql` → Run
-
-### 3. Add environment variables
-Create `.env` in project root:
-```
-VITE_SUPABASE_URL=https://YOUR-ID.supabase.co
-VITE_SUPABASE_ANON_KEY=YOUR-ANON-KEY
-```
-Get these from: Supabase → Settings → API
-
-### 4. Create admin account
-- Supabase → Authentication → Users → Invite user (your email)
-- Check email, set password, log in
-- Supabase → Table Editor → profiles → set `is_admin = true` on your row
-
-### 5. Invite your team
-App → Invitations → Send Invitation → WhatsApp or Email
-
----
-
-## Features
-
-### Admin
-- **Dashboard** — Overview with events + attendance quick links
-- **Services** — Create/manage with setlist builder (drag, key edit, notes blocks)
-- **Songs** — Bilingual library (English + Arabic)
-- **People** — Full team directory with availability (7-day week)
-- **Schedule** — Monthly calendar + list view
-- **Attendance** — Generate QR codes, track check-in/check-out, reports
-- **Events** — Create conferences/camps with RSVP polls (bilingual)
-- **Reports** — 4 tabs: Overview, Songs, Team, Services
-- **WhatsApp** — Notify team members directly from service detail
-- **Invitations** — Invite via WhatsApp or Email
-
-### Members (non-admin)
-- **My Home** — Animated instrument display, upcoming services, confirm/excuse/sub buttons
-- **Check In** — Scan QR or tap to check into attendance sessions
-- **Events** — See events and RSVP
-- **Profile** — Edit info, availability (full 7-day), password
-
-### Service Detail
-- **Setlist** — Drag to reorder, inline key editor, notes blocks (📝 Note, 🙏 Prayer, 📖 Reading, ⏸ Break)
-- **Team** — Confirm/decline, request substitute with dropdown of available players
-- **Practice** — Schedule practice, track attendance per member
-- **Notes** — Rich service notes
-
----
-
-## Deploy to Production
-
-### Cloudflare Pages (FREE)
-1. Push to GitHub
-2. pages.cloudflare.com → Connect repo
-3. Build: `npm run build`, Output: `dist`
-4. Add env vars: VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
-5. Deploy
-
-### Custom Domain
-- Buy `.org` on Namecheap (~$12/yr)
-- Add to Cloudflare Pages → Custom Domains
-- SSL automatic
-
-## Monthly Cost
-| Tier | Cost |
-|------|------|
-| Starter (free Supabase + Cloudflare) | ~$1/mo (domain only) |
-| Production (Supabase Pro + Cloudflare) | ~$26/mo |
-| Self-hosted VPS (Hetzner) | ~$6/mo |
+- **Configuration required screen:** verify both Supabase values are present and the URL is an HTTP(S) URL.
+- **Unexpected demo data:** remove `VITE_DEMO_MODE=true`, configure Supabase, and restart the server.
+- **Auth works but data writes fail:** inspect the Supabase response and RLS policies for the signed-in profile's active status and roles.
+- **Recovery or deep link returns 404:** add the route to Supabase's redirect allow-list and configure the host's SPA rewrite.
+- **Old database lacks roles:** run `MIGRATION_security_data_integrity.sql`; it includes the legacy roles backfill and the current policy/trigger hardening.
+- **Security migration prints a skipped-index warning:** query the duplicate key named in the warning, reconcile the historical rows without discarding audit evidence, then rerun the migration.
+- **A legacy constraint remains `NOT VALID`:** new writes are already protected. Audit/fix older violating rows, then run `alter table ... validate constraint ...` during a maintenance window.

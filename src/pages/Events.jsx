@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Plus, MapPin, Calendar, Clock, ChevronRight, Megaphone } from 'lucide-react'
-import { format, parseISO, isAfter } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { Card, Btn, Badge, Avatar, Modal, Input, Select, Textarea, Tabs, EmptyState } from '../components/ui'
+import { isAdminUser } from '../lib/permissions.js'
+import { Card, Btn, Badge, Avatar, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog } from '../components/ui'
 
 const TYPE_COLORS = {
   'مؤتمر':'blue','معسكر':'green','ورشة عمل':'purple','فعالية خاصة':'orange','نشاط اجتماعي':'pink','خلوة':'indigo','تدريب':'amber',
@@ -20,9 +21,9 @@ const TYPE_GRADIENTS = {
 const BLANK = { title:'', titleEn:'', description:'', descriptionEn:'', date:format(new Date(),'yyyy-MM-dd'), endDate:'', time:'10:00', location:'', type:'', status:'upcoming' }
 
 export default function Events() {
-  const { isAr, t, lang } = useLang()
-  const { currentUser, people } = useStore()
-  const isAdmin = currentUser?.isAdmin || currentUser?.is_admin
+  const { isAr, t } = useLang()
+  const { currentUser, people, events, eventResponses:responses, addEvent, updateEvent, deleteEvent, setEventResponse } = useStore()
+  const isAdmin = isAdminUser(currentUser)
   const locale  = isAr ? arLocale : undefined
 
   const EVENT_TYPES_AR = ['مؤتمر','معسكر','ورشة عمل','فعالية خاصة','نشاط اجتماعي','خلوة','تدريب']
@@ -37,20 +38,19 @@ export default function Events() {
   }
 
   const [tab,        setTab]        = useState('upcoming')
-  const [events,     setEvents]     = useState([])
-  const [responses,  setResponses]  = useState({})
   const [showCreate, setShowCreate] = useState(false)
   const [showDetail, setShowDetail] = useState(null)
   const [editTarget, setEditTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [form,       setForm]       = useState({...BLANK, type: isAr ? 'مؤتمر' : 'Conference'})
 
-  const today    = new Date()
-  const upcoming = events.filter(e => isAfter(parseISO(e.date), today))
-  const past     = events.filter(e => !isAfter(parseISO(e.date), today))
+  const todayKey = format(new Date(),'yyyy-MM-dd')
+  const upcoming = events.filter(e => e.date>=todayKey && !['past','cancelled'].includes(e.status))
+  const past     = events.filter(e => e.date<todayKey || ['past','cancelled'].includes(e.status))
   const display  = tab==='upcoming' ? upcoming : tab==='past' ? past : events
 
   const myResponse  = (evtId) => responses[evtId]?.[currentUser?.id] || 'pending'
-  const setResponse = (evtId, resp) => setResponses(r => ({...r,[evtId]:{...(r[evtId]||{}),[currentUser.id]:resp}}))
+  const setResponse = (evtId, resp) => setEventResponse(evtId, resp)
 
   const getCounts = (evtId) => {
     const r = responses[evtId] || {}
@@ -64,17 +64,14 @@ export default function Events() {
   const openCreate = () => { setEditTarget(null); setForm({...BLANK, type: isAr?'مؤتمر':'Conference'}); setShowCreate(true) }
   const openEdit   = (evt) => { setEditTarget(evt.id); setForm({...evt}); setShowCreate(true) }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title || !form.date) return
-    if (editTarget) {
-      setEvents(prev => prev.map(e => e.id===editTarget ? {...e,...form} : e))
-    } else {
-      setEvents(prev => [{...form, id:'evt_'+Date.now(), created_by:currentUser.id, created_at:new Date().toISOString()}, ...prev])
-    }
+    const result = editTarget ? await updateEvent(editTarget,form) : await addEvent(form)
+    if (result?.error) return
     setShowCreate(false); setForm({...BLANK, type:isAr?'مؤتمر':'Conference'}); setEditTarget(null)
   }
 
-  const handleDelete = (evtId) => { setEvents(prev => prev.filter(e => e.id !== evtId)); setShowDetail(null) }
+  const handleDelete = async (evtId) => { const result=await deleteEvent(evtId); if (!result?.error) setDeleteTarget(null); return result }
 
   const formatDate = (d) => {
     if (!d) return ''
@@ -85,6 +82,7 @@ export default function Events() {
     upcoming: isAr ? 'قادم' : 'Upcoming',
     ongoing:  isAr ? 'جاري' : 'Ongoing',
     past:     isAr ? 'منتهي' : 'Past',
+    cancelled:isAr ? 'ملغي' : 'Cancelled',
   }
 
   return (
@@ -111,6 +109,7 @@ export default function Events() {
             const gradient = TYPE_GRADIENTS[evt.type] || 'from-indigo-500 to-violet-600'
             const displayTitle = isAr ? evt.title : (evt.titleEn || evt.title)
             const displayDesc  = isAr ? evt.description : (evt.descriptionEn || evt.description)
+            const responsesOpen = evt.status === 'upcoming' && (evt.endDate || evt.date) >= todayKey
             return (
               <Card key={evt.id} className="overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className={`h-2 bg-gradient-to-r ${gradient}`}/>
@@ -119,7 +118,7 @@ export default function Events() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge color={TYPE_COLORS[evt.type]||'blue'} size="xs">{evt.type}</Badge>
-                        <Badge color={evt.status==='upcoming'?'blue':'slate'} size="xs">
+                        <Badge color={evt.status==='upcoming'?'blue':evt.status==='cancelled'?'red':'slate'} size="xs">
                           {STATUS_LABEL[evt.status] || evt.status}
                         </Badge>
                       </div>
@@ -129,9 +128,9 @@ export default function Events() {
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
                       {isAdmin && (
-                        <button onClick={() => openEdit(evt)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer">✏️</button>
+                        <button onClick={() => openEdit(evt)} aria-label={isAr?'تعديل الفعالية':'Edit event'} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer">✏️</button>
                       )}
-                      <button onClick={() => setShowDetail(evt)} className="p-1.5 hover:bg-slate-100 rounded-lg cursor-pointer">
+                      <button onClick={() => setShowDetail(evt)} aria-label={isAr?'عرض تفاصيل الفعالية':'View event details'} className="p-1.5 hover:bg-slate-100 rounded-lg cursor-pointer">
                         <ChevronRight size={16} className="text-slate-400"/>
                       </button>
                     </div>
@@ -159,18 +158,24 @@ export default function Events() {
                       <div className="bg-amber-400 h-full transition-all" style={{width:`${total>0?(counts.maybe/total)*100:0}%`}}/>
                       <div className="bg-red-400 h-full transition-all" style={{width:`${total>0?(counts.not_attending/total)*100:0}%`}}/>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
-                      {['attending','not_attending','maybe'].map(resp => {
-                        const c = RESPONSE_CONFIG[resp]
-                        const isSelected = myResp === resp
-                        return (
-                          <button key={resp} onClick={() => setResponse(evt.id, resp)}
-                            className={`py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all select-none ${isSelected ? c.bg + ' border-2' : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}>
-                            {c.label}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    {responsesOpen ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                        {['attending','not_attending','maybe'].map(resp => {
+                          const c = RESPONSE_CONFIG[resp]
+                          const isSelected = myResp === resp
+                          return (
+                            <button key={resp} onClick={() => setResponse(evt.id, resp)} aria-pressed={isSelected}
+                              className={`py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all select-none ${isSelected ? c.bg + ' border-2' : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}>
+                              {c.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="rounded-lg bg-slate-100 px-3 py-2 text-center text-xs font-medium text-slate-500">
+                        {isAr?'تم إغلاق الردود لهذه الفعالية.':'Responses are closed for this event.'}
+                      </p>
+                    )}
                     <div className="flex gap-4 text-xs text-center">
                       <span className="flex-1 text-emerald-600">✓ {counts.attending}</span>
                       <span className="flex-1 text-amber-500">? {counts.maybe}</span>
@@ -185,7 +190,7 @@ export default function Events() {
       )}
 
       {/* Create / Edit modal */}
-      <Modal open={showCreate} onClose={() => { setShowCreate(false); setEditTarget(null) }}
+      <Modal open={isAdmin&&showCreate} onClose={() => { setShowCreate(false); setEditTarget(null) }}
         title={editTarget ? t('edit') : t('newEvent')} size="lg"
         footer={<>
           <Btn variant="secondary" onClick={() => { setShowCreate(false); setEditTarget(null) }}>{t('cancel')}</Btn>
@@ -194,15 +199,8 @@ export default function Events() {
           </Btn>
         </>}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                {t('arabicTitle')} <span className="text-red-500">*</span>
-              </label>
-              <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} dir="rtl"
-                placeholder="مؤتمر الشباب ٢٠٢٦"
-                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label={t('arabicTitle')} required value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} dir="rtl" placeholder="مؤتمر الشباب ٢٠٢٦"/>
             <Input label={t('englishTitle')} value={form.titleEn} onChange={e=>setForm(f=>({...f,titleEn:e.target.value}))} placeholder="Youth Conference 2026"/>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -210,19 +208,15 @@ export default function Events() {
             <Input label={t('endDate')} type="date" value={form.endDate} onChange={e=>setForm(f=>({...f,endDate:e.target.value}))}/>
             <Input label={t('time')} type="time" value={form.time} onChange={e=>setForm(f=>({...f,time:e.target.value}))}/>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select label={t('eventType')} value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
               {EVENT_TYPES.map(tp=><option key={tp}>{tp}</option>)}
             </Select>
             <Input label={t('location')} placeholder={isAr?'قاعة الكنيسة، القاهرة...':'Church hall, Cairo...'} value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))}/>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('arabicTitle')} {t('description')}</label>
-            <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} dir="rtl"
-              placeholder={isAr?'تفاصيل الفعالية...':'Event details in Arabic...'} rows={3}
-              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none hover:border-slate-300"/>
-          </div>
-          <Input label={`${t('description')} (EN)`} value={form.descriptionEn} onChange={e=>setForm(f=>({...f,descriptionEn:e.target.value}))} placeholder="Event details in English..."/>
+          <Textarea label={`${t('arabicTitle')} ${t('description')}`} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} dir="rtl"
+            placeholder={isAr?'تفاصيل الفعالية...':'Event details in Arabic...'} rows={3}/>
+          <Textarea label={`${t('description')} (EN)`} value={form.descriptionEn} onChange={e=>setForm(f=>({...f,descriptionEn:e.target.value}))} placeholder="Event details in English..."/>
         </div>
       </Modal>
 
@@ -232,7 +226,7 @@ export default function Events() {
           title={isAr ? showDetail.title : (showDetail.titleEn || showDetail.title)} size="lg"
           footer={isAdmin ? (
             <div className="flex justify-between w-full">
-              <Btn variant="danger" onClick={() => handleDelete(showDetail.id)}>{t('deleteEvent')}</Btn>
+              <Btn variant="danger" onClick={() => { setDeleteTarget(showDetail.id); setShowDetail(null) }}>{isAr?'إلغاء الفعالية':'Cancel Event'}</Btn>
               <div className="flex gap-2">
                 <Btn variant="secondary" onClick={() => setShowDetail(null)}>{t('close')}</Btn>
                 <Btn onClick={() => { openEdit(showDetail); setShowDetail(null) }}>{t('edit')}</Btn>
@@ -271,6 +265,10 @@ export default function Events() {
           </div>
         </Modal>
       )}
+
+      <ConfirmDialog open={isAdmin&&!!deleteTarget} onClose={()=>setDeleteTarget(null)} onConfirm={()=>handleDelete(deleteTarget)}
+        title={isAr?'إلغاء الفعالية':'Cancel event'} confirmLabel={isAr?'إلغاء الفعالية':'Cancel event'}
+        message={isAr?'سيتم إخفاء الفعالية من القائمة القادمة مع الحفاظ على الردود والسجل.':'The event will leave the upcoming list while its responses and history are preserved.'}/>
     </div>
   )
 }

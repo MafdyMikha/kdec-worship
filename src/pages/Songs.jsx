@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Music2, Edit2, Trash2, ChevronDown, ChevronUp, Globe } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
+import { canManageWorship } from '../lib/permissions.js'
 import { Card, Btn, Badge, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog } from '../components/ui'
 
 const KEYS = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Am','Dm','Em','Gm','Bm']
@@ -23,17 +24,13 @@ function SongForm({ value, onChange, isAr }) {
   }
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{isAr?'العنوان بالعربي':'Arabic Title'} <span className="text-red-500">*</span></label>
-          <input value={value.title||''} onChange={e=>onChange({...value,title:e.target.value})} dir="rtl"
-            placeholder="يا مالئ كوني"
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input label={isAr?'العنوان بالعربي':'Arabic Title'} required dir="rtl" placeholder="يا مالئ كوني"
+          value={value.title||''} onChange={e=>onChange({...value,title:e.target.value})}/>
         <Input label={isAr?'العنوان بالإنجليزي':'English Title'} placeholder="Fill My Being"
           value={value.titleEn||''} onChange={e=>onChange({...value,titleEn:e.target.value})}/>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input label={isAr?'المؤلف':'Author'} placeholder="KDEC Worship" value={value.author||''} onChange={e=>onChange({...value,author:e.target.value})}/>
         <Input label="CCLI" placeholder="4348399" value={value.ccliNumber||''} onChange={e=>onChange({...value,ccliNumber:e.target.value})}/>
       </div>
@@ -72,7 +69,7 @@ function SongForm({ value, onChange, isAr }) {
 const BLANK = {title:'',titleEn:'',author:'',key:'G',bpm:'',timeSignature:'4/4',language:'ar',sequence:['مقطع ١','لازمة','مقطع ٢','لازمة','جسر'],notes:'',ccliNumber:''}
 
 export default function Songs() {
-  const { songs, addSong, updateSong, deleteSong } = useStore()
+  const { songs, addSong, updateSong, deleteSong, currentUser } = useStore()
   const { t, isAr } = useLang()
   const [search,   setSearch]   = useState('')
   const [filterKey,setFilterKey]= useState('all')
@@ -83,10 +80,12 @@ export default function Songs() {
   const [expanded, setExpanded] = useState(null)
   const [delTarget,setDelTarget]= useState(null)
   const [showEn,   setShowEn]   = useState({})
+  const canManage = canManageWorship(currentUser)
 
-  const filtered = songs.filter(s => {
+  const activeSongs = songs.filter(s => s.status!=='inactive')
+  const filtered = activeSongs.filter(s => {
     const q = search.toLowerCase()
-    const matchQ = s.title.includes(search)||(s.titleEn||'').toLowerCase().includes(q)||(s.author||'').toLowerCase().includes(q)
+    const matchQ = (s.title||'').toLowerCase().includes(q)||(s.titleEn||'').toLowerCase().includes(q)||(s.author||'').toLowerCase().includes(q)
     const matchKey = filterKey==='all'||s.key===filterKey
     const matchTab = tab==='all'||(tab==='ar'?s.language==='ar':s.language==='en')
     return matchQ&&matchKey&&matchTab
@@ -96,9 +95,8 @@ export default function Songs() {
   const openEdit = (s) => { setEditing(s.id); setForm({...s,titleEn:s.titleEn||''}); setShowAdd(true) }
   const handleSave = async () => {
     if (!form.title) return
-    if (editing) await updateSong(editing, form)
-    else await addSong(form)
-    setShowAdd(false); setEditing(null); setForm(BLANK)
+    const result = editing ? await updateSong(editing, form) : await addSong(form)
+    if (!result?.error) { setShowAdd(false); setEditing(null); setForm(BLANK) }
   }
 
   const LANG_COLOR = {ar:'orange',en:'blue',both:'purple'}
@@ -109,29 +107,30 @@ export default function Songs() {
   return (
     <div className="max-w-5xl space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
           <SearchInput value={search} onChange={setSearch}
-            placeholder={isAr?'ابحث بالعربي أو الإنجليزي...':'Search in Arabic or English...'} className="w-64"/>
+            placeholder={isAr?'ابحث بالعربي أو الإنجليزي...':'Search in Arabic or English...'} className="w-full sm:w-64"/>
           <select value={filterKey} onChange={e=>setFilterKey(e.target.value)}
+            aria-label={isAr?'تصفية حسب الطبقة':'Filter by key'}
             className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="all">{isAr?'كل الطبقات':'All Keys'}</option>
             {KEYS.map(k=><option key={k} value={k}>{k}</option>)}
           </select>
         </div>
-        <Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>
+        {canManage&&<Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>}
       </div>
 
       <Tabs tabs={[
-        { label:t('all'),     value:'all', count:songs.length },
-        { label:t('arabic'),  value:'ar',  count:songs.filter(s=>s.language==='ar').length },
-        { label:t('english'), value:'en',  count:songs.filter(s=>s.language==='en').length },
+        { label:t('all'),     value:'all', count:activeSongs.length },
+        { label:t('arabic'),  value:'ar',  count:activeSongs.filter(s=>s.language==='ar').length },
+        { label:t('english'), value:'en',  count:activeSongs.filter(s=>s.language==='en').length },
       ]} active={tab} onChange={setTab}/>
 
       {filtered.length===0 ? (
         <EmptyState icon={<Music2 size={28}/>}
           title={isAr?'لا توجد ترانيم':'No songs found'}
           description={isAr?'أضف ترانيم لبناء مكتبة التسبيح.':'Add songs to build your library.'}
-          action={<Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>}/>
+          action={canManage?<Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>:null}/>
       ) : (
         <div className="space-y-2">
           <div className="grid grid-cols-12 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -148,7 +147,8 @@ export default function Songs() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-slate-800" dir="rtl">{song.title}</span>
                     {song.titleEn && (
-                      <button onClick={()=>setShowEn(prev=>({...prev,[song.id]:!prev[song.id]}))}
+                      <button onClick={()=>setShowEn(prev=>({...prev,[song.id]:!prev[song.id]}))} aria-pressed={!!showEn[song.id]}
+                        aria-label={isAr?'إظهار العنوان الإنجليزي':'Show English title'}
                         className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold border cursor-pointer transition-all ${showEn[song.id]?'bg-indigo-600 text-white border-indigo-600':'bg-white text-indigo-400 border-indigo-200 hover:border-indigo-400'}`}>
                         <Globe size={9}/> EN
                       </button>
@@ -161,8 +161,8 @@ export default function Songs() {
                 <div className="col-span-2 text-sm text-slate-600">{song.bpm||'—'}</div>
                 <div className="col-span-2 text-sm text-slate-600">{song.usageCount||0}×</div>
                 <div className="col-span-1 flex items-center justify-end gap-1">
-                  <button onClick={()=>openEdit(song)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer"><Edit2 size={13}/></button>
-                  <button onClick={()=>setExpanded(expanded===song.id?null:song.id)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded cursor-pointer">
+                  {canManage&&<button onClick={()=>openEdit(song)} aria-label={isAr?'تعديل الترنيمة':'Edit song'} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded cursor-pointer"><Edit2 size={13}/></button>}
+                  <button onClick={()=>setExpanded(expanded===song.id?null:song.id)} aria-expanded={expanded===song.id} aria-label={isAr?'عرض تفاصيل الترنيمة':'Show song details'} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded cursor-pointer">
                     {expanded===song.id?<ChevronUp size={13}/>:<ChevronDown size={13}/>}
                   </button>
                 </div>
@@ -181,10 +181,10 @@ export default function Songs() {
                     </div>
                   )}
                   {song.notes&&<p className="text-sm text-slate-500 italic">📝 {song.notes}</p>}
-                  <div className="flex gap-2 pt-1">
+                  {canManage&&<div className="flex gap-2 pt-1">
                     <Btn variant="outline" size="xs" onClick={()=>openEdit(song)} icon={<Edit2 size={11}/>}>{t('edit')}</Btn>
-                    <Btn variant="ghost" size="xs" onClick={()=>setDelTarget(song.id)} className="text-red-500 hover:bg-red-50" icon={<Trash2 size={11}/>}>{t('delete')}</Btn>
-                  </div>
+                    <Btn variant="ghost" size="xs" onClick={()=>setDelTarget(song.id)} className="text-red-500 hover:bg-red-50" icon={<Trash2 size={11}/>}>{isAr?'أرشفة':'Archive'}</Btn>
+                  </div>}
                 </div>
               )}
             </Card>
@@ -192,16 +192,17 @@ export default function Songs() {
         </div>
       )}
 
-      <Modal open={showAdd} onClose={()=>{setShowAdd(false);setEditing(null)}}
+      <Modal open={canManage&&showAdd} onClose={()=>{setShowAdd(false);setEditing(null)}}
         title={editing?(isAr?'تعديل الترنيمة':'Edit Song'):(isAr?'إضافة ترنيمة جديدة':'Add New Song')} size="lg"
         footer={<><Btn variant="secondary" onClick={()=>setShowAdd(false)}>{t('cancel')}</Btn><Btn onClick={handleSave} disabled={!form.title}>{editing?t('saveChanges'):(isAr?'إضافة':'Add Song')}</Btn></>}>
         <SongForm value={form} onChange={setForm} isAr={isAr}/>
       </Modal>
 
-      <ConfirmDialog open={!!delTarget} onClose={()=>setDelTarget(null)}
-        onConfirm={()=>{deleteSong(delTarget);setDelTarget(null)}}
-        title={isAr?'حذف الترنيمة':'Delete Song'}
-        message={isAr?'هل أنت متأكد من حذف هذه الترنيمة؟':'Are you sure you want to delete this song?'}/>
+      <ConfirmDialog open={canManage&&!!delTarget} onClose={()=>setDelTarget(null)}
+        onConfirm={async()=>{const result=await deleteSong(delTarget);if(!result?.error)setDelTarget(null);return result}}
+        title={isAr?'أرشفة الترنيمة':'Archive Song'}
+        confirmLabel={isAr?'أرشفة':'Archive'}
+        message={isAr?'سيتم إخفاء الترنيمة مع الحفاظ على سجل استخدامها.':'The song will be hidden while its usage history is preserved.'}/>
     </div>
   )
 }
