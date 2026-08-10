@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { BarChart3, Music2, Users, Calendar, TrendingUp, Award } from 'lucide-react'
+import { BarChart3, Music2, Users, Calendar, TrendingUp, Award, Download, Eye, Clock, CheckCircle } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { Card, Badge, Avatar, StatCard, Tabs } from '../components/ui'
+import { Card, Badge, Avatar, StatCard, Tabs, Btn, Modal } from '../components/ui'
 import { format, subMonths, parseISO } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
+import { buildAttendanceReport, downloadAttendanceReport, formatAttendanceTime } from '../lib/attendanceReport.js'
+import AttendanceSessionDetails from '../components/attendance/AttendanceSessionDetails.jsx'
 
 function Bar({ value, max, color = 'bg-indigo-500' }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0
@@ -22,8 +24,9 @@ const RCOLS = ['bg-indigo-500','bg-violet-400','bg-blue-400','bg-emerald-400','b
 
 export default function Reports() {
   const { isAr, t } = useLang()
-  const { services, songs, people } = useStore()
+  const { services, songs, people, attendanceSessions, attendanceRecords, organizationSettings } = useStore()
   const [tab, setTab] = useState('overview')
+  const [selectedAttendanceSession, setSelectedAttendanceSession] = useState(null)
 
   // ── Computed stats ────────────────────────────────────────
   const activePeople       = people.filter(p => p.status === 'active')
@@ -75,11 +78,28 @@ export default function Reports() {
     confirmed: operationalServices.filter(s => s.team.find(tm => tm.personId === p.id && tm.status === 'confirmed')).length,
   })).filter(x => x.count > 0).sort((a,b) => b.count - a.count)
 
+  const attendanceReport = buildAttendanceReport({
+    sessions:attendanceSessions,
+    recordsBySession:attendanceRecords,
+    people,
+    timezone:organizationSettings.timezone,
+    lateMinutes:organizationSettings.attendanceLateMinutes,
+  })
+  const completedCheckouts = attendanceReport.rows.filter(row => row.checkOutAt).length
+  const lateArrivals = attendanceReport.rows.filter(row => row.arrival === 'late').length
+  const earlyCheckouts = attendanceReport.rows.filter(row => row.departure === 'early').length
+  const exportAttendance = () => downloadAttendanceReport(attendanceReport, {
+    isAr,
+    timezone:organizationSettings.timezone,
+    filename:`kdec-attendance-${new Date().toISOString().slice(0, 10)}`,
+  })
+
   const TABS = [
     { label: t('overview'),       value: 'overview'  },
     { label: t('songsLabel'),     value: 'songs'     },
     { label: t('team'),           value: 'team'      },
     { label: t('servicesLabel'),  value: 'services'  },
+    { label: isAr ? 'الحضور' : 'Attendance', value: 'attendance' },
   ]
 
   return (
@@ -360,6 +380,75 @@ export default function Reports() {
           </Card>
         </div>
       )}
+
+      {/* ── Attendance ────────────────────────────────────── */}
+      {tab === 'attendance' && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-display font-semibold text-slate-800">{isAr?'تقرير الحضور':'Attendance Report'}</h2>
+              <p className="text-sm text-slate-500 mt-0.5">{isAr?'بيانات الحضور الفعلية المسجلة من رموز QR':'Live attendance recorded through QR check-in'}</p>
+            </div>
+            <Btn onClick={exportAttendance} disabled={attendanceReport.rows.length === 0} icon={<Download size={16}/>}>{isAr?'تصدير Excel':'Export Excel'}</Btn>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label={isAr?'الجلسات':'Sessions'} value={attendanceSessions.length} icon={<Calendar size={20}/>} color="indigo"/>
+            <StatCard label={isAr?'تسجيلات الحضور':'Check-ins'} value={attendanceReport.rows.length} icon={<CheckCircle size={20}/>} color="green"/>
+            <StatCard label={isAr?'حضور متأخر':'Late arrivals'} value={lateArrivals} icon={<Clock size={20}/>} color="amber"/>
+            <StatCard label={isAr?'خروج مبكر':'Early checkouts'} value={earlyCheckouts} icon={<TrendingUp size={20}/>} color="red"/>
+          </div>
+
+          <Card className="overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-display font-semibold text-slate-800">{isAr?'الجلسات والفعاليات':'Sessions & Events'}</h3>
+              <span className="text-xs text-slate-400">{completedCheckouts} {isAr?'تسجيل خروج':'checkouts'}</span>
+            </div>
+            {attendanceSessions.length === 0 ? (
+              <div className="p-8 text-center text-sm text-slate-400">{isAr?'لا توجد جلسات حضور بعد':'No attendance sessions yet'}</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {attendanceSessions.map(session => {
+                  const sessionRows = attendanceRecords[session.id] || []
+                  return <div key={session.id} className="px-5 py-4 flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Calendar size={18}/></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-slate-800 truncate" dir="auto">{session.name || session.service?.title || session.label}</div>
+                      <div className="text-xs text-slate-400">{session.sessionDate || session.session_date || session.service?.date || '—'} · {formatAttendanceTime(session.sessionTime || session.session_time, isAr)} – {formatAttendanceTime(session.endTime || session.end_time, isAr)}</div>
+                    </div>
+                    <Badge color="green">{sessionRows.length} {isAr?'حضور':'attended'}</Badge>
+                    <Btn variant="secondary" size="sm" onClick={()=>setSelectedAttendanceSession(session)} icon={<Eye size={14}/>}>{isAr?'عرض':'View'}</Btn>
+                  </div>
+                })}
+              </div>
+            )}
+          </Card>
+
+          <Card className="overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100"><h3 className="font-display font-semibold text-slate-800">{isAr?'ملخص حضور الأعضاء':'Member Attendance Summary'}</h3></div>
+            {attendanceReport.summaries.length === 0 ? (
+              <div className="p-8 text-center text-sm text-slate-400">{isAr?'لا توجد بيانات حضور بعد':'No attendance data yet'}</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="p-3 text-start">{isAr?'العضو':'Member'}</th><th className="p-3 text-center">{isAr?'الإجمالي':'Total'}</th><th className="p-3 text-center">{isAr?'مبكر':'Early'}</th><th className="p-3 text-center">{isAr?'في الموعد':'On time'}</th><th className="p-3 text-center">{isAr?'متأخر':'Late'}</th><th className="p-3 text-center">{isAr?'خروج مبكر':'Early out'}</th><th className="p-3 text-center">{isAr?'خروج طبيعي':'Normal out'}</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {attendanceReport.summaries.map(summary => <tr key={summary.person.id} className="hover:bg-slate-50"><td className="p-3"><div className="flex items-center gap-2"><Avatar name={summary.person.name} size="xs"/><span className="font-medium text-slate-700" dir="auto">{summary.person.name}</span></div></td><td className="p-3 text-center font-semibold text-indigo-600">{summary.records}</td><td className="p-3 text-center text-blue-600">{summary.early}</td><td className="p-3 text-center text-emerald-600">{summary.onTime}</td><td className="p-3 text-center text-red-600">{summary.late}</td><td className="p-3 text-center text-amber-600">{summary.earlyCheckout}</td><td className="p-3 text-center text-emerald-600">{summary.normalCheckout}</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      <Modal open={!!selectedAttendanceSession} onClose={()=>setSelectedAttendanceSession(null)}
+        title={selectedAttendanceSession?.name || selectedAttendanceSession?.service?.title || (isAr?'تفاصيل الفعالية':'Event details')} size="xl">
+        <AttendanceSessionDetails session={selectedAttendanceSession}
+          records={selectedAttendanceSession ? (attendanceRecords[selectedAttendanceSession.id] || []) : []}
+          people={people} timezone={organizationSettings.timezone}
+          lateMinutes={organizationSettings.attendanceLateMinutes} isAr={isAr}/>
+      </Modal>
     </div>
   )
 }

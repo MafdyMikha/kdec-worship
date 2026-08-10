@@ -631,7 +631,9 @@ create table if not exists public.attendance_sessions (
   service_id    uuid references public.services(id) on delete cascade,
   name          text not null default '',
   label         text not null default 'Service',   -- 'Practice', 'Soundcheck', 'Team Meeting', 'Service'
+  session_date  date not null default current_date,
   session_time  time,
+  end_time      time,
   qr_code       text unique not null,               -- short token embedded in QR
   active        boolean not null default true,
   max_attendees integer check (max_attendees is null or max_attendees > 0),
@@ -641,6 +643,7 @@ create table if not exists public.attendance_sessions (
   created_at    timestamptz not null default now(),
   expires_at    timestamptz not null default (now() + interval '24 hours'),
   constraint attendance_session_expiry_check check (expires_at > created_at),
+  constraint attendance_session_time_range_check check (end_time is null or session_time is not null),
   constraint attendance_session_repeat_check check (
     (repeatable and repeat_freq is not null)
     or (not repeatable and repeat_freq is null)
@@ -1159,7 +1162,9 @@ returns table (
   service_id       uuid,
   name             text,
   label            text,
+  session_date     date,
   session_time     time,
+  end_time         time,
   active           boolean,
   max_attendees    integer,
   repeatable       boolean,
@@ -1195,7 +1200,9 @@ begin
          s.service_id,
          s.name,
          s.label,
+         s.session_date,
          s.session_time,
+         s.end_time,
          s.active,
          s.max_attendees,
          s.repeatable,
@@ -1211,9 +1218,23 @@ begin
      and s.expires_at > now()
      and (s.service_id is null or v.status <> 'cancelled')
      and (
-       s.repeatable
-       or s.service_id is null
-       or v.date = v_local_date
+       (
+         s.repeatable
+         and v_local_date >= s.session_date
+         and (
+           s.repeat_freq = 'daily'
+           or (s.repeat_freq = 'weekly' and mod(v_local_date - s.session_date, 7) = 0)
+           or (
+             s.repeat_freq = 'monthly'
+             and extract(day from v_local_date)::integer =
+               least(
+                 extract(day from s.session_date)::integer,
+                 extract(day from (date_trunc('month', v_local_date::timestamp) + interval '1 month - 1 day'))::integer
+               )
+           )
+         )
+       )
+       or (not s.repeatable and s.session_date = v_local_date)
      )
    order by s.expires_at desc
    limit 1;
@@ -1235,6 +1256,7 @@ declare
   v_local_date      date;
   v_occurrence_date date;
   v_service_date    date;
+  v_session_date    date;
   v_attendance_status public.attendance_records.status%type := 'present';
   v_attendee_count  integer;
   v_record_exists   boolean;
@@ -1274,35 +1296,46 @@ begin
   v_local_now := clock_timestamp() at time zone v_timezone;
   v_local_date := v_local_now::date;
 
-  if not v_session.repeatable and v_session.service_id is not null then
+  if v_session.service_id is not null then
     select linked_service.date
       into v_service_date
       from public.services as linked_service
      where linked_service.id = v_session.service_id;
 
-    if not found or v_service_date <> v_local_date then
+    if not found then
       raise exception 'Attendance link is invalid or expired' using errcode = '22023';
     end if;
   end if;
 
-  if v_session.repeatable then
-    v_occurrence_date := case v_session.repeat_freq
-      when 'weekly' then date_trunc('week', v_local_date::timestamp)::date
-      when 'monthly' then date_trunc('month', v_local_date::timestamp)::date
-      else v_local_date
-    end;
-  else
-    v_occurrence_date := coalesce(
-      v_service_date,
-      (v_session.created_at at time zone v_timezone)::date
-    );
+  v_session_date := coalesce(
+    v_session.session_date,
+    v_service_date,
+    (v_session.created_at at time zone v_timezone)::date
+  );
+
+  if not v_session.repeatable and v_session_date <> v_local_date then
+    raise exception 'Attendance link is invalid or expired' using errcode = '22023';
   end if;
 
+  if v_session.repeatable and (
+    v_local_date < v_session_date
+    or (v_session.repeat_freq = 'weekly' and mod(v_local_date - v_session_date, 7) <> 0)
+    or (
+      v_session.repeat_freq = 'monthly'
+      and extract(day from v_local_date)::integer <>
+        least(
+          extract(day from v_session_date)::integer,
+          extract(day from (date_trunc('month', v_local_date::timestamp) + interval '1 month - 1 day'))::integer
+        )
+    )
+  ) then
+    raise exception 'Attendance link is invalid or expired' using errcode = '22023';
+  end if;
+
+  v_occurrence_date := case when v_session.repeatable then v_local_date else v_session_date end;
+
   if v_session.session_time is not null and v_local_now > (
-    (case
-       when v_session.repeatable then v_local_date
-       else v_occurrence_date
-     end + v_session.session_time)
+    (v_occurrence_date + v_session.session_time)
     + make_interval(mins => v_late_minutes)
   ) then
     v_attendance_status := 'late';

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { QrCode, CheckCircle, Clock, X, Plus, Printer, RefreshCw, CheckCheck, ChevronDown, Calendar } from 'lucide-react'
+import { QrCode, CheckCircle, Clock, X, Plus, Printer, RefreshCw, CheckCheck, ChevronDown, Calendar, Eye } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
@@ -9,7 +9,8 @@ import { useLang } from '../lib/i18n.jsx'
 import { isAdminUser } from '../lib/permissions.js'
 import { Card, Btn, Badge, Avatar, Modal, StatCard, Tabs, Input, Select } from '../components/ui'
 import { KDEC_LOGO } from '../assets/kdecLogo.js'
-import { attendanceOccurrenceDate, dateKeyInTimezone } from '../lib/attendance.js'
+import { addMinutesToTime, attendanceOccurrenceDate, attendanceTiming, dateKeyInTimezone } from '../lib/attendance.js'
+import AttendanceSessionDetails from '../components/attendance/AttendanceSessionDetails.jsx'
 
 const SESSION_TYPES = [
   { key:'Service',              icon:'🎵', color:'bg-indigo-100 text-indigo-600'   },
@@ -28,6 +29,24 @@ const escapeHtml = (value='') => String(value).replace(/[&<>'"]/g, char => ({'&'
 
 const PERIODS_AR = { total:'إجمالي', monthly:'شهرياً', weekly:'أسبوعياً' }
 const PERIODS_EN = { total:'Total',   monthly:'Monthly', weekly:'Weekly'   }
+
+const formatSessionTime = (value, isAr) => {
+  if (!value) return '—'
+  const [hours, minutes] = value.split(':').map(Number)
+  const date = new Date(Date.UTC(2020, 0, 1, hours, minutes))
+  return new Intl.DateTimeFormat(isAr ? 'ar-EG' : 'en-US', {
+    hour:'numeric', minute:'2-digit', hour12:true, timeZone:'UTC',
+  }).format(date)
+}
+
+const timingLabel = (kind, isAr) => ({
+  early:isAr ? 'مبكر' : 'Early',
+  on_time:isAr ? 'في الموعد' : 'On time',
+  late:isAr ? 'متأخر' : 'Late',
+  normal:isAr ? 'خروج طبيعي' : 'Normal checkout',
+}[kind] || '')
+
+const timingColor = kind => ({ early:'blue', on_time:'green', late:'red', normal:'green' }[kind] || 'slate')
 
 function ExcuseLimitEditor({ lateMins, onLateMins, excuseLimit, excusePeriod, onExcuseLimit, onExcusePeriod, t, isAr }) {
   const [open, setOpen] = useState(false)
@@ -88,6 +107,8 @@ function QRModal({ open, onClose, session, service, occurrenceDateLabel, t, isAr
   const url = `${window.location.origin}/checkin/${session.qr_code}`
   const st  = getSession(session.label)
   const stLabel = SESSION_LABEL[lang]?.[session.label] || session.label
+  const sessionDate = session.sessionDate || session.session_date || occurrenceDateLabel || service?.date
+  const timeRange = `${formatSessionTime(session.sessionTime || session.session_time, isAr)} – ${formatSessionTime(session.endTime || session.end_time, isAr)}`
 
   const handlePrint = () => {
     const win = window.open('','_blank')
@@ -100,7 +121,7 @@ function QRModal({ open, onClose, session, service, occurrenceDateLabel, t, isAr
     </style></head><body>
     <img src="${KDEC_LOGO}" style="width:50px;border-radius:8px"/>
     <h1>${escapeHtml(service?.title || 'KDEC Worship')}</h1>
-    <p>${escapeHtml(occurrenceDateLabel || service?.date)} · ${escapeHtml(session.session_time)}</p>
+    <p>${escapeHtml(sessionDate)} · ${escapeHtml(timeRange)}</p>
     <div class="badge">${escapeHtml(st.icon)} ${escapeHtml(stLabel)}</div>
     <div class="qr">${qrRef.current?.innerHTML||''}</div>
     <p style="font-size:12px;color:#94a3b8">${isAr ? 'امسح لتسجيل الحضور' : 'Scan to check in'}</p>
@@ -112,7 +133,7 @@ function QRModal({ open, onClose, session, service, occurrenceDateLabel, t, isAr
     <Modal open={open} onClose={onClose} title={`QR — ${stLabel}`} size="sm"
       footer={<><Btn variant="secondary" onClick={onClose}>{t('close')}</Btn><Btn onClick={handlePrint} icon={<Printer size={14}/>}>{t('print')}</Btn></>}>
       <div className="text-center space-y-4">
-        <div className="text-sm text-slate-500">{service?.title} · {occurrenceDateLabel || service?.date}</div>
+        <div className="text-sm text-slate-500">{service?.title || session.name} · {sessionDate} · {timeRange}</div>
         <div className="flex justify-center p-6 bg-white border-2 border-slate-100 rounded-2xl" ref={qrRef}>
           <QRCodeSVG value={url} size={200} level="M" includeMargin
             imageSettings={{src:KDEC_LOGO,height:28,width:28,excavate:true}}/>
@@ -126,7 +147,7 @@ function QRModal({ open, onClose, session, service, occurrenceDateLabel, t, isAr
   )
 }
 
-function CheckInWidget({ record, lateMins, onCheckIn, onCheckOut, t, isAr }) {
+function CheckInWidget({ record, session, timezone, lateMins, onCheckIn, onCheckOut, t, isAr }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const doAction = async (type) => {
@@ -136,11 +157,7 @@ function CheckInWidget({ record, lateMins, onCheckIn, onCheckOut, t, isAr }) {
     if (result?.error) setError(result.error)
     setLoading(false)
   }
-  const getLate = () => {
-    if (!record?.check_in_at) return null
-    if (record.status === 'late') return { label:isAr?`متأخر (أكثر من ${lateMins} دقيقة)`:`Late (over ${lateMins}m)`, cls:'bg-red-100 text-red-700' }
-    return { label:isAr?'حاضر ضمن الوقت المسموح ✓':'Present within tolerance ✓', cls:'bg-emerald-100 text-emerald-700' }
-  }
+  const timing = attendanceTiming(record, session, timezone, lateMins)
 
   if (!record?.check_in_at) return (
     <div className="text-center space-y-4">
@@ -155,14 +172,13 @@ function CheckInWidget({ record, lateMins, onCheckIn, onCheckOut, t, isAr }) {
     </div>
   )
   if (!record.check_out_at) {
-    const late = getLate()
     return (
       <div className="text-center space-y-3">
         <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto"><CheckCheck size={28} className="text-emerald-600"/></div>
         <div>
           <p className="font-bold text-emerald-700 text-lg">{isAr ? 'تم تسجيل الحضور ✓' : 'Checked In ✓'}</p>
           <p className="text-sm text-slate-500">{isAr ? 'وقت الدخول:' : 'Check-in time:'} {format(new Date(record.check_in_at),'h:mm a')}</p>
-          {late && <span className={`inline-block mt-1.5 px-3 py-1 rounded-full text-xs font-semibold ${late.cls}`}>{late.label}</span>}
+          {timing.arrival && <div className="mt-1.5"><Badge color={timingColor(timing.arrival)} size="xs">{timingLabel(timing.arrival, isAr)}</Badge></div>}
         </div>
         {error&&<p className="text-sm text-red-600" role="alert">{error}</p>}
         <button onClick={() => doAction('out')} disabled={loading}
@@ -180,6 +196,10 @@ function CheckInWidget({ record, lateMins, onCheckIn, onCheckOut, t, isAr }) {
       <p className="text-xs text-slate-400">
         {isAr ? 'دخول' : 'In'}: {format(new Date(record.check_in_at),'h:mm a')} · {isAr ? 'خروج' : 'Out'}: {format(new Date(record.check_out_at),'h:mm a')}
       </p>
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        {timing.arrival && <Badge color={timingColor(timing.arrival)} size="xs">{isAr?'الدخول':'Arrival'}: {timingLabel(timing.arrival, isAr)}</Badge>}
+        {timing.departure && <Badge color={timingColor(timing.departure)} size="xs">{isAr?'الخروج':'Departure'}: {timingLabel(timing.departure, isAr)}</Badge>}
+      </div>
     </div>
   )
 }
@@ -199,6 +219,7 @@ export default function Attendance() {
   const [tab,          setTab]          = useState(routeToken ? 'checkin' : (isAdmin ? 'sessions' : 'checkin'))
   const [showCreate,   setShowCreate]   = useState(false)
   const [showQR,       setShowQR]       = useState(null)
+  const [viewSession,  setViewSession]  = useState(null)
   const [resolvedSession, setResolvedSession] = useState(null)
   const [resolveError, setResolveError] = useState('')
   const lateMins = organizationSettings.attendanceLateMinutes
@@ -213,8 +234,12 @@ export default function Attendance() {
     void updateOrganizationSettings({ excuseLimit:value })
   }
   const setExcusePeriod = value => { void updateOrganizationSettings({ excusePeriod:value }) }
-  const BLANK_CREATE = { name:'', label:'Service', sessionTime:'', serviceId:'', maxAttendees:'', repeatable:false, repeatFreq:'weekly' }
+  const BLANK_CREATE = {
+    name:'', label:'Service', sessionDate:dateKeyInTimezone(new Date(), organizationSettings.timezone),
+    sessionTime:'', endTime:'', serviceId:'', maxAttendees:'', repeatable:false, repeatFreq:'weekly',
+  }
   const [createForm,   setCreateForm]   = useState(BLANK_CREATE)
+  const [createError, setCreateError] = useState('')
   useEffect(() => {
     if (!routeToken) return undefined
     let active = true
@@ -261,13 +286,34 @@ export default function Attendance() {
   const activeSessions = routeToken ? (resolvedSession?[resolvedSession]:[]) : sessions.filter(s=>s.active)
 
   const handleCreate = async () => {
-    if (!createForm.label) return
+    if (!createForm.label || !createForm.sessionDate || !createForm.sessionTime || !createForm.endTime) {
+      setCreateError(isAr ? 'التاريخ ووقت البداية ووقت النهاية مطلوبة.' : 'Date, start time, and end time are required.')
+      return
+    }
+    setCreateError('')
     const result = await createAttendanceSession(createForm)
     if (result?.data) {
       setShowCreate(false)
       setCreateForm(BLANK_CREATE)
       setShowQR(result.data)
+    } else if (result?.error) {
+      setCreateError(result.error)
     }
+  }
+
+  const handleLinkedService = serviceId => {
+    const linkedService = services.find(service => service.id===serviceId)
+    setCreateForm(form => {
+      if (!linkedService) return { ...form, serviceId:'' }
+      const startTime = linkedService.time?.slice(0, 5) || form.sessionTime
+      return {
+        ...form,
+        serviceId,
+        sessionDate:linkedService.date || form.sessionDate,
+        sessionTime:startTime,
+        endTime:form.endTime || addMinutesToTime(startTime, 120),
+      }
+    })
   }
 
   const ADMIN_TABS = [
@@ -320,7 +366,7 @@ export default function Attendance() {
                       {sess.max_attendees && <Badge color="amber" size="xs">max {sess.max_attendees}</Badge>}
                     </div>
                     <p className="text-xs text-slate-400">
-                      {currentOccurrenceDate} · {sess.session_time} · {formatDistanceToNow(new Date(sess.created_at), {addSuffix:true, locale: isAr ? arLocale : undefined})}
+                      {currentOccurrenceDate} · {formatSessionTime(sess.sessionTime || sess.session_time, isAr)} – {formatSessionTime(sess.endTime || sess.end_time, isAr)} · {formatDistanceToNow(new Date(sess.created_at), {addSuffix:true, locale: isAr ? arLocale : undefined})}
                     </p>
                     <div className="flex items-center gap-3 mt-2">
                       <span className="text-sm text-emerald-600 font-medium">{p} {isAr ? 'حضور' : 'present'}</span>
@@ -329,6 +375,9 @@ export default function Attendance() {
                     </div>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
+                    <button onClick={()=>setViewSession(sess)} aria-label={isAr?'عرض تفاصيل الفعالية':'View event details'} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-medium rounded-lg cursor-pointer hover:bg-slate-50">
+                      <Eye size={13}/>{isAr?'عرض':'View'}
+                    </button>
                     <button onClick={()=>setShowQR(sess)} aria-label={isAr?'عرض رمز الحضور':'Show attendance QR code'} className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg cursor-pointer hover:bg-indigo-700">
                       <QrCode size={13}/> QR
                     </button>
@@ -340,12 +389,13 @@ export default function Attendance() {
                     {currentRecords.map(rec => {
                       const p2  = people.find(pp=>pp.id===rec.person_id)
                       if (!p2) return null
-                      const late = rec.status === 'late'
+                      const recTiming = attendanceTiming(rec, sess, organizationSettings.timezone, lateMins)
+                      const late = recTiming.arrival === 'late'
                       return (
                         <div key={rec.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium ${late?'bg-amber-50 text-amber-700 border border-amber-200':'bg-emerald-50 text-emerald-700'}`}>
                           <CheckCircle size={10}/>{p2.name.split(' ')[0]}
-                          {late && <span className="text-amber-500">{isAr?'متأخر':'late'}</span>}
-                          {rec.check_out_at && <span className="opacity-60">{isAr?'خرج':'out'}</span>}
+                          {recTiming.arrival && <span className="opacity-75">{timingLabel(recTiming.arrival, isAr)}</span>}
+                          {recTiming.departure && <span className="opacity-60">{timingLabel(recTiming.departure, isAr)}</span>}
                         </div>
                       )
                     })}
@@ -375,11 +425,11 @@ export default function Attendance() {
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${st.color}`}>{st.icon}</div>
                   <div>
                     <h3 className="font-semibold text-slate-800">{sess.name || sess.service?.title || sess.label}</h3>
-                    <p className="text-sm text-slate-500">{stLabel} · {occurrenceDate(sess)} · {sess.session_time}</p>
+                    <p className="text-sm text-slate-500">{stLabel} · {occurrenceDate(sess)} · {formatSessionTime(sess.sessionTime || sess.session_time, isAr)} – {formatSessionTime(sess.endTime || sess.end_time, isAr)}</p>
                   </div>
                   <Badge color="green" size="sm" className="ms-auto">{isAr?'نشط':'Active'}</Badge>
                 </div>
-                <CheckInWidget record={myRecord(sess)} lateMins={lateMins} t={t} isAr={isAr}
+                <CheckInWidget record={myRecord(sess)} session={sess} timezone={organizationSettings.timezone} lateMins={lateMins} t={t} isAr={isAr}
                   onCheckIn={()=>checkInAttendance(sess.qr_code)}
                   onCheckOut={()=>checkOutAttendance(sess.id)}/>
               </Card>
@@ -402,7 +452,7 @@ export default function Attendance() {
                     <span className="text-lg">{st.icon}</span>
                     <span className="font-semibold text-slate-700">{sess.name || sess.service?.title || sess.label}</span>
                     <Badge color="slate" size="xs">{stLabel}</Badge>
-                    <span className="text-xs text-slate-400">{sess.service?.date}</span>
+                    <span className="text-xs text-slate-400">{sess.sessionDate || sess.session_date || sess.service?.date}</span>
                   </div>
                   <span className="text-xs text-slate-400">{(records[sess.id]||[]).length} {isAr?'سجل':'records'}</span>
                 </div>
@@ -412,8 +462,7 @@ export default function Attendance() {
                     <div className="divide-y divide-slate-50">
                       {(records[sess.id]||[]).map(rec => {
                         const p2 = people.find(pp=>pp.id===rec.person_id)
-                        const lateStatus = rec.status==='late' ? 'late' : 'on_time'
-                        const lateLabel  = rec.status==='late' ? (isAr?'متأخر':'Late') : (isAr?'ضمن الوقت المسموح':'Within tolerance')
+                        const recTiming = attendanceTiming(rec, sess, organizationSettings.timezone, lateMins)
                         return (
                           <div key={rec.id} className="flex items-center gap-3 px-5 py-3">
                             <Avatar name={p2?.name||'?'} size="sm"/>
@@ -425,7 +474,10 @@ export default function Attendance() {
                               <div className="text-emerald-600">{isAr?'دخول':'In'}: {rec.check_in_at?format(new Date(rec.check_in_at),'h:mm a'):'—'}</div>
                               <div className="text-amber-500">{isAr?'خروج':'Out'}: {rec.check_out_at?format(new Date(rec.check_out_at),'h:mm a'):'—'}</div>
                             </div>
-                            <Badge color={lateStatus==='on_time'?'green':'red'} size="xs">{lateLabel}</Badge>
+                            <div className="flex flex-col items-end gap-1">
+                              {recTiming.arrival && <Badge color={timingColor(recTiming.arrival)} size="xs">{isAr?'الدخول':'Arrival'}: {timingLabel(recTiming.arrival, isAr)}</Badge>}
+                              {recTiming.departure && <Badge color={timingColor(recTiming.departure)} size="xs">{isAr?'الخروج':'Departure'}: {timingLabel(recTiming.departure, isAr)}</Badge>}
+                            </div>
                           </div>
                         )
                       })}
@@ -501,6 +553,7 @@ export default function Attendance() {
             const sess = sessions.find(s=>s.id===sId)
             const st   = getSession(sess?.label)
             const stLabel = SESSION_LABEL[lang]?.[sess?.label] || sess?.label
+            const recTiming = attendanceTiming(r, sess, organizationSettings.timezone, lateMins)
             return (
               <Card key={r.id} className="p-4">
                 <div className="flex items-center gap-3">
@@ -514,6 +567,10 @@ export default function Attendance() {
                     <div className="text-amber-500">{isAr?'خروج':'Out'}: {r.check_out_at?format(new Date(r.check_out_at),'h:mm a'):'—'}</div>
                   </div>
                 </div>
+                <div className="flex gap-2 flex-wrap mt-3">
+                  {recTiming.arrival && <Badge color={timingColor(recTiming.arrival)} size="xs">{isAr?'الدخول':'Arrival'}: {timingLabel(recTiming.arrival, isAr)}</Badge>}
+                  {recTiming.departure && <Badge color={timingColor(recTiming.departure)} size="xs">{isAr?'الخروج':'Departure'}: {timingLabel(recTiming.departure, isAr)}</Badge>}
+                </div>
               </Card>
             )
           }))}
@@ -526,15 +583,21 @@ export default function Attendance() {
         </div>
       )}
 
+      <Modal open={!!viewSession} onClose={()=>setViewSession(null)}
+        title={viewSession?.name || viewSession?.service?.title || (isAr?'تفاصيل الفعالية':'Event details')} size="xl">
+        <AttendanceSessionDetails session={viewSession} records={viewSession ? (records[viewSession.id] || []) : []}
+          people={people} timezone={organizationSettings.timezone} lateMinutes={lateMins} isAr={isAr}/>
+      </Modal>
+
       {/* Create session modal */}
       <Modal
         open={isAdmin&&showCreate}
-        onClose={() => { setShowCreate(false); setCreateForm(BLANK_CREATE) }}
+        onClose={() => { setShowCreate(false); setCreateForm(BLANK_CREATE); setCreateError('') }}
         title={t('createSession')}
         size="md"
         footer={<>
-          <Btn variant="secondary" onClick={() => { setShowCreate(false); setCreateForm(BLANK_CREATE) }}>{t('cancel')}</Btn>
-          <Btn onClick={handleCreate} disabled={!createForm.label}>{t('createAndQR')}</Btn>
+          <Btn variant="secondary" onClick={() => { setShowCreate(false); setCreateForm(BLANK_CREATE); setCreateError('') }}>{t('cancel')}</Btn>
+          <Btn onClick={handleCreate} disabled={!createForm.label || !createForm.sessionDate || !createForm.sessionTime || !createForm.endTime}>{t('createAndQR')}</Btn>
         </>}>
 
         <div className="space-y-5">
@@ -565,18 +628,31 @@ export default function Attendance() {
             </div>
           </div>
 
-          {/* Start time + max attendees */}
+          {/* Explicit schedule drives arrival and departure classification. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label={`${t('startTime')} (${isAr?'لحساب التأخير':'for late tracking'})`} type="time" value={createForm.sessionTime}
-              onChange={e => setCreateForm(f => ({ ...f, sessionTime:e.target.value }))}/>
+            <Input label={`${isAr?'تاريخ الجلسة':'Session Date'} *`} type="date" value={createForm.sessionDate}
+              onChange={e => setCreateForm(f => ({ ...f, sessionDate:e.target.value }))}/>
             <Input label={`${isAr?'الحد الأقصى للحضور':'Attendee Limit'} (${t('optional')})`} type="number" min="1" max="500"
               value={createForm.maxAttendees} onChange={e => setCreateForm(f => ({ ...f, maxAttendees:e.target.value }))}
               placeholder={isAr?'مثال: 30':'e.g. 30'}/>
+            <Input label={`${t('startTime')} *`} type="time" value={createForm.sessionTime}
+              onChange={e => {
+                const sessionTime = e.target.value
+                setCreateForm(f => ({ ...f, sessionTime, endTime:f.endTime || addMinutesToTime(sessionTime, 120) }))
+              }}/>
+            <Input label={`${isAr?'وقت النهاية':'End Time'} *`} type="time" value={createForm.endTime}
+              onChange={e => setCreateForm(f => ({ ...f, endTime:e.target.value }))}/>
           </div>
+          <p className="-mt-3 text-xs text-slate-400">
+            {isAr
+              ? 'تأكد من صباحاً/مساءً: الساعة 4 مساءً تُسجل 16:00. الخروج قبل وقت النهاية يُعتبر مبكراً.'
+              : 'Check AM/PM carefully: 4:00 PM is 16:00. Checkout before the end time is marked early.'}
+          </p>
+          {createError && <p className="text-sm text-red-600" role="alert">{createError}</p>}
 
           {/* Optional service link */}
           <Select label={isAr?'ربط بخدمة (اختياري)':'Link to Service (optional)'} value={createForm.serviceId}
-              onChange={e => setCreateForm(f => ({ ...f, serviceId:e.target.value }))}>
+              onChange={e => handleLinkedService(e.target.value)}>
               <option value="">{isAr ? '— بدون ربط بخدمة —' : '— No linked service —'}</option>
               {services.filter(s => !['completed','cancelled'].includes(s.status) && s.date>=format(new Date(),'yyyy-MM-dd')).map(s => (
                 <option key={s.id} value={s.id}>{s.title} — {s.date}</option>
@@ -639,6 +715,8 @@ export default function Attendance() {
           <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
             <Clock size={13} className="flex-shrink-0"/>
             <span>
+              {isAr ? 'الموعد' : 'Schedule'}: <strong>{createForm.sessionDate || '—'} · {formatSessionTime(createForm.sessionTime, isAr)} – {formatSessionTime(createForm.endTime, isAr)}</strong>
+              {' · '}
               {isAr ? 'حد التأخير' : 'Late limit'}: <strong>{lateMins} {isAr ? 'دقيقة' : 'min'}</strong>
               {' · '}
               {isAr ? 'حد الأعذار' : 'Excuse limit'}: <strong>{excuseLimit}</strong> {PERIODS[excusePeriod]}

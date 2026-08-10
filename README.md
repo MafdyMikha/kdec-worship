@@ -78,9 +78,10 @@ src/lib/permissions.js      shared client permission helpers
 src/lib/runtimeConfig.js    fail-closed live/demo environment validation
 src/lib/supabase.js         Supabase client creation
 src/lib/recurrence.js       tested recurrence generation
-src/lib/attendance.js       occurrence-date helpers
+src/lib/attendance.js       timezone-safe occurrence and attendance-timing helpers
 supabase-schema-FULL.sql    authoritative fresh-project schema and RLS
 MIGRATION_security_data_integrity.sql current rerunnable upgrade migration
+MIGRATION_attendance_session_timing.sql small upgrade for already-migrated live databases
 MIGRATION_multi_role.sql    superseded legacy migration; do not combine
 scripts/check-browser-env.mjs blocks server secrets before bundling
 test/                       Node unit tests

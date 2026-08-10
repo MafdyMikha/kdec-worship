@@ -2,7 +2,7 @@
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } from '../lib/supabase.js'
-import { attendanceOccurrenceDate } from '../lib/attendance.js'
+import { attendanceOccurrenceDate, attendanceTiming } from '../lib/attendance.js'
 import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
 
@@ -108,7 +108,9 @@ const normalizeAttendanceSession = (session) => ({
   service: session.service || (session.service_title ? {
     id:session.service_id, title:session.service_title, date:session.service_date, time:session.service_time,
   } : null),
+  sessionDate: session.session_date || session.service_date || session.service?.date || '',
   sessionTime: session.session_time || '',
+  endTime: session.end_time || '',
   maxAttendees: session.max_attendees,
   repeatFreq: session.repeat_freq || 'weekly',
 })
@@ -1107,15 +1109,26 @@ export function AppProvider({ children }) {
   // ── ATTENDANCE ──────────────────────────────────────────
   const createAttendanceSession = async (form) => {
     const service = form.serviceId ? services.find(item => item.id===form.serviceId) : null
+    const sessionDate = form.sessionDate || service?.date
+    const sessionTime = form.sessionTime || service?.time || null
+    const endTime = form.endTime || null
+    if (!sessionDate || !sessionTime || !endTime) {
+      const message = 'Session date, start time, and end time are required.'
+      toast(message, 'error')
+      return { error:message }
+    }
+    const scheduledEnd = sessionDate && endTime ? new Date(`${sessionDate}T${endTime}:00`) : null
+    if (scheduledEnd && sessionTime && endTime <= sessionTime) scheduledEnd.setDate(scheduledEnd.getDate() + 1)
     const expiresAt = form.repeatable
       ? new Date(Date.now() + 90 * 86400000).toISOString()
-      : service
-        ? new Date(`${service.date}T23:59:59.999Z`).toISOString()
+      : scheduledEnd && !Number.isNaN(scheduledEnd.getTime())
+        ? new Date(scheduledEnd.getTime() + 6 * 3600000).toISOString()
         : new Date(Date.now() + 86400000).toISOString()
     const localSession = {
       id:`sess_${Date.now()}`, name:form.name || service?.title || form.label,
       service_id:form.serviceId||null, service:service||null, label:form.label,
-      session_time:form.sessionTime||service?.time||null, max_attendees:form.maxAttendees?Number(form.maxAttendees):null,
+      session_date:sessionDate, session_time:sessionTime, end_time:endTime,
+      max_attendees:form.maxAttendees?Number(form.maxAttendees):null,
       repeatable:Boolean(form.repeatable), repeat_freq:form.repeatable?(form.repeatFreq||'weekly'):null, qr_code:createSecureToken(12),
       active:true, expires_at:expiresAt, created_at:new Date().toISOString(), created_by:currentUser.id,
     }
@@ -1125,7 +1138,8 @@ export function AppProvider({ children }) {
     }
     const payload = {
       name:localSession.name, service_id:localSession.service_id, label:localSession.label,
-      session_time:localSession.session_time, max_attendees:localSession.max_attendees,
+      session_date:localSession.session_date, session_time:localSession.session_time, end_time:localSession.end_time,
+      max_attendees:localSession.max_attendees,
       repeatable:localSession.repeatable, repeat_freq:localSession.repeat_freq,
       qr_code:localSession.qr_code, active:true, expires_at:localSession.expires_at,
       created_by:localSession.created_by,
@@ -1171,6 +1185,7 @@ export function AppProvider({ children }) {
       if (existing?.check_in_at) return { success:true, data:existing }
       if (session.max_attendees && (attendanceRecords[session.id]||[]).filter(record => record.occurrence_date===occurrenceDate && record.check_in_at).length>=session.max_attendees) return { error:'This attendance session is full.' }
       const record = { id:`rec_${Date.now()}`, session_id:session.id, person_id:currentUser.id, occurrence_date:occurrenceDate, check_in_at:new Date().toISOString(), check_out_at:null, status:'present' }
+      record.status = attendanceTiming(record, session, organizationSettings.timezone, organizationSettings.attendanceLateMinutes).arrival === 'late' ? 'late' : 'present'
       setAttendanceRecords(prev => ({ ...prev, [session.id]:[...(prev[session.id]||[]),record] }))
       return { success:true, data:record }
     }
