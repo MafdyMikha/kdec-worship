@@ -30,8 +30,13 @@ export default function Dashboard() {
     <div className="space-y-6 max-w-7xl animate-fade-in">
       {/* Hero */}
       <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 rounded-2xl p-6 text-white relative overflow-hidden">
-        {/* Background watermark logo — always at the physical right edge, behind text */}
-        <img src={KDEC_LOGO} alt="" className="absolute right-6 top-1/2 -translate-y-1/2 w-24 h-24 object-contain opacity-10 pointer-events-none select-none" style={{zIndex:0}}/>
+        {/* Keep the watermark opposite the reading edge so it never competes with the welcome copy. */}
+        <img
+          src={KDEC_LOGO}
+          alt=""
+          className={`absolute ${isAr ? 'left-6' : 'right-6'} top-1/2 -translate-y-1/2 w-24 h-24 object-contain opacity-10 pointer-events-none select-none`}
+          style={{zIndex:0}}
+        />
         <div className="relative" style={{zIndex:1}}>
           <div className="text-indigo-200 text-sm mb-1">
             {isAr ? format(today,'EEEE، d MMMM yyyy',{locale:arLocale}) : format(today,'EEEE, MMMM d, yyyy')}
