@@ -52,6 +52,7 @@ Follow [SUPABASE-SETUP.md](./SUPABASE-SETUP.md). The checked-in `.env.example` c
 Supabase mode currently loads and writes:
 
 - profiles and multi-role membership;
+- centrally managed worship roles, role categories, primary-role assignments, explicit system access levels, and admin audit history;
 - invitations;
 - songs;
 - services and recurrence metadata;
@@ -79,7 +80,8 @@ src/lib/runtimeConfig.js    fail-closed live/demo environment validation
 src/lib/supabase.js         Supabase client creation
 src/lib/recurrence.js       tested recurrence generation
 src/lib/attendance.js       timezone-safe occurrence and attendance-timing helpers
-supabase-schema-FULL.sql    authoritative fresh-project schema and RLS
+supabase-schema-FULL.sql    fresh-project base schema and RLS (follow with the dynamic-role migration)
+MIGRATION_dynamic_roles_admin.sql dynamic role/access/admin-control upgrade for existing projects
 MIGRATION_security_data_integrity.sql current rerunnable upgrade migration
 MIGRATION_attendance_session_timing.sql small upgrade for already-migrated live databases
 MIGRATION_multi_role.sql    superseded legacy migration; do not combine

@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog, StatusDot } from '../components/ui'
 import { buildAttendanceReport, downloadAttendanceReport, formatAttendanceTimestamp } from '../lib/attendanceReport.js'
+import { isAdminUser } from '../lib/permissions.js'
 
 const ROLE_COLOR = {
   'Worship Leader':'indigo','Music Director':'purple','Pianist/Keys':'blue',
@@ -222,7 +223,7 @@ function AvailabilityView({ people, t }) {
 }
 
 // ── Multi-select role picker (pill grid, same pattern as availability days) ──
-function RolesPicker({ selected, onChange, ROLES, isAr }) {
+function RolesPicker({ selected,onChange,ROLES,isAr,primaryRole,onPrimaryChange }) {
   const toggle = (role) => {
     const has = selected.includes(role)
     onChange(has ? selected.filter(r => r !== role) : [...selected, role])
@@ -254,17 +255,15 @@ function RolesPicker({ selected, onChange, ROLES, isAr }) {
       {selected.length === 0 && (
         <p className="text-xs text-amber-700 mt-1.5" role="alert">{isAr ? 'اختر دوراً واحداً على الأقل' : 'Select at least one role'}</p>
       )}
+      {selected.length>0&&<Select className="mt-3" label={isAr?'الدور الأساسي':'Primary role'} value={primaryRole||selected[0]} onChange={event=>onPrimaryChange(event.target.value)}>{selected.map(role=><option key={role} value={role}>{role}</option>)}</Select>}
     </fieldset>
   )
 }
 
 // ── Edit Form ───────────────────────────────────────────────
-function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr, protectAuthorization=false }) {
+function EditForm({ value,onChange,ROLES,t,isAr,protectAuthorization=false,canAssignAdmin=false,worshipRoles=[] }) {
   const POSITION_LABEL = {
-    Leader: isAr ? 'قائد' : 'Leader',
-    Member: isAr ? 'عضو' : 'Member',
-    Volunteer: isAr ? 'متطوع' : 'Volunteer',
-    Admin: isAr ? 'مسؤول' : 'Admin',
+    super_admin:isAr?'مسؤول أعلى':'Super Admin',admin:isAr?'مسؤول':'Admin',leader:isAr?'قائد':'Leader',member:isAr?'عضو':'Member',
   }
   return (
     <div className="space-y-4">
@@ -282,12 +281,12 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr, protectAuthoriza
       </div>
 
       {/* Multi-select roles */}
-      <RolesPicker selected={value.roles || []} onChange={roles => onChange({ ...value, roles })} ROLES={ROLES} isAr={isAr}/>
+      <RolesPicker selected={value.roles||[]} onChange={roles=>onChange({...value,roles,primaryRole:roles.includes(value.primaryRole)?value.primaryRole:(roles[0]||''),primaryRoleId:roles.includes(value.primaryRole)?value.primaryRoleId:(worshipRoles.find(role=>role.name===roles[0])?.id||'')})} ROLES={ROLES} isAr={isAr} primaryRole={value.primaryRole||value.role} onPrimaryChange={primaryRole=>onChange({...value,primaryRole,primaryRoleId:worshipRoles.find(role=>role.name===primaryRole)?.id||''})}/>
 
-      <Select label={t('position')} value={value.position || 'Member'} disabled={protectAuthorization}
+      <Select label={isAr?'صلاحية النظام':'System access'} value={value.accessLevel||'member'} disabled={protectAuthorization}
         title={protectAuthorization ? (isAr?'لا يمكنك تغيير صلاحيات حسابك أثناء تسجيل الدخول':'You cannot change your signed-in authorization') : undefined}
-        onChange={e => onChange({ ...value, position: e.target.value })}>
-        {POSITIONS.map(p => <option key={p} value={p}>{POSITION_LABEL[p] || p}</option>)}
+        onChange={e=>onChange({...value,accessLevel:e.target.value})}>
+        {(canAssignAdmin?['super_admin','admin','leader','member']:['leader','member']).map(level=><option key={level} value={level}>{POSITION_LABEL[level]}</option>)}
       </Select>
       <Select label={t('active')} value={value.status || 'active'} disabled={protectAuthorization}
         title={protectAuthorization ? (isAr?'لا يمكنك تعطيل حسابك أثناء تسجيل الدخول':'You cannot deactivate your signed-in account') : undefined}
@@ -317,13 +316,13 @@ function EditForm({ value, onChange, ROLES, POSITIONS, t, isAr, protectAuthoriza
 }
 
 // ── Main Page ───────────────────────────────────────────────
-const blank = { name:'', email:'', phone:'', whatsapp:'', roles:[], position:'Member', status:'active', notes:'', availability:{} }
+const blank={name:'',email:'',phone:'',whatsapp:'',roles:[],primaryRole:'',primaryRoleId:'',accessLevel:'member',status:'active',notes:'',availability:{}}
 
 export default function People() {
-  const { people, updatePerson, deletePerson, currentUser, ROLES, POSITIONS, attendanceSessions, attendanceRecords, organizationSettings } = useStore()
+  const {people,updatePerson,deletePerson,currentUser,ROLES,worshipRoles,attendanceSessions,attendanceRecords,organizationSettings}=useStore()
   const { isAr, t } = useLang()
   const navigate = useNavigate()
-  const isAdmin  = currentUser?.isAdmin || currentUser?.is_admin
+  const isAdmin=isAdminUser(currentUser)
 
   const [search,       setSearch]       = useState('')
   const [filterRole,   setFilterRole]   = useState('all')
@@ -371,7 +370,7 @@ export default function People() {
     })
   }
 
-  const openEdit = (p) => { setEditing(p.id); setForm({ ...p, roles: getRoles(p) }); setShowForm(true) }
+  const openEdit=p=>{setEditing(p.id);setForm({...p,roles:getRoles(p),primaryRole:p.primaryRole||p.role,accessLevel:p.accessLevel||'member'});setShowForm(true)}
   const closeEdit = () => { setShowForm(false); setEditing(null); setForm(blank) }
 
   const handleSave = async () => {
@@ -490,8 +489,8 @@ export default function People() {
           <Btn variant="secondary" onClick={closeEdit}>{t('cancel')}</Btn>
           <Btn onClick={handleSave} disabled={!form.name?.trim() || !form.roles || form.roles.length === 0}>{t('saveChanges')}</Btn>
         </>}>
-        <EditForm value={form} onChange={setForm} ROLES={ROLES} POSITIONS={POSITIONS} t={t} isAr={isAr}
-          protectAuthorization={editing===currentUser?.id && isAdmin}/>
+        <EditForm value={form} onChange={setForm} ROLES={ROLES} t={t} isAr={isAr} worshipRoles={worshipRoles}
+          canAssignAdmin={currentUser?.accessLevel==='super_admin'} protectAuthorization={editing===currentUser?.id&&isAdmin}/>
       </Modal>
 
       <Modal open={isAdmin && !!historyPerson} onClose={()=>setHistoryPerson(null)}

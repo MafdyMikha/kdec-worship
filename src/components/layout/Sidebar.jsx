@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Calendar, Music2, Users, MessageSquare, BarChart3, BookOpen, ChevronLeft, ChevronRight, Settings, UserPlus, QrCode, Megaphone, Home, MessageCircle, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, Calendar, Music2, Users, MessageSquare, BarChart3, BookOpen, ChevronLeft, ChevronRight, Settings, UserPlus, QrCode, Megaphone, Home, MessageCircle, ClipboardList, ShieldCog } from 'lucide-react'
 import { useState } from 'react'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
@@ -94,6 +94,12 @@ export default function Sidebar() {
               }`}>
             <UserPlus size={20}/>
             {!collapsed && <span>{t('invitations')}</span>}
+          </NavLink>
+        )}
+        {isAdmin && (
+          <NavLink to="/admin/settings" aria-label={t('adminControl')}
+            className={({isActive})=>`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${isActive?'bg-indigo-600 text-white':'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
+            <ShieldCog size={20}/>{!collapsed&&<span>{t('adminControl')}</span>}
           </NavLink>
         )}
       </nav>

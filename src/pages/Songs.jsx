@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Plus, Music2, Edit2, Trash2, ChevronDown, ChevronUp, Globe } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { canManageWorship } from '../lib/permissions.js'
+import { hasPermission } from '../lib/permissions.js'
 import { Card, Btn, Badge, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog } from '../components/ui'
 
 const KEYS = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Am','Dm','Em','Gm','Bm']
@@ -80,7 +80,7 @@ export default function Songs() {
   const [expanded, setExpanded] = useState(null)
   const [delTarget,setDelTarget]= useState(null)
   const [showEn,   setShowEn]   = useState({})
-  const canManage = canManageWorship(currentUser)
+  const canManage = hasPermission(currentUser,'songs.manage')
 
   const activeSongs = songs.filter(s => s.status!=='inactive')
   const filtered = activeSongs.filter(s => {

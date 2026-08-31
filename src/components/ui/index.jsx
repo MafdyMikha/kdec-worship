@@ -197,7 +197,7 @@ export function Textarea({ label, required, error, className = '', ...props }) {
 }
 
 // Card
-export function Card({ children, className = '', onClick, hover = false }) {
+export function Card({ children, className = '', onClick, hover = false, ...props }) {
   const handleKeyDown = onClick
     ? event => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -207,7 +207,7 @@ export function Card({ children, className = '', onClick, hover = false }) {
       }
     : undefined
   return (
-    <div onClick={onClick} onKeyDown={handleKeyDown} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
+    <div onClick={onClick} onKeyDown={handleKeyDown} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} {...props}
       className={`bg-white rounded-xl border border-slate-200/80 shadow-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer' : ''} transition-all ${className}`}>
       {children}
     </div>

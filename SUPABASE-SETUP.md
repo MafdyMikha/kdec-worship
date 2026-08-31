@@ -10,7 +10,7 @@ Do not put the service-role key in this application. Vite exposes every `VITE_*`
 
 ## 2. Apply the database schema
 
-For a new project, open **SQL Editor**, paste the complete contents of `supabase-schema-FULL.sql`, and run it once. That file is the authoritative fresh-install schema and includes multi-role columns, triggers, Row Level Security, and the currently planned tables.
+For a new project, open **SQL Editor**, paste the complete contents of `supabase-schema-FULL.sql`, and run it once. Then run `MIGRATION_dynamic_roles_admin.sql` to install the normalized role catalogue, explicit access levels, permission matrix, audit log, and protected administration functions. The dynamic-role migration is safe on a newly created database and is also the upgrade path for an existing live project.
 
 For an existing project:
 
@@ -19,6 +19,7 @@ For an existing project:
 3. Read the SQL Editor output. The migration is rerunnable and preserves legacy rows, but it deliberately emits a warning and skips a unique index when duplicate historical attendance, recurrence position/date, pending-excuse, open-substitute, or filled-substitute-candidate rows need manual reconciliation. It also warns instead of guessing when legacy recurrence cadence metadata is ambiguous or conflicting.
 4. After cleaning any warned-about rows, rerun the migration and confirm that it completes without warnings.
 5. Validate any constraints left `NOT VALID` after legacy cleanup, for example with `alter table public.excuses validate constraint excuse_exactly_one_target_check;`.
+6. Run `MIGRATION_dynamic_roles_admin.sql`. It imports every legacy role name, creates role-ID relationships, preserves the legacy text columns as synchronized compatibility snapshots, and promotes the oldest active legacy administrator to the first Super Admin. Review the resulting access levels before inviting additional administrators.
 
 If `MIGRATION_security_data_integrity.sql` was already applied before explicit attendance dates and end times were introduced, run `MIGRATION_attendance_session_timing.sql` once. New upgrades do not need the smaller migration because the main migration already includes the same columns and RPC behavior.
 
@@ -66,8 +67,8 @@ Use the trusted Supabase dashboard for the first account:
 
 1. Create or invite the user under **Authentication → Users**.
 2. Confirm that the signup trigger created its `profiles` row.
-3. In **Table Editor → profiles**, set `status` to `active`, `is_admin` to `true`, and `position` to `Admin`.
-4. Set an appropriate primary `role` and matching JSON `roles` array.
+3. In **Table Editor → profiles**, set `status` to `active`, `access_level` to `super_admin`, `is_admin` to `true`, and `position` to `Admin`.
+4. In **Table Editor → profile_worship_roles**, add at least one role assignment for that profile and mark exactly one assignment as `is_primary = true`. Use a role ID from `worship_roles`.
 
 This manual step is only for the first trusted administrator. Create subsequent accounts through application invitations so the invitation email, role, expiry, and one-time redemption checks are applied.
 
@@ -76,6 +77,10 @@ This manual step is only for the first trusted administrator. Create subsequent 
 Before inviting the team, verify all of the following:
 
 - the administrator can sign in and reload persisted data;
+- Admin Control can create, rename, reorder, disable, reactivate, and safely replace a worship role, with the change still present after reload;
+- worship-role changes never grant system access; only `access_level` and its permission matrix authorize protected actions;
+- a member can hold multiple worship roles while exactly one is primary, and inactive roles remain visible on historical records but cannot be used for new assignments;
+- an Admin cannot modify another Admin or Super Admin, while a Super Admin can, and the final active Super Admin remains protected;
 - a new invitation works only for its intended email and cannot be reused;
 - an ordinary member cannot change their role, status, position, or admin flag;
 - the last active administrator cannot be demoted, deactivated, or stripped of administrator status, including by concurrent updates;
@@ -121,5 +126,6 @@ Publish `dist/` and configure the two Supabase variables in the hosting environm
 - **Auth works but data writes fail:** inspect the Supabase response and RLS policies for the signed-in profile's active status and roles.
 - **Recovery or deep link returns 404:** add the route to Supabase's redirect allow-list and configure the host's SPA rewrite.
 - **Old database lacks roles:** run `MIGRATION_security_data_integrity.sql`; it includes the legacy roles backfill and the current policy/trigger hardening.
+- **Admin Control reports missing tables/functions:** run `MIGRATION_dynamic_roles_admin.sql`, then sign out and back in so the new access level and role assignments reload.
 - **Security migration prints a skipped-index warning:** query the duplicate key named in the warning, reconcile the historical rows without discarding audit evidence, then rerun the migration.
 - **A legacy constraint remains `NOT VALID`:** new writes are already protected. Audit/fix older violating rows, then run `alter table ... validate constraint ...` during a maintenance window.

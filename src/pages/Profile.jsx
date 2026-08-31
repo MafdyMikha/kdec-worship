@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, Tabs } from '../components/ui'
 import { KDEC_LOGO } from '../assets/kdecLogo.js'
+import { ACCESS_LEVEL_LABELS, isAdminUser } from '../lib/permissions.js'
 
 const DAYS_CONFIG = [
   { key:'sun' }, { key:'mon' }, { key:'tue' },
@@ -52,7 +53,7 @@ export default function Profile() {
     })
   }, [currentUser, person])
 
-  const isAdmin    = currentUser?.isAdmin || currentUser?.is_admin
+  const isAdmin=isAdminUser(currentUser)
   const myServices = services.filter(s => s.team.find(tm => tm.personId === currentUser?.id))
   const confirmed  = myServices.filter(s => s.team.find(tm => tm.personId===currentUser?.id && tm.status==='confirmed')).length
   const availDays  = DAYS_CONFIG.filter(d => form.availability?.[d.key])
@@ -353,7 +354,7 @@ export default function Profile() {
           </Btn>
           <div className="pt-4 border-t border-slate-100 space-y-2 text-sm">
             <div className="flex flex-col sm:flex-row sm:justify-between gap-1"><span className="text-slate-500">{t('email')}</span><span className="text-slate-700 break-all" dir="ltr">{currentUser?.email}</span></div>
-            <div className="flex justify-between"><span className="text-slate-400">{t('role')}</span><Badge color={isAdmin?'indigo':'slate'} size="xs">{isAdmin?(isAr?'مسؤول':'Admin'):(isAr?'عضو':'Member')}</Badge></div>
+            <div className="flex justify-between"><span className="text-slate-400">{isAr?'صلاحية النظام':'System access'}</span><Badge color={isAdmin?'indigo':'slate'} size="xs">{ACCESS_LEVEL_LABELS[currentUser?.accessLevel||'member']?.[isAr?'ar':'en']}</Badge></div>
           </div>
         </Card>
       )}

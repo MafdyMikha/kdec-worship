@@ -18,6 +18,7 @@ export const T = {
   invitations:      { ar:'الدعوات',               en:'Invitations'            },
   whatsappBulk:     { ar:'واتساب الجماعي',        en:'WhatsApp'               },
   requests:         { ar:'الطلبات',               en:'Requests'               },
+  adminControl:     { ar:'التحكم الإداري',         en:'Admin Control'          },
 
   // ── Common actions ───────────────────────────────────────
   save:             { ar:'حفظ',                   en:'Save'                   },

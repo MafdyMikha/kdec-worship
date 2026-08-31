@@ -13,7 +13,7 @@ import SetlistTab from '../components/SetlistTab'
 export default function ServiceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { services, people, currentUser, updateService, deleteService, deleteRecurringService, generateMoreOccurrences, addTeamMember, updateTeamMemberStatus, removeTeamMember, requestSubstitute, ROLES } = useStore()
+  const {services,people,currentUser,updateService,deleteService,deleteRecurringService,generateMoreOccurrences,addTeamMember,updateTeamMemberStatus,removeTeamMember,requestSubstitute,ROLES,worshipRoles}=useStore()
   const { t, isAr } = useLang()
 
   const [tab,             setTab]            = useState('setlist')
@@ -38,6 +38,10 @@ export default function ServiceDetail() {
   )
 
   const teamMembers     = service.team.map(t => ({...t, person: t.person || people.find(p => p.id === t.personId)}))
+  const teamRoleNames=[...new Set(teamMembers.map(member=>member.role).filter(Boolean))].sort((a,b)=>{
+    const order=name=>worshipRoles.find(role=>role.name===name)?.displayOrder??9999
+    return order(a)-order(b)||a.localeCompare(b)
+  })
   const availablePeople = people.filter(p => p.status==='active' && !service.team.find(t => t.personId===p.id))
   const confirmed       = service.team.filter(t => t.status==='confirmed').length
   const pending         = service.team.filter(t => t.status==='pending').length
@@ -164,7 +168,7 @@ export default function ServiceDetail() {
             {canEdit&&<Btn size="sm" onClick={()=>setShowAddPerson(true)} icon={<Plus size={14}/>}>{isAr?'إضافة عضو':'Add Member'}</Btn>}
           </div>
 
-          {ROLES.filter(role=>teamMembers.some(t=>t.role===role)).map(role=>(
+          {teamRoleNames.map(role=>(
             <div key={role}>
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">{role}</div>
               <div className="space-y-2">

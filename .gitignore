@@ -6,3 +6,6 @@ dist/
 *.local
 .DS_Store
 
+KDEC_NUDE_LOGO_PROMPT.md
+public/kdec-motion/index.html
+public/kdec-motion/kdec-nude-logo.png

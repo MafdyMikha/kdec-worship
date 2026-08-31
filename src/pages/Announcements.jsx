@@ -4,7 +4,7 @@ import { formatDistanceToNow, parseISO, isValid } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { canManageWorship } from '../lib/permissions.js'
+import { hasPermission } from '../lib/permissions.js'
 import { Card, Btn, Badge, Avatar, Modal, Input, Textarea, Select, EmptyState, ConfirmDialog } from '../components/ui'
 
 const blank = { title:'', content:'', priority:'normal' }
@@ -15,7 +15,7 @@ export default function Announcements() {
   const [showAdd,      setShowAdd]      = useState(false)
   const [form,         setForm]         = useState(blank)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const canManage = canManageWorship(currentUser)
+  const canManage = hasPermission(currentUser,'announcements.manage')
 
   const PRIORITY_CONFIG = {
     high:   { color:'red',   icon:<AlertCircle size={16}/>,   label: isAr?'عاجل':'Urgent',  border:'border-l-red-400'   },

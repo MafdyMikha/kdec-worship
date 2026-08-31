@@ -4,12 +4,13 @@ import MobileNav from './MobileNav'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { useLocation } from 'react-router-dom'
+import { isAdminUser } from '../../lib/permissions.js'
 
 export default function Layout({ children }) {
   const { currentUser } = useStore()
   const { t, isAr } = useLang()
   const { pathname } = useLocation()
-  const isAdmin = currentUser?.isAdmin || currentUser?.is_admin
+  const isAdmin=isAdminUser(currentUser)
 
   const PAGE_KEYS = {
     '/':             isAdmin ? 'dashboard' : 'home',
@@ -29,6 +30,7 @@ export default function Layout({ children }) {
     '/events':       'events',
     '/requests':     'requests',
     '/whatsapp':     'whatsappBulk',
+    '/admin/settings':'adminControl',
   }
 
   const base  = Object.keys(PAGE_KEYS).find(k => pathname === k || (k !== '/' && k !== '/home' && pathname.startsWith(k)))

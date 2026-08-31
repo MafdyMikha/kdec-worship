@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { AppProvider, useStore } from './store/useStore.jsx'
-import { isAdminUser } from './lib/permissions.js'
+import { hasPermission, isAdminUser } from './lib/permissions.js'
 import Layout from './components/layout'
 import { Notifications } from './components/ui'
 const Login = lazy(() => import('./pages/Login'))
@@ -21,6 +21,7 @@ const Attendance = lazy(() => import('./pages/Attendance'))
 const Events = lazy(() => import('./pages/Events'))
 const WhatsAppBulk = lazy(() => import('./pages/WhatsAppBulk'))
 const Requests = lazy(() => import('./pages/Requests'))
+const AdminControl = lazy(() => import('./pages/AdminControl'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 function Spinner() {
@@ -54,6 +55,11 @@ function AdminOnly({ children }) {
   return isAdminUser(currentUser) ? children : <Navigate to="/" replace />
 }
 
+function PermissionOnly({ permission, children }) {
+  const { currentUser } = useStore()
+  return hasPermission(currentUser,permission) ? children : <Navigate to="/" replace />
+}
+
 function AuthGate() {
   const { currentUser, authLoading, configurationError, isPasswordRecovery, notifications } = useStore()
   const inviteCode = new URLSearchParams(window.location.search).get('invite')
@@ -79,7 +85,7 @@ function AuthGate() {
           <Route path="/songs"         element={<Songs/>}/>
           <Route path="/people"        element={<People/>}/>
           <Route path="/schedule"      element={<Schedule/>}/>
-          <Route path="/reports"       element={<AdminOnly><Reports/></AdminOnly>}/>
+          <Route path="/reports"       element={<PermissionOnly permission="reports.view"><Reports/></PermissionOnly>}/>
           <Route path="/announcements" element={<Announcements/>}/>
           <Route path="/attendance"    element={<Attendance/>}/>
           <Route path="/checkin/:token" element={<Attendance/>}/>
@@ -89,6 +95,7 @@ function AuthGate() {
           <Route path="/profile"       element={<Profile/>}/>
           <Route path="/invitations"   element={<AdminOnly><Invitations/></AdminOnly>}/>
           <Route path="/whatsapp"      element={<AdminOnly><WhatsAppBulk/></AdminOnly>}/>
+          <Route path="/admin/settings" element={<AdminOnly><AdminControl/></AdminOnly>}/>
           <Route path="*"              element={<Navigate to="/" replace/>}/>
         </Routes></Suspense>
       </Layout>

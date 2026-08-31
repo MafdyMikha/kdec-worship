@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Music2, Users, QrCode,
   MessageSquare, Home, BarChart3, Megaphone, Settings, User,
-  ChevronUp, X, ClipboardList
+  ChevronUp, X, ClipboardList, ShieldCog
 } from 'lucide-react'
 import { useState } from 'react'
 import { useStore } from '../../store/useStore.jsx'
@@ -54,6 +54,7 @@ export default function MobileNav() {
     { to: '/reports',       icon: <BarChart3 size={20}/>,    label: t('reports')       },
     { to: '/announcements', icon: <MessageSquare size={20}/>,label: t('announcements'), badge: announcements.length },
     { to: '/invitations',   icon: <Users size={20}/>,        label: t('invitations')   },
+    { to: '/admin/settings',icon: <ShieldCog size={20}/>,    label: t('adminControl')  },
     { to: '/profile',       icon: <User size={20}/>,         label: t('profile')       },
     { to: '/settings',      icon: <Settings size={20}/>,     label: t('settings')      },
   ]

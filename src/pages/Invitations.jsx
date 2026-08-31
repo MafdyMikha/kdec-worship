@@ -3,6 +3,7 @@ import { Plus, Mail, Copy, Check, X, Clock, UserPlus } from 'lucide-react'
 import { useStore, buildInvitationMsg } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Modal, Input, Select, EmptyState } from '../components/ui'
+import { isAdminUser, isSuperAdminUser } from '../lib/permissions.js'
 
 const WA = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -12,13 +13,13 @@ const WA = () => (
 
 export default function Invitations() {
   const { isAr, t } = useLang()
-  const { invitations, createInvitation, cancelInvitation, currentUser, ROLES } = useStore()
+  const { invitations,createInvitation,cancelInvitation,currentUser,ROLES,worshipRoles } = useStore()
   const [showAdd, setShowAdd] = useState(false)
-  const [form,    setForm]    = useState({ email:'', roles:['Vocalist'], method:'whatsapp', phone:'' })
+  const [form,    setForm]    = useState({email:'',roles:[],primaryRole:'',accessLevel:'member',method:'whatsapp',phone:''})
   const [created, setCreated] = useState(null)
   const [copied,  setCopied]  = useState(null)
 
-  const isAdmin    = currentUser?.isAdmin || currentUser?.is_admin
+  const isAdmin=isAdminUser(currentUser)
   const senderName = currentUser?.name || currentUser?.email?.split('@')[0] || (isAr?'المسؤول':'Admin')
 
   if (!isAdmin) return (
@@ -29,8 +30,9 @@ export default function Invitations() {
 
   const handleCreate = async () => {
     if (!form.email || !form.roles || form.roles.length === 0) return
-    const inv = await createInvitation(form.email, form.roles, form.method)
-    if (inv) { setCreated({...inv, phone:form.phone}); setShowAdd(false); setForm({email:'',roles:['Vocalist'],method:'whatsapp',phone:''}) }
+    const primaryRoleId=worshipRoles.find(role=>role.name===form.primaryRole)?.id
+    const inv=await createInvitation(form.email,form.roles,form.method,{primaryRoleId,accessLevel:form.accessLevel})
+    if(inv){const defaultRole=ROLES[0]||'';setCreated({...inv,phone:form.phone});setShowAdd(false);setForm({email:'',roles:defaultRole?[defaultRole]:[],primaryRole:defaultRole,accessLevel:'member',method:'whatsapp',phone:''})}
   }
 
   const getInviteUrl = (code) => `${window.location.origin}?invite=${code}`
@@ -180,10 +182,7 @@ export default function Invitations() {
                 const on = form.roles.includes(role)
                 return (
                   <button key={role} type="button"
-                    onClick={() => setForm(f => ({
-                      ...f,
-                      roles: f.roles.includes(role) ? f.roles.filter(r => r !== role) : [...f.roles, role]
-                    }))}
+                    onClick={()=>setForm(f=>{const roles=f.roles.includes(role)?f.roles.filter(item=>item!==role):[...f.roles,role];return{...f,roles,primaryRole:roles.includes(f.primaryRole)?f.primaryRole:(roles[0]||'')}})}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-all select-none ${
                       on ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50'
                     }`}>
@@ -196,6 +195,12 @@ export default function Invitations() {
               <p className="text-xs text-amber-500 mt-1.5">{isAr ? 'اختر دوراً واحداً على الأقل' : 'Select at least one role'}</p>
             )}
           </div>
+          <Select label={isAr?'الدور الأساسي':'Primary role'} value={form.primaryRole} onChange={event=>setForm(current=>({...current,primaryRole:event.target.value}))}>
+            {form.roles.map(role=><option key={role} value={role}>{role}</option>)}
+          </Select>
+          <Select label={isAr?'صلاحية النظام':'System access'} value={form.accessLevel} onChange={event=>setForm(current=>({...current,accessLevel:event.target.value}))}>
+            <option value="member">{isAr?'عضو':'Member'}</option><option value="leader">{isAr?'قائد':'Leader'}</option>{isSuperAdminUser(currentUser)&&<option value="admin">{isAr?'مسؤول':'Admin'}</option>}
+          </Select>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               {isAr?'طريقة الإرسال':'Send via'}

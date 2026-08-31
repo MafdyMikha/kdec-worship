@@ -5,6 +5,8 @@ import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } fro
 import { attendanceOccurrenceDate, attendanceTiming } from '../lib/attendance.js'
 import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
+import { ACCESS_LEVELS, SYSTEM_PERMISSIONS, hasPermission, isAdminUser, isSuperAdminUser } from '../lib/permissions.js'
+import { parseLyricsSections, slugifySongPath } from '../lib/songImport.js'
 
 // ─────────────────────────────────────────────────────────
 // Helpers
@@ -27,8 +29,25 @@ function createSecureToken(byteLength = 16) {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('').toUpperCase()
 }
 
-export const ROLES = ['Worship Leader','Music Director','Pianist/Keys','Acoustic Guitar','Electric Guitar','Bass Guitar','Drummer','Vocalist','AUX Instrument','Sound Engineer','Projection','Camera']
-export const POSITIONS = ['Leader','Member','Volunteer','Admin']
+const DEMO_ROLE_CATEGORIES = [
+  {id:'cat-leadership',name:'Leadership',slug:'leadership',displayOrder:10,active:true},
+  {id:'cat-vocals',name:'Vocals',slug:'vocals',displayOrder:20,active:true},
+  {id:'cat-instruments',name:'Instruments',slug:'instruments',displayOrder:30,active:true},
+  {id:'cat-technical',name:'Technical',slug:'technical',displayOrder:40,active:true},
+  {id:'cat-other',name:'Other',slug:'other',displayOrder:50,active:true},
+]
+const DEMO_ROLE_NAMES = ['Worship Leader','Music Director','Service Leader','Vocalist','Vocal','Background Vocal','Choir','Pianist/Keys','Piano','Keyboard','Acoustic Guitar','Electric Guitar','Bass Guitar','Drummer','Percussion','Violin','Cello','Saxophone','AUX Instrument','Sound Engineer','Projection','Media','Lyrics','Lighting','Camera']
+const DEMO_WORSHIP_ROLES = DEMO_ROLE_NAMES.map((name,index)=>{
+  const categoryId=['Worship Leader','Music Director','Service Leader'].includes(name)?'cat-leadership':['Vocalist','Vocal','Background Vocal','Choir'].includes(name)?'cat-vocals':['Sound Engineer','Projection','Media','Lyrics','Lighting','Camera'].includes(name)?'cat-technical':'cat-instruments'
+  return {id:`demo-role-${index+1}`,name,slug:name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),categoryId,displayOrder:(index+1)*10,active:true,description:''}
+})
+const DEMO_PERMISSION_DEFINITIONS=SYSTEM_PERMISSIONS.map((permission_key,index)=>({permission_key,category:permission_key.split('.')[0],description:permission_key.replace('.', ' · '),display_order:(index+1)*10,active:true}))
+const DEMO_PERMISSION_MATRIX={
+  admin:SYSTEM_PERMISSIONS.filter(permission=>permission!=='permissions.manage'),
+  leader:['users.view','services.view','services.create','services.edit','songs.manage','schedules.manage','events.manage','announcements.manage'],
+  member:['services.view'],
+}
+export const POSITIONS = ACCESS_LEVELS
 export const DEFAULT_ORGANIZATION_SETTINGS = {
   id: true,
   orgNameAr: 'KDEC فريق التسبيح',
@@ -41,17 +60,40 @@ export const DEFAULT_ORGANIZATION_SETTINGS = {
   notificationPreferences: { reminders:true, newSongs:true, teamChanges:false, events:true },
 }
 
-const normalizeProfile = (profile) => ({
-  ...profile,
-  isAdmin: profile.is_admin,
-  joinDate: profile.join_date,
-  timeSlots: profile.time_slots || [],
-  tags: profile.tags || [],
-  availability: profile.availability || {},
-  roles: Array.isArray(profile.roles) && profile.roles.length > 0
-    ? profile.roles
-    : (profile.role ? [profile.role] : []),
-})
+const normalizeRoleCategory = category => ({...category,displayOrder:category.display_order??category.displayOrder??0})
+const normalizeWorshipRole = role => ({...role,categoryId:role.category_id??role.categoryId,displayOrder:role.display_order??role.displayOrder??0,archivedAt:role.archived_at??role.archivedAt,category:role.category?normalizeRoleCategory(role.category):null})
+const normalizeProfile = (profile) => {
+  const assignments=(profile.roleAssignments||profile.role_assignments||[]).map(assignment=>({
+    ...assignment,roleId:assignment.role_id??assignment.roleId,isPrimary:assignment.is_primary??assignment.isPrimary,
+    worshipRole:assignment.worshipRole?normalizeWorshipRole(assignment.worshipRole):assignment.worship_role?normalizeWorshipRole(assignment.worship_role):null,
+  }))
+  const assignmentNames=assignments.map(assignment=>assignment.worshipRole?.name).filter(Boolean)
+  const roles=assignmentNames.length?assignmentNames:Array.isArray(profile.roles)&&profile.roles.length?profile.roles:(profile.role?[profile.role]:[])
+  const primaryAssignment=assignments.find(assignment=>assignment.isPrimary)||assignments[0]
+  return {
+    ...profile,roleAssignments:assignments,roleIds:assignments.map(assignment=>assignment.roleId),primaryRoleId:primaryAssignment?.roleId||null,
+    primaryRole:primaryAssignment?.worshipRole?.name||profile.role||roles[0]||'',roles,
+    accessLevel:profile.access_level||profile.accessLevel||(profile.is_admin?'admin':'member'),
+    isAdmin:['super_admin','admin'].includes(profile.access_level||profile.accessLevel)||(Boolean(profile.is_admin)&&!profile.access_level),
+    joinDate:profile.join_date,timeSlots:profile.time_slots||[],lastActiveAt:profile.last_active_at,
+    tags:profile.tags||[],availability:profile.availability||{},
+  }
+}
+
+const normalizeInvitation = invitation => {
+  const assignments=(invitation.roleAssignments||invitation.role_assignments||[]).map(assignment=>({
+    ...assignment,roleId:assignment.role_id??assignment.roleId,isPrimary:assignment.is_primary??assignment.isPrimary,
+    worshipRole:assignment.worshipRole?normalizeWorshipRole(assignment.worshipRole):assignment.worship_role?normalizeWorshipRole(assignment.worship_role):null,
+  }))
+  const assignedNames=assignments.map(assignment=>assignment.worshipRole?.name).filter(Boolean)
+  const roles=assignedNames.length?assignedNames:(Array.isArray(invitation.roles)?invitation.roles:(invitation.role?[invitation.role]:[]))
+  const primary=assignments.find(assignment=>assignment.isPrimary)||assignments[0]
+  return {
+    ...invitation,roles,role:primary?.worshipRole?.name||invitation.role||roles[0]||'',roleAssignments:assignments,
+    roleIds:assignments.map(assignment=>assignment.roleId),primaryRoleId:primary?.roleId||null,
+    accessLevel:invitation.access_level||invitation.accessLevel||'member',
+  }
+}
 
 const normalizeSong = (song) => ({
   ...song,
@@ -65,6 +107,35 @@ const normalizeSong = (song) => ({
   arrangements: song.arrangements || [],
   sequence: song.sequence || [],
   themes: song.themes || [],
+  tags: song.themes || [],
+  lyricVersions: (song.lyrics || []).map(lyrics => ({
+    ...lyrics,
+    songId:lyrics.song_id,
+    isPrimary:lyrics.is_primary,
+    createdBy:lyrics.created_by,
+  })),
+  primaryLyrics: (song.lyrics || []).find(lyrics => lyrics.is_primary) || (song.lyrics || [])[0] || null,
+  charts: (song.charts || []).map(chart => ({
+    ...chart,
+    songId:chart.song_id,
+    arrangementName:chart.arrangement_name,
+    chartKey:chart.chart_key,
+    chartType:chart.chart_type,
+    isPrimary:chart.is_primary,
+    createdBy:chart.created_by,
+    versions:(chart.versions || []).map(version => ({
+      ...version,
+      chartId:version.chart_id,
+      storagePath:version.storage_path,
+      originalFilename:version.original_filename,
+      mimeType:version.mime_type,
+      fileSize:version.file_size,
+      rawContent:version.raw_content,
+      parsedData:version.parsed_data,
+      uploadedBy:version.uploaded_by,
+      uploadedAt:version.uploaded_at,
+    })).sort((a,b) => b.version-a.version),
+  })),
 })
 
 const normalizeService = (service) => ({
@@ -85,7 +156,9 @@ const normalizeService = (service) => ({
     })),
   team: (service.team || []).map(member => ({
     personId: member.person_id,
-    role: member.role,
+    roleId: member.worship_role_id,
+    role: member.roleDefinition?.name || member.role_definition?.name || member.role,
+    roleDefinition: member.roleDefinition ? normalizeWorshipRole(member.roleDefinition) : member.role_definition ? normalizeWorshipRole(member.role_definition) : null,
     status: member.status,
     person: member.person ? normalizeProfile(member.person) : null,
   })),
@@ -137,10 +210,10 @@ const lastSun  = new Date(today);    lastSun.setDate(today.getDate() - ((today.g
 // ── 14 Team Members ───────────────────────────────────────
 const DEMO_PEOPLE = [
   // ── Admins ──
-  { id:'p1',  name:'مافدي حنا',       nameEn:'Mafdy Hanna',       email:'mafdy@kdec.org',      phone:'+20 100 111 0001', whatsapp:'+20 100 111 0001', role:'Worship Leader',roles:['Worship Leader','Pianist/Keys'],  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'قائد التسبيح الرئيسي',  joinDate:'2020-01-15', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
-  { id:'p2',  name:'كريستين رمزي',   nameEn:'Christine Ramzy',   email:'christine@kdec.org',  phone:'+20 100 111 0002', whatsapp:'+20 100 111 0002', role:'Music Director',roles:['Music Director','Vocalist'],  position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'مديرة موسيقية',         joinDate:'2019-06-01', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p1',  name:'مافدي حنا',       nameEn:'Mafdy Hanna',       email:'mafdy@kdec.org',      phone:'+20 100 111 0001', whatsapp:'+20 100 111 0001', role:'Worship Leader',roles:['Worship Leader','Pianist/Keys'],  access_level:'super_admin',position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'قائد التسبيح الرئيسي',  joinDate:'2020-01-15', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
+  { id:'p2',  name:'كريستين رمزي',   nameEn:'Christine Ramzy',   email:'christine@kdec.org',  phone:'+20 100 111 0002', whatsapp:'+20 100 111 0002', role:'Music Director',roles:['Music Director','Vocalist'],  access_level:'admin',position:'Admin',    status:'active', isAdmin:true,  is_admin:true,  notes:'مديرة موسيقية',         joinDate:'2019-06-01', availability:{sun:true,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false},  timeSlots:[], tags:[] },
   // ── Members ──
-  { id:'p3',  name:'سارة ميخائيل',   nameEn:'Sarah Mikhail',     email:'sarah@kdec.org',      phone:'+20 100 111 0003', whatsapp:'+20 100 111 0003', role:'Pianist/Keys',roles:['Pianist/Keys'],    position:'Leader',   status:'active', isAdmin:false, is_admin:false, notes:'بيانو رئيسي، تعزف من سنة ٢٠١٨', joinDate:'2020-03-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
+  { id:'p3',  name:'سارة ميخائيل',   nameEn:'Sarah Mikhail',     email:'sarah@kdec.org',      phone:'+20 100 111 0003', whatsapp:'+20 100 111 0003', role:'Pianist/Keys',roles:['Pianist/Keys'],    access_level:'leader',position:'Leader',   status:'active', isAdmin:false, is_admin:false, notes:'بيانو رئيسي، تعزف من سنة ٢٠١٨', joinDate:'2020-03-10', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
   { id:'p4',  name:'داود سمير',      nameEn:'David Samir',       email:'david@kdec.org',      phone:'+20 100 111 0004', whatsapp:'+20 100 111 0004', role:'Acoustic Guitar',roles:['Acoustic Guitar'], position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'جيتار أكوستيك',         joinDate:'2021-06-01', availability:{sun:true,wed:true,fri:false,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
   { id:'p5',  name:'مريم جورج',      nameEn:'Mary George',       email:'mary@kdec.org',       phone:'+20 100 111 0005', whatsapp:'+20 100 111 0005', role:'Vocalist',roles:['Vocalist'],        position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'ألتو — الصوت الأول',     joinDate:'2021-09-15', availability:{sun:true,wed:false,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
   { id:'p6',  name:'بطرس نجيب',      nameEn:'Peter Naguib',      email:'peter@kdec.org',      phone:'+20 100 111 0006', whatsapp:'+20 100 111 0006', role:'Bass Guitar',roles:['Bass Guitar'],     position:'Member',   status:'active', isAdmin:false, is_admin:false, notes:'باس جيتار',              joinDate:'2022-01-20', availability:{sun:false,wed:true,fri:true,mon:false,tue:false,thu:false,sat:false}, timeSlots:[], tags:[] },
@@ -328,7 +401,14 @@ export function AppProvider({ children }) {
   const [currentUser,    setCurrentUser]    = useState(null)
   const [authLoading,    setAuthLoading]    = useState(() => !configurationError)
   const [people,         setPeople]         = useState([])
+  const [roleCategories, setRoleCategories] = useState(DEMO_ROLE_CATEGORIES)
+  const [worshipRoles,   setWorshipRoles]   = useState(DEMO_WORSHIP_ROLES)
+  const [roleUsage,      setRoleUsage]      = useState({})
+  const [permissionDefinitions,setPermissionDefinitions]=useState(DEMO_PERMISSION_DEFINITIONS)
+  const [permissionMatrix,setPermissionMatrix]=useState(DEMO_PERMISSION_MATRIX)
+  const [auditLogs,setAuditLogs]=useState([])
   const [songs,          setSongs]          = useState([])
+  const [songImportHistory, setSongImportHistory] = useState([])
   const [services,       setServices]       = useState([])
   const [announcements,  setAnnouncements]  = useState([])
   const [invitations,    setInvitations]    = useState([])
@@ -351,11 +431,22 @@ export function AppProvider({ children }) {
     setTimeout(() => setNotifications(n => n.filter(x => x.id !== id)), 3500)
   }, [])
 
+  const appendDemoAudit=useCallback((action,entityType,entityId,oldValue,newValue,metadata={})=>{
+    setAuditLogs(previous=>[{id:`audit-${Date.now()}-${Math.random().toString(16).slice(2)}`,action,entity_type:entityType,entity_id:entityId,actor_id:currentUser?.id,actor:{name:currentUser?.name,email:currentUser?.email},old_value:oldValue,new_value:newValue,metadata,created_at:new Date().toISOString()},...previous])
+  },[currentUser])
+
   const clearLoadedData = useCallback(() => {
     authGenerationRef.current += 1
     activeUserIdRef.current = null
     setPeople([])
+    setRoleCategories([])
+    setWorshipRoles([])
+    setRoleUsage({})
+    setPermissionDefinitions([])
+    setPermissionMatrix({admin:[],leader:[],member:[]})
+    setAuditLogs([])
     setSongs([])
+    setSongImportHistory([])
     setServices([])
     setAnnouncements([])
     setInvitations([])
@@ -374,16 +465,22 @@ export function AppProvider({ children }) {
     if (!isDemoMode) return
     // Load from localStorage; an intentionally empty collection must stay empty.
     const storedUser = localStorage.getItem('kdec_demo_user')
+    let parsedUser=null
     if (storedUser) {
       try {
-        setCurrentUser(JSON.parse(storedUser))
+        parsedUser=JSON.parse(storedUser)
       } catch {
         localStorage.removeItem('kdec_demo_user')
       }
     }
 
     const storedPeople = localStorage.getItem('kdec_people')
+    const storedRoleCategories=localStorage.getItem('kdec_role_categories')
+    const storedWorshipRoles=localStorage.getItem('kdec_worship_roles')
+    const storedPermissionMatrix=localStorage.getItem('kdec_permission_matrix')
+    const storedAuditLogs=localStorage.getItem('kdec_admin_audit_logs')
     const storedSongs  = localStorage.getItem('kdec_songs')
+    const storedSongImports = localStorage.getItem('kdec_song_import_history')
     const storedSvcs   = localStorage.getItem('kdec_services')
     const storedAnns   = localStorage.getItem('kdec_announcements')
     const storedEvents = localStorage.getItem('kdec_events')
@@ -409,7 +506,12 @@ export function AppProvider({ children }) {
     }
 
     const p      = parseSafe(storedPeople, DEMO_PEOPLE, Array.isArray, true)
+    const categories=parseSafe(storedRoleCategories,DEMO_ROLE_CATEGORIES)
+    const dynamicRoles=parseSafe(storedWorshipRoles,DEMO_WORSHIP_ROLES)
+    const matrix=parseSafe(storedPermissionMatrix,DEMO_PERMISSION_MATRIX,value=>Boolean(value)&&typeof value==='object'&&!Array.isArray(value))
+    const logs=parseSafe(storedAuditLogs,[])
     const s      = parseSafe(storedSongs,  DEMO_SONGS, Array.isArray, true)
+    const songImports = parseSafe(storedSongImports, [])
     const a      = parseSafe(storedAnns,   DEMO_ANNOUNCEMENTS, Array.isArray, true)
     const rawSvcs = parseSafe(storedSvcs,  DEMO_SERVICES, Array.isArray, true)
     const evts   = parseSafe(storedEvents, [])
@@ -421,10 +523,22 @@ export function AppProvider({ children }) {
     const records = parseSafe(storedRecords, {}, isPlainObject)
     const organization = parseSafe(storedOrganization, DEFAULT_ORGANIZATION_SETTINGS, isPlainObject)
 
-    setPeople(p)
+    const normalizedPeople=p.map(profile=>{
+      const roleNames=Array.isArray(profile.roles)&&profile.roles.length?profile.roles:(profile.role?[profile.role]:[])
+      const roleAssignments=roleNames.map((name,index)=>{const worshipRole=dynamicRoles.find(role=>role.name===name);return worshipRole?{roleId:worshipRole.id,isPrimary:name===(profile.role||roleNames[0])||index===0,worshipRole}:null}).filter(Boolean)
+      const access_level=profile.access_level||(profile.id==='p1'&&profile.is_admin?'super_admin':profile.is_admin?'admin':String(profile.position).toLowerCase()==='leader'?'leader':'member')
+      return normalizeProfile({...profile,access_level,roleAssignments})
+    })
+    setPeople(normalizedPeople)
+    if(parsedUser){const restored=normalizedPeople.find(person=>person.id===parsedUser.id);if(restored)setCurrentUser({...restored,personId:restored.id,permissions:restored.accessLevel==='super_admin'?['*']:(matrix[restored.accessLevel]||[])})}
+    setRoleCategories(categories)
+    setWorshipRoles(dynamicRoles)
+    setPermissionMatrix(matrix)
+    setAuditLogs(logs)
     setSongs(s)
+    setSongImportHistory(songImports)
     setAnnouncements(a)
-    setServices(hydrateDemoServices(rawSvcs, s, p))
+    setServices(hydrateDemoServices(rawSvcs, s, normalizedPeople))
     setEvents(evts)
     setEventResponses(responses)
     setAttendanceSessions(sessions.map(session => ({
@@ -446,10 +560,20 @@ export function AppProvider({ children }) {
     localStorage.setItem('kdec_people', JSON.stringify(people))
   }, [demoReady, isDemoMode, people])
 
+  useEffect(()=>{if(isDemoMode&&demoReady)localStorage.setItem('kdec_role_categories',JSON.stringify(roleCategories))},[demoReady,isDemoMode,roleCategories])
+  useEffect(()=>{if(isDemoMode&&demoReady)localStorage.setItem('kdec_worship_roles',JSON.stringify(worshipRoles))},[demoReady,isDemoMode,worshipRoles])
+  useEffect(()=>{if(isDemoMode&&demoReady)localStorage.setItem('kdec_permission_matrix',JSON.stringify(permissionMatrix))},[demoReady,isDemoMode,permissionMatrix])
+  useEffect(()=>{if(isDemoMode&&demoReady)localStorage.setItem('kdec_admin_audit_logs',JSON.stringify(auditLogs))},[auditLogs,demoReady,isDemoMode])
+
   useEffect(() => {
     if (!isDemoMode || !demoReady) return
     localStorage.setItem('kdec_songs', JSON.stringify(songs))
   }, [demoReady, isDemoMode, songs])
+
+  useEffect(() => {
+    if (!isDemoMode || !demoReady) return
+    localStorage.setItem('kdec_song_import_history', JSON.stringify(songImportHistory))
+  }, [demoReady, isDemoMode, songImportHistory])
 
   useEffect(() => {
     if (!isDemoMode || !demoReady) return
@@ -480,16 +604,19 @@ export function AppProvider({ children }) {
 
   const loadAll = useCallback(async (includeAdminData = false, expectedGeneration = authGenerationRef.current) => {
     if (isDemoMode || !supabase) return
-    if (!includeAdminData) {
-      setInvitations([])
-      setAttendanceSessions([])
-    }
+    // Kept for call-site compatibility. RLS now decides which protected
+    // collections each access level may read, including custom report access.
+    void includeAdminData
     setLoading(true)
     try {
       const queries = [
-        ['profiles', supabase.from('profiles').select('*').order('name')],
-        ['songs', supabase.from('songs').select('*').order('title')],
-        ['services', supabase.from('services').select('*, setlist:setlist_items(*, song:songs(*)), team:service_team(*, person:profiles(*))').order('date')],
+        ['profiles', supabase.from('profiles').select('*, roleAssignments:profile_worship_roles(*, worshipRole:worship_roles(*, category:role_categories(*)))').order('name')],
+        ['roleCategories',supabase.from('role_categories').select('*').order('display_order').order('name')],
+        ['worshipRoles',supabase.from('worship_roles').select('*, category:role_categories(*)').order('display_order').order('name')],
+        ['permissionDefinitions',supabase.from('system_permissions').select('*').eq('active',true).order('display_order')],
+        ['permissionMatrix',supabase.from('access_level_permissions').select('*')],
+        ['songs', supabase.from('songs').select('*, lyrics:song_lyrics(*), charts:song_charts(*, versions:song_chart_versions(*))').order('title')],
+        ['services', supabase.from('services').select('*, setlist:setlist_items(*, song:songs(*)), team:service_team(*, person:profiles(*), roleDefinition:worship_roles(*))').order('date')],
         ['announcements', supabase.from('announcements').select('*, author:profiles(name)').order('created_at',{ascending:false})],
         ['events', supabase.from('events').select('*').order('date')],
         ['eventResponses', supabase.from('event_responses').select('*')],
@@ -497,13 +624,12 @@ export function AppProvider({ children }) {
         ['excuses', supabase.from('excuses').select('*').order('created_at',{ascending:false})],
         ['substitutes', supabase.from('substitute_requests').select('*').order('created_at',{ascending:false})],
         ['organization', supabase.from('organization_settings').select('*').eq('id',1).maybeSingle()],
+        ['invitations', supabase.from('invitations').select('*, roleAssignments:invitation_worship_roles(*, worshipRole:worship_roles(*))').order('created_at',{ascending:false})],
+        ['attendanceSessions', supabase.from('attendance_sessions').select('*, service:services(*)').order('created_at',{ascending:false})],
+        ['songImportHistory', supabase.from('song_import_batches').select('*, items:song_import_items(*)').order('created_at',{ascending:false}).limit(50)],
+        ['roleUsage',supabase.rpc('get_worship_role_usage')],
+        ['auditLogs',supabase.from('admin_audit_logs').select('*, actor:profiles(name,email)').order('created_at',{ascending:false}).limit(100)],
       ]
-      if (includeAdminData) {
-        queries.push(
-          ['invitations', supabase.from('invitations').select('*').order('created_at',{ascending:false})],
-          ['attendanceSessions', supabase.from('attendance_sessions').select('*, service:services(*)').order('created_at',{ascending:false})],
-        )
-      }
 
       const resolved = await Promise.all(queries.map(async ([key, query]) => [key, await query]))
       if (expectedGeneration !== authGenerationRef.current) return
@@ -516,7 +642,18 @@ export function AppProvider({ children }) {
       const servicesResult = resultByKey.services
       const announcementsResult = resultByKey.announcements
       if (profilesResult.data) setPeople(profilesResult.data.map(normalizeProfile))
+      if(resultByKey.roleCategories?.data)setRoleCategories(resultByKey.roleCategories.data.map(normalizeRoleCategory))
+      if(resultByKey.worshipRoles?.data)setWorshipRoles(resultByKey.worshipRoles.data.map(normalizeWorshipRole))
+      if(resultByKey.permissionDefinitions?.data)setPermissionDefinitions(resultByKey.permissionDefinitions.data)
+      if(resultByKey.permissionMatrix?.data){
+        const matrix=resultByKey.permissionMatrix.data.reduce((all,row)=>({...all,[row.access_level]:[...(all[row.access_level]||[]),row.permission_key]}),{admin:[],leader:[],member:[]})
+        setPermissionMatrix(matrix)
+        setCurrentUser(previous=>previous?{...previous,permissions:previous.accessLevel==='super_admin'?['*']:(matrix[previous.accessLevel]||[])}:previous)
+      }
+      if(resultByKey.roleUsage?.data)setRoleUsage(resultByKey.roleUsage.data.reduce((all,item)=>({...all,[item.role_id]:item}),{}))
+      if(resultByKey.auditLogs?.data)setAuditLogs(resultByKey.auditLogs.data)
       if (songsResult.data) setSongs(songsResult.data.map(normalizeSong))
+      if (resultByKey.songImportHistory?.data) setSongImportHistory(resultByKey.songImportHistory.data)
       if (servicesResult.data) setServices(servicesResult.data.map(normalizeService))
       if (announcementsResult.data) {
         setAnnouncements(announcementsResult.data.map(announcement => ({
@@ -549,12 +686,8 @@ export function AppProvider({ children }) {
           notificationPreferences: settings.notification_preferences || DEFAULT_ORGANIZATION_SETTINGS.notificationPreferences,
         })
       }
-      if (resultByKey.invitations?.data) setInvitations(resultByKey.invitations.data)
+      if (resultByKey.invitations?.data) setInvitations(resultByKey.invitations.data.map(normalizeInvitation))
       if (resultByKey.attendanceSessions?.data) setAttendanceSessions(resultByKey.attendanceSessions.data.map(normalizeAttendanceSession))
-      if (!includeAdminData) {
-        setInvitations([])
-        setAttendanceSessions([])
-      }
     } finally {
       if (expectedGeneration === authGenerationRef.current) setLoading(false)
     }
@@ -565,7 +698,7 @@ export function AppProvider({ children }) {
     setCurrentUser(null)
     clearLoadedData()
     const expectedGeneration = authGenerationRef.current
-    const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    const { data: profile, error } = await supabase.from('profiles').select('*, roleAssignments:profile_worship_roles(*, worshipRole:worship_roles(*, category:role_categories(*)))').eq('id', user.id).single()
     if (expectedGeneration !== authGenerationRef.current) return
     if (error || !profile) {
       setCurrentUser(null)
@@ -581,9 +714,18 @@ export function AppProvider({ children }) {
       await supabase.auth.signOut({ scope: 'local' })
       return
     }
-    setCurrentUser(mergeAuthenticatedProfile(normalizeProfile(profile), user))
+    const baseProfile=normalizeProfile(profile)
+    let assignedPermissions
+    if(baseProfile.accessLevel!=='super_admin'){
+      const {data:permissionRows}=await supabase.from('access_level_permissions').select('permission_key').eq('access_level',baseProfile.accessLevel)
+      if(permissionRows)assignedPermissions=permissionRows.map(row=>row.permission_key)
+    }
+    if (expectedGeneration !== authGenerationRef.current) return
+    const normalizedProfile=mergeAuthenticatedProfile({...baseProfile,...(baseProfile.accessLevel==='super_admin'?{permissions:['*']}:assignedPermissions?{permissions:assignedPermissions}:{})},user)
+    setCurrentUser(normalizedProfile)
     activeUserIdRef.current = user.id
-    await loadAll(Boolean(profile.is_admin), expectedGeneration)
+    void supabase.rpc('record_user_activity')
+    await loadAll(isAdminUser(normalizedProfile), expectedGeneration)
     if (expectedGeneration === authGenerationRef.current) setAuthLoading(false)
   }, [clearLoadedData, loadAll, toast])
 
@@ -624,9 +766,9 @@ export function AppProvider({ children }) {
   const login = async (email, password) => {
     if (isDemoMode) {
       // Match seeded people by email
-      const p = DEMO_PEOPLE.find(u => u.email.toLowerCase() === email.toLowerCase())
+      const p = people.find(u => u.email.toLowerCase() === email.toLowerCase())
       if (p) {
-        const user = { ...p, id: p.id, personId: p.id }
+        const user = { ...p, id: p.id, personId: p.id,permissions:p.accessLevel==='super_admin'?['*']:(permissionMatrix[p.accessLevel]||[]) }
         setCurrentUser(user)
         localStorage.setItem('kdec_demo_user', JSON.stringify(user))
         return { success: true }
@@ -722,25 +864,40 @@ export function AppProvider({ children }) {
   }
 
   // ── INVITATIONS ─────────────────────────────────────────
-  const createInvitation = async (email, roles, method) => {
+  const createInvitation = async (email, roles, method, options={}) => {
     const code = createSecureToken()
-    const rolesArr = Array.isArray(roles) ? roles : [roles]
-    const primaryRole = rolesArr[0] || ''
+    const roleValues=Array.isArray(roles)?roles:[roles]
+    const selectedRoles=roleValues.map(value=>worshipRoles.find(role=>role.id===value||role.name===value)).filter(Boolean)
+    if(!selectedRoles.length){toast('Select at least one active worship role.','error');return null}
+    const roleIds=selectedRoles.map(role=>role.id)
+    const primaryRoleId=options.primaryRoleId&&roleIds.includes(options.primaryRoleId)?options.primaryRoleId:roleIds[0]
+    const primaryRole=selectedRoles.find(role=>role.id===primaryRoleId)?.name||selectedRoles[0].name
+    const rolesArr=selectedRoles.map(role=>role.name)
+    const accessLevel=options.accessLevel||'member'
     if (isDemoMode) {
-      const inv = { id:'inv_'+Date.now(), code, email, role:primaryRole, roles:rolesArr, method, status:'pending', created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString(), created_at: new Date().toISOString() }
+      if(accessLevel==='admin'&&!isSuperAdminUser(currentUser)){toast('Only a Super Admin can invite another Admin.','error');return null}
+      const inv = { id:'inv_'+Date.now(), code, email, role:primaryRole, roles:rolesArr,roleIds,primaryRoleId,access_level:accessLevel,accessLevel,method,status:'pending',created_by:currentUser.id,expires_at:new Date(Date.now()+7*86400000).toISOString(),created_at:new Date().toISOString(),roleAssignments:selectedRoles.map(role=>({roleId:role.id,isPrimary:role.id===primaryRoleId,worshipRole:role})) }
       setInvitations(prev => [inv, ...prev]); toast(`Invitation created for ${email}`); return inv
     }
-    const { data, error } = await supabase.from('invitations').insert({ code, email, role:primaryRole, roles:rolesArr, method, created_by:currentUser.id, expires_at: new Date(Date.now()+7*86400000).toISOString() }).select().single()
-    if (!error) { setInvitations(prev => [data,...prev]); toast(`Invitation created for ${email}`); return data }
-    toast('Failed to create invitation','error'); return null
+    const {data,error}=await supabase.rpc('admin_create_invitation',{p_email:email,p_role_ids:roleIds,p_primary_role_id:primaryRoleId,p_access_level:accessLevel,p_method:method,p_code:code})
+    if(!error){await loadAll(true);toast(`Invitation created for ${email}`);return data}
+    toast(error.message,'error');return null
   }
 
   const cancelInvitation = async (id) => {
-    if (isDemoMode) { setInvitations(prev => prev.map(i => i.id===id?{...i,status:'cancelled'}:i)); toast('Cancelled','error'); return }
-    const { error } = await supabase.from('invitations').update({ status:'cancelled' }).eq('id',id).select('id').single()
+    if (isDemoMode) { const old=invitations.find(item=>item.id===id);setInvitations(prev => prev.map(i => i.id===id?{...i,status:'cancelled'}:i));appendDemoAudit('invitation.cancelled','invitation',id,old,{...old,status:'cancelled'});toast('Cancelled','error'); return {success:true} }
+    const {error}=await supabase.rpc('admin_cancel_invitation',{p_invitation_id:id})
     if (error) { toast(error.message,'error'); return }
     setInvitations(prev => prev.map(i => i.id===id?{...i,status:'cancelled'}:i))
     toast('Invitation cancelled','error')
+    return {success:true}
+  }
+
+  const renewInvitation=async id=>{
+    if(isDemoMode){const old=invitations.find(item=>item.id===id);const updated={...old,status:'pending',expires_at:new Date(Date.now()+7*86400000).toISOString()};setInvitations(previous=>previous.map(item=>item.id===id?updated:item));appendDemoAudit('invitation.renewed','invitation',id,old,updated);toast('Invitation renewed');return {success:true,data:updated}}
+    const {data,error}=await supabase.rpc('admin_renew_invitation',{p_invitation_id:id})
+    if(error){toast(error.message,'error');return {error:error.message}}
+    await loadAll(true);toast('Invitation renewed');return {success:true,data}
   }
 
   // ── PEOPLE ──────────────────────────────────────────────
@@ -750,25 +907,28 @@ export function AppProvider({ children }) {
       const message = 'You cannot deactivate your signed-in account.'
       toast(message,'error'); return { error:message }
     }
-    const rolesArr = Array.isArray(data.roles) && data.roles.length > 0 ? data.roles : (data.role ? [data.role] : [])
+    const requestedRoles=Array.isArray(data.roleIds)&&data.roleIds.length?data.roleIds:Array.isArray(data.roles)&&data.roles.length?data.roles:(data.role?[data.role]:[])
+    const selectedRoles=requestedRoles.map(value=>worshipRoles.find(role=>role.id===value||role.name===value)).filter(Boolean)
+    if(!selectedRoles.length){const message='Select at least one active worship role.';toast(message,'error');return {error:message}}
+    const roleIds=selectedRoles.map(role=>role.id)
+    const primaryRoleId=data.primaryRoleId&&roleIds.includes(data.primaryRoleId)?data.primaryRoleId:roleIds[0]
+    const rolesArr=selectedRoles.map(role=>role.name)
+    const accessLevel=ACCESS_LEVELS.includes(data.accessLevel)?data.accessLevel:ACCESS_LEVELS.includes(data.access_level)?data.access_level:data.position==='Admin'?'admin':data.position==='Leader'?'leader':'member'
     const updates = {
       name: data.name, phone: data.phone, whatsapp: data.whatsapp,
-      role: rolesArr[0] || '',   // primary role kept for backward-compat badges/filters
-      roles: rolesArr,           // full set of roles/capabilities
-      position: data.position, status: data.status, notes: data.notes,
+      role:selectedRoles.find(role=>role.id===primaryRoleId)?.name||rolesArr[0]||'',roles:rolesArr,roleIds,primaryRoleId,
+      roleAssignments:selectedRoles.map(role=>({roleId:role.id,isPrimary:role.id===primaryRoleId,worshipRole:role})),
+      position:accessLevel==='leader'?'Leader':accessLevel==='member'?'Member':'Admin',accessLevel,access_level:accessLevel,status:data.status,notes:data.notes,
       availability: data.availability,
-      isAdmin: id===currentUser?.id ? Boolean(currentUser.isAdmin || currentUser.is_admin) : data.position === 'Admin',
-      is_admin: id===currentUser?.id ? Boolean(currentUser.isAdmin || currentUser.is_admin) : data.position === 'Admin',
+      isAdmin:['super_admin','admin'].includes(accessLevel),is_admin:['super_admin','admin'].includes(accessLevel),
     }
-    if (isDemoMode) { setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated'); return }
-    const { error } = await supabase.from('profiles').update({
-      name:updates.name, phone:updates.phone, whatsapp:updates.whatsapp,
-      role:updates.role, roles:updates.roles, position:updates.position,
-      status:updates.status, notes:updates.notes, availability:updates.availability,
-      is_admin:updates.isAdmin,
-    }).eq('id',id).select('id').single()
+    if(isDemoMode){const old=people.find(person=>person.id===id);if((['super_admin','admin'].includes(old?.accessLevel)||['super_admin','admin'].includes(accessLevel))&&!isSuperAdminUser(currentUser)){const message='Only a Super Admin can manage administrator access.';toast(message,'error');return {error:message}};setPeople(prev=>prev.map(p=>p.id===id?{...p,...updates}:p));if(id===currentUser?.id)setCurrentUser(previous=>({...previous,...updates}));appendDemoAudit('user.updated','profile',id,old,{...old,...updates});toast('Updated');return {success:true}}
+    const { error } = await supabase.rpc('admin_update_user',{
+      p_user_id:id,p_name:updates.name,p_phone:updates.phone||'',p_whatsapp:updates.whatsapp||'',p_notes:updates.notes||'',
+      p_status:updates.status,p_access_level:updates.accessLevel,p_role_ids:roleIds,p_primary_role_id:primaryRoleId,
+    })
     if (error) { toast(error.message,'error'); return { error:error.message } }
-    setPeople(prev => prev.map(p => p.id===id?{...p,...updates}:p)); toast('Updated')
+    await loadAll(true);toast('Updated')
     return { success:true }
   }
   const deletePerson = async (id) => {
@@ -776,11 +936,77 @@ export function AppProvider({ children }) {
       const message = 'You cannot deactivate your signed-in account.'
       toast(message,'error'); return { error:message }
     }
-    if (isDemoMode) { setPeople(prev => prev.map(p => p.id===id?{...p,status:'inactive'}:p)); toast('Marked inactive','error'); return }
-    const { error } = await supabase.from('profiles').update({ status:'inactive' }).eq('id',id).select('id').single()
-    if (error) { toast(error.message,'error'); return { error:error.message } }
-    setPeople(prev => prev.map(p => p.id===id?{...p,status:'inactive'}:p)); toast('Marked inactive','error')
-    return { success:true }
+    const person=people.find(item=>item.id===id)
+    if(!person)return {error:'User not found.'}
+    const result=await updatePerson(id,{...person,status:'inactive'})
+    if(!result?.error)toast('Marked inactive','error')
+    return result
+  }
+
+  // ── DYNAMIC WORSHIP ROLES & SYSTEM ACCESS ─────────────
+  const saveRoleCategory=async data=>{
+    if(!isAdminUser(currentUser))return {error:'Only administrators can manage role categories.'}
+    if(isDemoMode){
+      const existing=roleCategories.find(category=>category.id===data.id)
+      if(roleCategories.some(category=>category.id!==data.id&&category.name.trim().toLowerCase()===data.name.trim().toLowerCase()))return {error:'A category with this name already exists.'}
+      const saved={...existing,...data,id:data.id||`demo-category-${Date.now()}`,slug:data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-'),displayOrder:Number(data.displayOrder)||0,active:data.active!==false}
+      setRoleCategories(previous=>existing?previous.map(category=>category.id===saved.id?saved:category):[...previous,saved])
+      appendDemoAudit(existing?'role_category.updated':'role_category.created','role_category',saved.id,existing||null,saved);toast('Role category saved');return {success:true,data:saved}
+    }
+    const {data:saved,error}=await supabase.rpc('admin_save_role_category',{p_category_id:data.id||null,p_name:data.name,p_description:data.description||'',p_display_order:Number(data.displayOrder)||0,p_active:data.active!==false})
+    if(error){toast(error.message,'error');return {error:error.message}}
+    await loadAll(true);toast('Role category saved');return {success:true,data:saved}
+  }
+
+  const saveWorshipRole=async data=>{
+    if(!isAdminUser(currentUser))return {error:'Only administrators can manage roles.'}
+    if(isDemoMode){
+      const existing=worshipRoles.find(role=>role.id===data.id)
+      if(worshipRoles.some(role=>role.id!==data.id&&role.name.trim().toLowerCase()===data.name.trim().toLowerCase()))return {error:'A role with this name already exists.'}
+      const saved={...existing,...data,id:data.id||`demo-role-${Date.now()}`,slug:data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-'),categoryId:data.categoryId,displayOrder:Number(data.displayOrder)||0,active:data.active!==false,category:roleCategories.find(category=>category.id===data.categoryId)||null}
+      setWorshipRoles(previous=>(existing?previous.map(role=>role.id===saved.id?saved:role):[...previous,saved]).sort((a,b)=>a.displayOrder-b.displayOrder))
+      appendDemoAudit(existing?'role.updated':'role.created','worship_role',saved.id,existing||null,saved);toast(existing?'Role updated successfully.':'Role created successfully.');return {success:true,data:saved}
+    }
+    const {data:saved,error}=await supabase.rpc('admin_save_role',{p_role_id:data.id||null,p_name:data.name,p_category_id:data.categoryId,p_description:data.description||'',p_display_order:Number(data.displayOrder)||0,p_active:data.active!==false})
+    if(error){toast(error.message,'error');return {error:error.message}}
+    await loadAll(true);toast(data.id?'Role updated successfully.':'Role created successfully.');return {success:true,data:saved}
+  }
+
+  const setWorshipRoleStatus=async(roleId,active,replacementId=null)=>{
+    if(!isAdminUser(currentUser))return {error:'Only administrators can manage roles.'}
+    const existing=worshipRoles.find(role=>role.id===roleId)
+    if(!existing)return {error:'Role not found.'}
+    if(isDemoMode){
+      const replacement=worshipRoles.find(role=>role.id===replacementId&&role.active)
+      if(replacementId&&!replacement)return {error:'Choose an active replacement role.'}
+      setWorshipRoles(previous=>previous.map(role=>role.id===roleId?{...role,active,archivedAt:active?null:new Date().toISOString()}:role))
+      if(replacement){
+        setPeople(previous=>previous.map(person=>{
+          const roleIds=(person.roleIds||person.roles?.map(name=>worshipRoles.find(role=>role.name===name)?.id).filter(Boolean)||[]).map(id=>id===roleId?replacement.id:id)
+          const uniqueIds=[...new Set(roleIds)];const names=uniqueIds.map(id=>worshipRoles.find(role=>role.id===id)?.name).filter(Boolean)
+          return {...person,roleIds:uniqueIds,roles:names,primaryRoleId:person.primaryRoleId===roleId?replacement.id:person.primaryRoleId,role:person.primaryRoleId===roleId?replacement.name:person.role}
+        }))
+      }
+      appendDemoAudit(active?'role.enabled':'role.disabled','worship_role',roleId,existing,{...existing,active},{replacementId});toast(active?'Role enabled successfully.':'Role disabled successfully.');return {success:true}
+    }
+    const {data,error}=await supabase.rpc('admin_set_role_status',{p_role_id:roleId,p_active:active,p_replacement_id:replacementId})
+    if(error){toast(error.message,'error');return {error:error.message}}
+    await loadAll(true);toast(active?'Role enabled successfully.':'Role disabled successfully.');return {success:true,data}
+  }
+
+  const reorderWorshipRoles=async orderedIds=>{
+    if(isDemoMode){setWorshipRoles(previous=>orderedIds.map((id,index)=>({...previous.find(role=>role.id===id),displayOrder:(index+1)*10})));appendDemoAudit('roles.reordered','worship_role',null,null,orderedIds);return {success:true}}
+    const {error}=await supabase.rpc('admin_reorder_roles',{p_role_ids:orderedIds})
+    if(error){toast(error.message,'error');return {error:error.message}}
+    await loadAll(true);toast('Role order saved');return {success:true}
+  }
+
+  const updateAccessPermissions=async(accessLevel,permissionKeys)=>{
+    if(!isSuperAdminUser(currentUser))return {error:'Only a Super Admin can change the permission matrix.'}
+    if(isDemoMode){const old=permissionMatrix[accessLevel]||[];setPermissionMatrix(previous=>({...previous,[accessLevel]:permissionKeys}));appendDemoAudit('permissions.updated','access_level',accessLevel,old,permissionKeys);toast('Permissions updated');return {success:true}}
+    const {error}=await supabase.rpc('admin_set_access_permissions',{p_access_level:accessLevel,p_permission_keys:permissionKeys})
+    if(error){toast(error.message,'error');return {error:error.message}}
+    await loadAll(true);toast('Permissions updated');return {success:true}
   }
 
   // ── SONGS ───────────────────────────────────────────────
@@ -804,6 +1030,134 @@ export function AppProvider({ children }) {
     if (error) { toast(error.message,'error'); return { error:error.message } }
     setSongs(prev => prev.map(s => s.id===id?{...s,status:'inactive'}:s)); toast('Song archived')
     return { success:true }
+  }
+
+  const bulkImportSongs = async (rows, { sourceName='', importType='songs_csv' } = {}) => {
+    if (!hasPermission(currentUser,'songs.manage')) return { error:'You do not have permission to import songs.' }
+    const items = rows.map(row => {
+      const parsedLyrics = parseLyricsSections(row.lyrics || '')
+      return { ...row, lyricSections:parsedLyrics.sections }
+    })
+    if (isDemoMode) {
+      let created = 0; let updated = 0; let skipped = 0; let errors = 0
+      const nextSongs = [...songs]
+      const importItems = []
+      items.forEach((item,index) => {
+        if (item.errors?.length) { errors += 1; importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title||'', status:'error', action:item.action, error_message:item.errors.join('; ') }); return }
+        if (item.action === 'skip') { skipped += 1; importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title||'', status:'skipped', action:'skip' }); return }
+        const primaryLyrics = item.lyrics ? { id:`lyrics-${Date.now()}-${index}`, language:item.language, content:item.lyrics, sections:item.lyricSections, is_primary:true, isPrimary:true, version:1 } : null
+        const data = {
+          title:item.language==='ar' ? (item.arabicTitle||item.title) : item.title,
+          titleEn:item.title,
+          titleAr:item.arabicTitle || (item.language==='ar'?item.title:''),
+          author:item.artist, key:item.key, bpm:item.bpm, timeSignature:item.timeSignature,
+          language:item.language, themes:item.tags||[], tags:item.tags||[], notes:item.notes,
+          ccliNumber:item.ccliNumber, sequence:item.lyricSections.map(section=>section.label).filter(Boolean),
+          primaryLyrics, lyricVersions:primaryLyrics?[primaryLyrics]:[],
+        }
+        if (item.action === 'update') {
+          const songIndex = nextSongs.findIndex(song=>song.id===item.matchedSongId)
+          if (songIndex < 0) { errors += 1; importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title, status:'error', action:'update', error_message:'The selected song no longer exists' }); return }
+          nextSongs[songIndex] = { ...nextSongs[songIndex], ...data, id:nextSongs[songIndex].id }
+          updated += 1
+          importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title, status:'updated', action:'update', song_id:item.matchedSongId })
+        } else {
+          const id=`song-${createSecureToken(8).toLowerCase()}`
+          nextSongs.push({ ...data, id, usageCount:0, status:'active', charts:[] })
+          created += 1
+          importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title, status:'created', action:item.action, song_id:id })
+        }
+      })
+      const summary = { processed:items.length, created, updated, skipped, errors }
+      setSongs(nextSongs)
+      setSongImportHistory(previous => [{ id:`batch-${Date.now()}`, import_type:importType, source_name:sourceName, status:errors?'completed_with_errors':'completed', total_items:items.length, created_count:created, updated_count:updated, skipped_count:skipped, error_count:errors, chart_count:0, failed_matches:0, summary, created_by:currentUser.id, created_at:new Date().toISOString(), completed_at:new Date().toISOString(), items:importItems }, ...previous])
+      toast(`${created} songs created, ${updated} updated`)
+      return { success:true, ...summary }
+    }
+    const { data, error } = await supabase.rpc('bulk_import_songs', { p_items:items, p_source_name:sourceName, p_import_type:importType })
+    if (error) { toast(error.message,'error'); return { error:error.message } }
+    await loadAll(true)
+    toast(`${data.created} songs created, ${data.updated} updated`)
+    return { success:true, ...data }
+  }
+
+  const uploadSongCharts = async (chartItems, { sourceName='' } = {}) => {
+    if (!hasPermission(currentUser,'songs.manage')) return { error:'You do not have permission to upload Pro Chords.' }
+    if (!chartItems.length) return { error:'Choose at least one chart file.' }
+    if (isDemoMode) {
+      let uploaded=0; let errors=0; let failedMatches=0
+      const nextSongs=songs.map(song=>({ ...song, charts:[...(song.charts||[])] }))
+      const importItems=[]
+      chartItems.forEach((item,index)=>{
+        const song=nextSongs.find(candidate=>candidate.id===item.matchedSongId)
+        if (!song) { errors+=1; failedMatches+=1; importItems.push({ id:`chart-item-${Date.now()}-${index}`, source_name:item.file.name, status:'error', action:'upload', error_message:'No song selected' }); return }
+        const chartId=`chart-${createSecureToken(8).toLowerCase()}`
+        song.charts.push({ id:chartId, songId:song.id, arrangementName:item.arrangementName||'Original', chartKey:item.detectedKey||'', chartType:item.chartType, notes:item.notes||'', isPrimary:!!item.isPrimary, versions:[{ id:`version-${createSecureToken(8).toLowerCase()}`, version:1, originalFilename:item.file.name, mimeType:item.file.type, fileSize:item.file.size, rawContent:item.rawContent||null, parsedData:item.parsedChordPro||null, uploadedAt:new Date().toISOString() }] })
+        uploaded+=1; importItems.push({ id:`chart-item-${Date.now()}-${index}`, source_name:item.file.name, status:'uploaded', action:'upload', song_id:song.id, chart_id:chartId })
+      })
+      setSongs(nextSongs)
+      const summary={processed:chartItems.length,uploaded,errors,failedMatches}
+      setSongImportHistory(previous=>[{ id:`batch-${Date.now()}`, import_type:'charts', source_name:sourceName, status:errors?'completed_with_errors':'completed', total_items:chartItems.length, chart_count:uploaded, error_count:errors, failed_matches:failedMatches, created_count:0,updated_count:0,skipped_count:0, summary, created_by:currentUser.id,created_at:new Date().toISOString(),completed_at:new Date().toISOString(),items:importItems },...previous])
+      toast(`${uploaded} chart files added`)
+      return { success:true,...summary }
+    }
+
+    const { data:batchId, error:batchError } = await supabase.rpc('start_song_chart_import', { p_source_name:sourceName, p_total:chartItems.length })
+    if (batchError) { toast(batchError.message,'error'); return { error:batchError.message } }
+    let uploaded=0; let errors=0; let failedMatches=0
+    for (const item of chartItems) {
+      if (!item.matchedSongId) {
+        errors+=1; failedMatches+=1
+        await supabase.rpc('record_song_chart_import_error',{ p_batch_id:batchId,p_source_name:item.file.name,p_error_message:'No song match selected',p_song_id:null })
+        continue
+      }
+      const extension=item.file.name.split('.').pop()?.toLowerCase()||'bin'
+      const baseName=item.file.name.replace(/\.[^.]+$/,'')
+      const storagePath=`songs/${item.matchedSongId}/${createSecureToken(12).toLowerCase()}-${slugifySongPath(baseName)}.${extension}`
+      const { error:uploadError } = await supabase.storage.from('song-charts').upload(storagePath,item.file,{ cacheControl:'3600',upsert:false,contentType:item.file.type||'application/octet-stream' })
+      if (uploadError) {
+        errors+=1
+        await supabase.rpc('record_song_chart_import_error',{ p_batch_id:batchId,p_source_name:item.file.name,p_error_message:uploadError.message,p_song_id:item.matchedSongId })
+        continue
+      }
+      const parsedData=item.parsedChordPro ? { ...item.parsedChordPro,raw:undefined } : null
+      const { error:registerError } = await supabase.rpc('register_song_chart',{
+        p_batch_id:batchId,p_song_id:item.matchedSongId,p_arrangement_name:item.arrangementName||'Original',
+        p_chart_key:item.detectedKey||'',p_chart_type:item.chartType,p_notes:item.notes||'',p_is_primary:!!item.isPrimary,
+        p_storage_path:storagePath,p_original_filename:item.file.name,p_mime_type:item.file.type||'application/octet-stream',
+        p_file_size:item.file.size,p_raw_content:item.rawContent||null,p_parsed_data:parsedData,
+      })
+      if (registerError) {
+        errors+=1
+        await supabase.storage.from('song-charts').remove([storagePath])
+        await supabase.rpc('record_song_chart_import_error',{ p_batch_id:batchId,p_source_name:item.file.name,p_error_message:registerError.message,p_song_id:item.matchedSongId })
+      } else uploaded+=1
+    }
+    const { data:summary,error:finishError }=await supabase.rpc('finish_song_chart_import',{p_batch_id:batchId,p_errors:errors,p_failed_matches:failedMatches})
+    if (finishError) { toast(finishError.message,'error'); return {error:finishError.message} }
+    await loadAll(true)
+    toast(`${uploaded} chart files uploaded`)
+    return {success:true,...summary}
+  }
+
+  const getSongChartUrl = async (storagePath, download=false) => {
+    if (!storagePath) return { error:'Chart file is unavailable.' }
+    if (isDemoMode) return { error:'Demo chart files contain metadata only.' }
+    const { data,error }=await supabase.storage.from('song-charts').createSignedUrl(storagePath,300,{download})
+    return error?{error:error.message}:{success:true,url:data.signedUrl}
+  }
+
+  const deleteSongChart = async chartId => {
+    if (!hasPermission(currentUser,'songs.manage')) return {error:'You do not have permission to delete charts.'}
+    const chart=songs.flatMap(song=>song.charts||[]).find(item=>item.id===chartId)
+    if (!chart) return {error:'Chart not found.'}
+    if (isDemoMode) { setSongs(previous=>previous.map(song=>({...song,charts:(song.charts||[]).filter(item=>item.id!==chartId)}))); toast('Chart deleted'); return {success:true} }
+    const {error}=await supabase.from('song_charts').delete().eq('id',chartId).select('id').single()
+    if (error) {toast(error.message,'error');return {error:error.message}}
+    const paths=(chart.versions||[]).map(version=>version.storagePath).filter(Boolean)
+    if(paths.length){const {error:storageError}=await supabase.storage.from('song-charts').remove(paths);if(storageError)toast(`Chart deleted, but file cleanup failed: ${storageError.message}`,'error')}
+    setSongs(previous=>previous.map(song=>({...song,charts:(song.charts||[]).filter(item=>item.id!==chartId)})))
+    toast('Chart deleted');return {success:true}
   }
 
   // ── SERVICES ────────────────────────────────────────────
@@ -987,9 +1341,11 @@ export function AppProvider({ children }) {
   // ── TEAM ────────────────────────────────────────────────
   const addTeamMember = async (serviceId, personId, role) => {
     const person = people.find(p => p.id===personId)
-    const entry  = { personId, role, status:'pending', person }
+    const roleDefinition=worshipRoles.find(item=>item.id===role||item.name===role)
+    if(!roleDefinition?.active){const message='Choose an active worship role.';toast(message,'error');return {error:message}}
+    const entry  = { personId,roleId:roleDefinition.id,role:roleDefinition.name,roleDefinition,status:'pending',person }
     if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:[...s.team,entry]})); toast('Added'); return { success:true } }
-    const { error } = await supabase.from('service_team').insert({ service_id:serviceId, person_id:personId, role, status:'pending' })
+    const { error } = await supabase.from('service_team').insert({ service_id:serviceId,person_id:personId,worship_role_id:roleDefinition.id,role:roleDefinition.name,status:'pending' })
     if (error) { toast(error.message,'error'); return { error:error.message } }
     setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:[...s.team,entry]})); toast('Added')
     return { success:true }
@@ -1236,10 +1592,12 @@ export function AppProvider({ children }) {
 
   const requestSubstitute = async (serviceId, role, note='') => {
     if (!role) return { error:'Assignment role is required.' }
-    const request = { id:`sub_${Date.now()}`, service_id:serviceId, requester_id:currentUser.id, substitute_id:null, role, note, status:'open', created_at:new Date().toISOString() }
+    const roleDefinition=worshipRoles.find(item=>item.id===role||item.name===role)
+    if(!roleDefinition)return {error:'The assignment role is no longer available.'}
+    const request = { id:`sub_${Date.now()}`,service_id:serviceId,requester_id:currentUser.id,substitute_id:null,role:roleDefinition.name,worship_role_id:roleDefinition.id,note,status:'open',created_at:new Date().toISOString() }
     if (isDemoMode) setSubstituteRequests(prev => [request,...prev])
     else {
-      const { data, error } = await supabase.from('substitute_requests').insert({ service_id:serviceId, requester_id:currentUser.id, role, note, status:'open' }).select().single()
+      const { data, error } = await supabase.from('substitute_requests').insert({service_id:serviceId,requester_id:currentUser.id,role:roleDefinition.name,worship_role_id:roleDefinition.id,note,status:'open'}).select().single()
       if (error) { toast(error.message,'error'); return { error:error.message } }
       setSubstituteRequests(prev => [data,...prev])
     }
@@ -1321,16 +1679,21 @@ export function AppProvider({ children }) {
     setOrganizationSettings(next); toast('Settings saved'); return { success:true }
   }
 
+  const ROLES=worshipRoles.filter(role=>role.active).sort((a,b)=>a.displayOrder-b.displayOrder||a.name.localeCompare(b.name)).map(role=>role.name)
+
   const value = {
     isDemoMode, configurationError, currentUser, authLoading, loading, isPasswordRecovery,
     people, songs, services, announcements, invitations, events, eventResponses,
     attendanceSessions, attendanceRecords, excuseRequests, substituteRequests,
+    songImportHistory,roleCategories,worshipRoles,roleUsage,permissionDefinitions,permissionMatrix,auditLogs,
     organizationSettings, notifications,
     ROLES, POSITIONS,
     login, logout, registerWithInvite, forgotPassword, updatePassword, finishPasswordRecovery, updateProfile,
-    createInvitation, cancelInvitation,
+    createInvitation,cancelInvitation,renewInvitation,
     addPerson, updatePerson, deletePerson, updatePersonAvailability,
+    saveRoleCategory,saveWorshipRole,setWorshipRoleStatus,reorderWorshipRoles,updateAccessPermissions,
     addSong, updateSong, deleteSong,
+    bulkImportSongs, uploadSongCharts, getSongChartUrl, deleteSongChart,
     addService, updateService, updateRecurringService,
     deleteService, deleteRecurringService, generateMoreOccurrences,
     addToSetlist, removeFromSetlist, reorderSetlist, updateSetlistBlocks,

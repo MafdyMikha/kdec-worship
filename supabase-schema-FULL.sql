@@ -2371,3 +2371,8 @@ create policy "Worship managers resolve substitute requests"
   on public.substitute_requests for update to authenticated
   using (public.can_manage_worship())
   with check (public.can_manage_worship());
+
+-- IMPORTANT FOR FRESH INSTALLS
+-- Apply MIGRATION_dynamic_roles_admin.sql immediately after this base schema.
+-- It is kept as a separate transaction so the same reviewed, rerunnable SQL is
+-- used for both fresh projects and existing production upgrades without drift.

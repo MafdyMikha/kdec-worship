@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Save, Download, Shield, Globe, Database, LogOut } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { isAdminUser } from '../lib/permissions.js'
+import { hasPermission } from '../lib/permissions.js'
 import { Card, Btn, Badge, Input, Select } from '../components/ui'
 
 function Section({ title, icon, children }) {
@@ -59,7 +59,7 @@ export default function Settings() {
     organizationSettings, updateOrganizationSettings, toast, logout, currentUser, isDemoMode,
   } = useStore()
   const navigate = useNavigate()
-  const isAdmin = isAdminUser(currentUser)
+  const isAdmin = hasPermission(currentUser,'settings.manage')
   const handleExport = () => {
     if (!isAdmin) return
     const data = {

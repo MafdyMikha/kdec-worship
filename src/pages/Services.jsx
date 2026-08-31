@@ -4,7 +4,7 @@ import { Plus, Calendar, Music2, Users, CheckCircle, Clock, ChevronRight, Repeat
 import { format, parseISO } from 'date-fns'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { canManageWorship } from '../lib/permissions.js'
+import { hasPermission } from '../lib/permissions.js'
 import { Card, Btn, Badge, SearchInput, Tabs, Modal, Input, Select, Textarea, EmptyState } from '../components/ui'
 
 const SERVICE_TYPES_AR = ['خدمة أحد','ليلة صلاة','فعالية خاصة','خدمة شباب','عيد القيامة','عيد الميلاد','بروفة']
@@ -172,7 +172,7 @@ export default function Services() {
   const [showAdd, setShowAdd] = useState(false)
   const [form,    setForm]    = useState({ ...blankForm, type: isAr?'خدمة أحد':'Sunday Service' })
   const todayKey = format(new Date(),'yyyy-MM-dd')
-  const canManage = canManageWorship(currentUser)
+  const canCreate = hasPermission(currentUser,'services.create')
 
   const SERVICE_TYPES = isAr ? SERVICE_TYPES_AR : SERVICE_TYPES_EN
 
@@ -223,7 +223,7 @@ export default function Services() {
             className={`p-2.5 rounded-lg border cursor-pointer transition-all ${grouped?'bg-violet-50 border-violet-300 text-violet-600':'border-slate-200 text-slate-400 hover:border-slate-300'}`}>
             <Repeat size={16}/>
           </button>
-          {canManage&&<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>}
+          {canCreate&&<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>}
         </div>
       </div>
 
@@ -237,11 +237,11 @@ export default function Services() {
         ? <EmptyState icon={<Calendar size={28}/>}
             title={isAr?'لا توجد خدمات':'No services found'}
             description={tab==='upcoming'?(isAr?'لا توجد خدمات قادمة.':'No upcoming services.'):(isAr?'لا توجد نتائج.':'No results.')}
-            action={canManage?<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>:null}/>
+            action={canCreate?<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>:null}/>
         : <div className="space-y-3">{renderList()}</div>
       }
 
-      <Modal open={canManage&&showAdd} onClose={()=>setShowAdd(false)} title={isAr?'إنشاء خدمة جديدة':'Create New Service'} size="lg"
+      <Modal open={canCreate&&showAdd} onClose={()=>setShowAdd(false)} title={isAr?'إنشاء خدمة جديدة':'Create New Service'} size="lg"
         footer={<>
           <Btn variant="secondary" onClick={()=>setShowAdd(false)}>{t('cancel')}</Btn>
           <Btn onClick={handleAdd} disabled={!form.title||!form.date} icon={form.recurrence?.enabled?<Repeat size={14}/>:<Plus size={14}/>}>

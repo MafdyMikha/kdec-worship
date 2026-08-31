@@ -7,6 +7,7 @@ import { Avatar } from '../ui'
 import { KDEC_LOGO } from '../../assets/kdecLogo.js'
 import { format } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
+import { ACCESS_LEVEL_LABELS, isAdminUser } from '../../lib/permissions.js'
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => {
@@ -27,7 +28,7 @@ export default function Header({ title }) {
   const [open, setOpen]   = useState(false)
   const [dark, toggleDark] = useDarkMode()
   const ref  = useRef(null)
-  const isAdmin = currentUser?.isAdmin || currentUser?.is_admin
+  const isAdmin=isAdminUser(currentUser)
   const isAr    = lang === 'ar'
 
   useEffect(() => {
@@ -107,7 +108,7 @@ export default function Header({ title }) {
                 {currentUser?.name || (isAr ? 'مستخدم' : 'User')}
               </div>
               <div className="text-[10px] text-slate-400 leading-tight">
-                {isAdmin ? (isAr ? 'مسؤول' : 'Admin') : (isAr ? 'عضو' : 'Member')}
+                {ACCESS_LEVEL_LABELS[currentUser?.accessLevel||'member']?.[isAr?'ar':'en']}
               </div>
             </div>
             <ChevronDown size={13} className={`text-slate-400 transition-transform hidden sm:block ${open ? 'rotate-180' : ''}`}/>

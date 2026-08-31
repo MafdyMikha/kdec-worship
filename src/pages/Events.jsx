@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { isAdminUser } from '../lib/permissions.js'
+import { hasPermission } from '../lib/permissions.js'
 import { Card, Btn, Badge, Avatar, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog } from '../components/ui'
 
 const TYPE_COLORS = {
@@ -23,7 +23,7 @@ const BLANK = { title:'', titleEn:'', description:'', descriptionEn:'', date:for
 export default function Events() {
   const { isAr, t } = useLang()
   const { currentUser, people, events, eventResponses:responses, addEvent, updateEvent, deleteEvent, setEventResponse } = useStore()
-  const isAdmin = isAdminUser(currentUser)
+  const isAdmin = hasPermission(currentUser,'events.manage')
   const locale  = isAr ? arLocale : undefined
 
   const EVENT_TYPES_AR = ['مؤتمر','معسكر','ورشة عمل','فعالية خاصة','نشاط اجتماعي','خلوة','تدريب']
