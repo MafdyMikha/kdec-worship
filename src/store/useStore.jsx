@@ -610,7 +610,7 @@ export function AppProvider({ children }) {
     setLoading(true)
     try {
       const queries = [
-        ['profiles', supabase.from('profiles').select('*, roleAssignments:profile_worship_roles(*, worshipRole:worship_roles(*, category:role_categories(*)))').order('name')],
+        ['profiles', supabase.from('profiles').select('*, roleAssignments:profile_worship_roles!profile_worship_roles_profile_id_fkey(*, worshipRole:worship_roles(*, category:role_categories(*)))').order('name')],
         ['roleCategories',supabase.from('role_categories').select('*').order('display_order').order('name')],
         ['worshipRoles',supabase.from('worship_roles').select('*, category:role_categories(*)').order('display_order').order('name')],
         ['permissionDefinitions',supabase.from('system_permissions').select('*').eq('active',true).order('display_order')],
@@ -698,7 +698,7 @@ export function AppProvider({ children }) {
     setCurrentUser(null)
     clearLoadedData()
     const expectedGeneration = authGenerationRef.current
-    const { data: profile, error } = await supabase.from('profiles').select('*, roleAssignments:profile_worship_roles(*, worshipRole:worship_roles(*, category:role_categories(*)))').eq('id', user.id).single()
+    const { data: profile, error } = await supabase.from('profiles').select('*, roleAssignments:profile_worship_roles!profile_worship_roles_profile_id_fkey(*, worshipRole:worship_roles(*, category:role_categories(*)))').eq('id', user.id).single()
     if (expectedGeneration !== authGenerationRef.current) return
     if (error || !profile) {
       setCurrentUser(null)
