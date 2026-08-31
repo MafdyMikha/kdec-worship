@@ -31,3 +31,10 @@ test('worship role names are not used as the permanent authorization boundary', 
   assert.match(helper, /has_permission\('services\.edit'\)/)
   assert.doesNotMatch(helper, /Worship Leader|Music Director/)
 })
+
+test('role-array functions qualify unnested IDs instead of using ambiguous id references', () => {
+  assert.match(sql, /unnest\(p_role_ids\) as selected\(role_id\)/)
+  assert.match(sql, /existing\.role_id=selected\.role_id/)
+  assert.doesNotMatch(sql, /role\.id=id\b/)
+  assert.doesNotMatch(sql, /existing\.role_id=id\b/)
+})

@@ -134,7 +134,7 @@ drop policy if exists "Admins delete song charts" on public.song_charts;
 create policy "Members read song charts" on public.song_charts for select to authenticated
   using (public.is_active_member());
 create policy "Admins delete song charts" on public.song_charts for delete to authenticated
-  using (public.is_admin());
+  using (public.has_permission('songs.manage'));
 
 drop policy if exists "Members read song chart versions" on public.song_chart_versions;
 drop policy if exists "Admins manage song chart versions" on public.song_chart_versions;
@@ -147,13 +147,13 @@ drop policy if exists "Admins read song import batches" on public.song_import_ba
 drop policy if exists "Admins create song import batches" on public.song_import_batches;
 drop policy if exists "Admins update song import batches" on public.song_import_batches;
 create policy "Admins read song import batches" on public.song_import_batches for select to authenticated
-  using (public.is_admin());
+  using (public.has_permission('songs.manage'));
 -- Import batches are created and finalized only through audited RPCs.
 
 drop policy if exists "Admins read song import items" on public.song_import_items;
 drop policy if exists "Admins create song import items" on public.song_import_items;
 create policy "Admins read song import items" on public.song_import_items for select to authenticated
-  using (public.is_admin());
+  using (public.has_permission('songs.manage'));
 -- Import items are server-authored by the RPCs below.
 
 create or replace function public.bulk_import_songs(
@@ -182,8 +182,8 @@ declare
   v_errors integer := 0;
   v_total integer := 0;
 begin
-  if v_user is null or not public.is_admin() then
-    raise exception 'Only administrators can bulk import songs' using errcode = '42501';
+  if v_user is null or not public.has_permission('songs.manage') then
+    raise exception 'You do not have permission to bulk import songs' using errcode = '42501';
   end if;
   if jsonb_typeof(p_items) <> 'array' then
     raise exception 'Import items must be a JSON array' using errcode = '22023';
@@ -312,7 +312,7 @@ create or replace function public.start_song_chart_import(p_source_name text, p_
 returns uuid language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_batch_id uuid;
 begin
-  if auth.uid() is null or not public.is_admin() then raise exception 'Only administrators can upload song charts' using errcode='42501'; end if;
+  if auth.uid() is null or not public.has_permission('songs.manage') then raise exception 'You do not have permission to upload song charts' using errcode='42501'; end if;
   if p_total < 1 or p_total > 250 then raise exception 'Chart imports must contain 1 to 250 files' using errcode='22023'; end if;
   insert into public.song_import_batches(import_type,source_name,total_items,created_by)
   values('charts',left(coalesce(p_source_name,''),240),p_total,auth.uid()) returning id into v_batch_id;
@@ -329,7 +329,7 @@ create or replace function public.register_song_chart(
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_chart_id uuid; v_version integer;
 begin
-  if auth.uid() is null or not public.is_admin() then raise exception 'Only administrators can upload song charts' using errcode='42501'; end if;
+  if auth.uid() is null or not public.has_permission('songs.manage') then raise exception 'You do not have permission to upload song charts' using errcode='42501'; end if;
   if not exists(select 1 from public.song_import_batches where id=p_batch_id and created_by=auth.uid() and status='processing') then raise exception 'Chart import batch is not active'; end if;
   if not exists(select 1 from public.songs where id=p_song_id and status='active') then raise exception 'Select an active song'; end if;
   if p_chart_type not in ('pdf','chordpro','txt','docx','image','other') then raise exception 'Unsupported chart type'; end if;
@@ -353,7 +353,7 @@ create or replace function public.finish_song_chart_import(p_batch_id uuid, p_er
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_uploaded integer; v_total integer;
 begin
-  if auth.uid() is null or not public.is_admin() then raise exception 'Only administrators can finish chart imports' using errcode='42501'; end if;
+  if auth.uid() is null or not public.has_permission('songs.manage') then raise exception 'You do not have permission to finish chart imports' using errcode='42501'; end if;
   select total_items into v_total from public.song_import_batches where id=p_batch_id and created_by=auth.uid() and status='processing' for update;
   if not found then raise exception 'Chart import batch is not active'; end if;
   select count(*) into v_uploaded from public.song_import_items where batch_id=p_batch_id and status='uploaded';
@@ -374,7 +374,7 @@ create or replace function public.record_song_chart_import_error(
 returns uuid language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_item_id uuid;
 begin
-  if auth.uid() is null or not public.is_admin() then raise exception 'Only administrators can record chart imports' using errcode='42501'; end if;
+  if auth.uid() is null or not public.has_permission('songs.manage') then raise exception 'You do not have permission to record chart imports' using errcode='42501'; end if;
   if not exists(select 1 from public.song_import_batches where id=p_batch_id and created_by=auth.uid() and status='processing') then raise exception 'Chart import batch is not active'; end if;
   insert into public.song_import_items(batch_id,source_name,action,status,song_id,error_message)
   values(p_batch_id,left(coalesce(p_source_name,''),240),'upload','error',p_song_id,left(coalesce(p_error_message,'Upload failed'),1000))
@@ -410,10 +410,14 @@ drop policy if exists "Admins delete song chart files" on storage.objects;
 create policy "Members read song chart files" on storage.objects for select to authenticated
   using (bucket_id='song-charts' and public.is_active_member());
 create policy "Admins upload song chart files" on storage.objects for insert to authenticated
-  with check (bucket_id='song-charts' and public.is_admin() and (storage.foldername(name))[1]='songs');
+  with check (bucket_id='song-charts' and public.has_permission('songs.manage') and (storage.foldername(name))[1]='songs');
 create policy "Admins update song chart files" on storage.objects for update to authenticated
-  using (bucket_id='song-charts' and public.is_admin()) with check (bucket_id='song-charts' and public.is_admin());
+  using (bucket_id='song-charts' and public.has_permission('songs.manage')) with check (bucket_id='song-charts' and public.has_permission('songs.manage'));
 create policy "Admins delete song chart files" on storage.objects for delete to authenticated
-  using (bucket_id='song-charts' and public.is_admin());
+  using (bucket_id='song-charts' and public.has_permission('songs.manage'));
+
+-- Make newly created foreign-key relationships available to PostgREST
+-- immediately after the SQL Editor transaction commits.
+notify pgrst, 'reload schema';
 
 commit;

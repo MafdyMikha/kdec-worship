@@ -446,8 +446,8 @@ returns void language plpgsql security definer set search_path=public,pg_temp as
 begin
   if not public.has_permission('roles.manage') then raise exception 'You do not have permission to reorder roles' using errcode='42501'; end if;
   if cardinality(p_role_ids)<>(select count(*) from public.worship_roles) then raise exception 'The reorder list must contain every role exactly once'; end if;
-  if cardinality(p_role_ids)<>(select count(distinct id) from unnest(p_role_ids) id) then raise exception 'Duplicate role in reorder list'; end if;
-  update public.worship_roles role set display_order=ordered.position*10 from unnest(p_role_ids) with ordinality ordered(id,position) where role.id=ordered.id;
+  if cardinality(p_role_ids)<>(select count(distinct selected.role_id) from unnest(p_role_ids) as selected(role_id)) then raise exception 'Duplicate role in reorder list'; end if;
+  update public.worship_roles role set display_order=ordered.position*10 from unnest(p_role_ids) with ordinality ordered(role_id,position) where role.id=ordered.role_id;
   perform public.log_admin_action('roles.reordered','worship_role',null,null,to_jsonb(p_role_ids));
 end $$;
 
@@ -471,20 +471,22 @@ begin
   if coalesce(cardinality(p_role_ids),0)=0 then raise exception 'Select at least one worship role'; end if;
   if p_primary_role_id is null or not (p_primary_role_id=any(p_role_ids)) then raise exception 'Choose a primary role from the selected roles'; end if;
   if exists(
-    select 1 from unnest(p_role_ids) id
-    left join public.worship_roles role on role.id=id
+    select 1 from unnest(p_role_ids) as selected(role_id)
+    left join public.worship_roles role on role.id=selected.role_id
     where role.id is null
        or (not role.active and not exists(
          select 1 from public.profile_worship_roles existing
-         where existing.profile_id=p_user_id and existing.role_id=id
+         where existing.profile_id=p_user_id and existing.role_id=selected.role_id
        ))
   ) then raise exception 'New assignments require active roles'; end if;
   select array_agg(role.name order by mapping.position),max(role.name) filter(where role.id=p_primary_role_id)
-    into v_names,v_primary_name from unnest(p_role_ids) with ordinality mapping(id,position) join public.worship_roles role on role.id=mapping.id;
+    into v_names,v_primary_name from unnest(p_role_ids) with ordinality mapping(role_id,position) join public.worship_roles role on role.id=mapping.role_id;
   perform set_config('app.admin_user_update','1',true);
   update public.profiles set name=trim(p_name),phone=coalesce(p_phone,''),whatsapp=coalesce(p_whatsapp,''),notes=coalesce(p_notes,''),status=p_status,access_level=p_access_level,is_admin=(p_access_level in ('super_admin','admin')),position=case p_access_level when 'super_admin' then 'Admin' when 'admin' then 'Admin' when 'leader' then 'Leader' else 'Member' end,role=v_primary_name,roles=to_jsonb(v_names) where id=p_user_id;
   delete from public.profile_worship_roles where profile_id=p_user_id;
-  insert into public.profile_worship_roles(profile_id,role_id,is_primary,created_by) select p_user_id,id,id=p_primary_role_id,auth.uid() from unnest(p_role_ids) id;
+  insert into public.profile_worship_roles(profile_id,role_id,is_primary,created_by)
+    select p_user_id,selected.role_id,selected.role_id=p_primary_role_id,auth.uid()
+    from unnest(p_role_ids) as selected(role_id);
   select to_jsonb(p) into v_new from public.profiles p where id=p_user_id;
   perform public.log_admin_action('user.updated','profile',p_user_id::text,to_jsonb(v_old)-'notes',v_new-'notes');
   return v_new;
@@ -500,11 +502,13 @@ begin
   if p_access_level='admin' and not public.is_super_admin() then raise exception 'Only a Super Admin can invite another Admin' using errcode='42501'; end if;
   if nullif(trim(p_email),'') is null or position('@' in p_email)=0 then raise exception 'Enter a valid email address'; end if;
   if coalesce(cardinality(p_role_ids),0)=0 or p_primary_role_id is null or not(p_primary_role_id=any(p_role_ids)) then raise exception 'Select roles and a primary role'; end if;
-  if exists(select 1 from unnest(p_role_ids) id left join public.worship_roles role on role.id=id where role.id is null or not role.active) then raise exception 'Invitations require active roles'; end if;
-  select array_agg(role.name order by mapping.position),max(role.name) filter(where role.id=p_primary_role_id) into v_names,v_primary_name from unnest(p_role_ids) with ordinality mapping(id,position) join public.worship_roles role on role.id=mapping.id;
+  if exists(select 1 from unnest(p_role_ids) as selected(role_id) left join public.worship_roles role on role.id=selected.role_id where role.id is null or not role.active) then raise exception 'Invitations require active roles'; end if;
+  select array_agg(role.name order by mapping.position),max(role.name) filter(where role.id=p_primary_role_id) into v_names,v_primary_name from unnest(p_role_ids) with ordinality mapping(role_id,position) join public.worship_roles role on role.id=mapping.role_id;
   insert into public.invitations(code,email,role,roles,method,status,created_by,expires_at,access_level)
   values(p_code,lower(trim(p_email)),v_primary_name,to_jsonb(v_names),p_method,'pending',auth.uid(),now()+interval '7 days',p_access_level) returning * into v_invitation;
-  insert into public.invitation_worship_roles(invitation_id,role_id,is_primary) select v_invitation.id,id,id=p_primary_role_id from unnest(p_role_ids) id;
+  insert into public.invitation_worship_roles(invitation_id,role_id,is_primary)
+    select v_invitation.id,selected.role_id,selected.role_id=p_primary_role_id
+    from unnest(p_role_ids) as selected(role_id);
   perform public.log_admin_action('invitation.created','invitation',v_invitation.id::text,null,to_jsonb(v_invitation)-'code');
   return v_invitation;
 end $$;
@@ -539,10 +543,12 @@ declare v_old jsonb;
 begin
   if not public.is_super_admin() then raise exception 'Only a Super Admin can change the permission matrix' using errcode='42501'; end if;
   if p_access_level not in ('admin','leader','member') then raise exception 'Invalid access level'; end if;
-  if exists(select 1 from unnest(p_permission_keys) key left join public.system_permissions permission on permission.permission_key=key where permission.permission_key is null) then raise exception 'Unknown permission key'; end if;
+  if exists(select 1 from unnest(p_permission_keys) as selected(permission_key) left join public.system_permissions permission on permission.permission_key=selected.permission_key where permission.permission_key is null) then raise exception 'Unknown permission key'; end if;
   select coalesce(jsonb_agg(permission_key order by permission_key),'[]'::jsonb) into v_old from public.access_level_permissions where access_level=p_access_level;
   delete from public.access_level_permissions where access_level=p_access_level;
-  insert into public.access_level_permissions(access_level,permission_key,created_by) select p_access_level,key,auth.uid() from unnest(p_permission_keys) key;
+  insert into public.access_level_permissions(access_level,permission_key,created_by)
+    select p_access_level,selected.permission_key,auth.uid()
+    from unnest(p_permission_keys) as selected(permission_key);
   perform public.log_admin_action('permissions.updated','access_level',p_access_level,v_old,to_jsonb(p_permission_keys));
 end $$;
 
@@ -739,5 +745,7 @@ grant execute on function public.admin_renew_invitation(uuid) to authenticated;
 grant execute on function public.admin_cancel_invitation(uuid) to authenticated;
 grant execute on function public.admin_set_access_permissions(text,text[]) to authenticated;
 grant execute on function public.record_user_activity() to authenticated;
+
+notify pgrst, 'reload schema';
 
 commit;
