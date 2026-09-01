@@ -1,3 +1,5 @@
+import { MUSICAL_KEYS } from './musicKeys.js'
+
 export const SONG_IMPORT_HEADERS = [
   'title','arabic_title','artist','default_key','bpm','time_signature',
   'language','ccli_number','lyrics','tags','notes',
@@ -21,7 +23,7 @@ const ARABIC_DIACRITICS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g
 const ARABIC_CHARACTER = /[\u0600-\u06FF]/g
 const LATIN_CHARACTER = /[A-Za-z]/g
 const MOJIBAKE = /(?:Ø.|Ù.|Ã.|Â.){2,}/
-const VALID_KEYS = new Set(['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Cb','E#','F#','Am','Bm','Cm','Dm','Em','Fm','Gm','Abm','Bbm','C#m','D#m','F#m','G#m'])
+const VALID_KEYS = new Set(MUSICAL_KEYS)
 const LANGUAGE_VALUES = new Map([
   ['ar','ar'],['arabic','ar'],['عربي','ar'],['العربية','ar'],
   ['en','en'],['english','en'],['إنجليزي','en'],['الإنجليزية','en'],

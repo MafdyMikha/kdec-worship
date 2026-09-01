@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { GripVertical, Trash2, Music2, Edit2, Check, X, Plus, MessageSquare, Globe, ArrowUp, ArrowDown } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
+import { MAJOR_KEYS, MINOR_KEYS } from '../lib/musicKeys.js'
 import { Card, Badge, Btn, Modal, Select, Input, SearchInput } from '../components/ui'
-
-const KEYS = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Am','Dm','Em','Gm','Bm']
 
 const PART_COLOR = {
   'مقدمة':'bg-slate-100 text-slate-600','مقطع ١':'bg-blue-50 text-blue-700',
@@ -32,7 +31,8 @@ function KeyEditor({ value, onChange }) {
     <div className="flex items-center gap-1">
       <select value={local} onChange={e => setLocal(e.target.value)} autoFocus
         className="px-2 py-0.5 border border-indigo-300 rounded text-xs focus:outline-none bg-white">
-        {KEYS.map(k => <option key={k}>{k}</option>)}
+        <optgroup label="Major">{MAJOR_KEYS.map(k => <option key={k} value={k}>{k} Major</option>)}</optgroup>
+        <optgroup label="Minor">{MINOR_KEYS.map(k => <option key={k} value={k}>{k} Minor</option>)}</optgroup>
       </select>
       <button onClick={() => { onChange(local); setEditing(false) }} aria-label="Save song key" className="p-1 text-emerald-500 cursor-pointer"><Check size={13}/></button>
       <button onClick={() => setEditing(false)} aria-label="Cancel key edit" className="p-1 text-slate-400 cursor-pointer"><X size={13}/></button>
@@ -290,7 +290,8 @@ export default function SetlistTab({ service, canEdit=true }) {
           {selectedSong && (
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
               <Select label={isAr?'طبقة هذه الخدمة':'Key for this service'} value={songKey} onChange={e=>setSongKey(e.target.value)}>
-                {KEYS.map(k=><option key={k} value={k}>{k}</option>)}
+                <optgroup label={isAr?'ماجور':'Major'}>{MAJOR_KEYS.map(k=><option key={k} value={k}>{k} Major</option>)}</optgroup>
+                <optgroup label={isAr?'مينور':'Minor'}>{MINOR_KEYS.map(k=><option key={k} value={k}>{k} Minor</option>)}</optgroup>
               </Select>
               <Input label={isAr?'ملاحظة للقائد':'Leader note'} placeholder={isAr?'مثال: جسر مرتين':'e.g. Bridge twice'} value={songNotes} onChange={e=>setSongNotes(e.target.value)}/>
             </div>

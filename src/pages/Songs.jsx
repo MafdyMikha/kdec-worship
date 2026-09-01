@@ -3,9 +3,9 @@ import { Plus, Music2, Edit2, Trash2, ChevronDown, ChevronUp, Globe } from 'luci
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { hasPermission } from '../lib/permissions.js'
+import { MAJOR_KEYS, MINOR_KEYS, MUSICAL_KEYS } from '../lib/musicKeys.js'
 import { Card, Btn, Badge, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog } from '../components/ui'
 
-const KEYS = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Am','Dm','Em','Gm','Bm']
 const SEQ_AR = ['مقدمة','مقطع ١','مقطع ٢','مقطع ٣','لازمة','جسر','قبل اللازمة','ختام']
 const SEQ_EN = ['Intro','Verse 1','Verse 2','Verse 3','Chorus','Bridge','Pre-Chorus','Outro']
 const PART_COLOR = {
@@ -36,7 +36,8 @@ function SongForm({ value, onChange, isAr }) {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Select label={isAr?'الطبقة الأصلية':'Original Key'} value={value.key||'G'} onChange={e=>onChange({...value,key:e.target.value})}>
-          {KEYS.map(k=><option key={k} value={k}>{k}</option>)}
+          <optgroup label={isAr?'ماجور':'Major'}>{MAJOR_KEYS.map(k=><option key={k} value={k}>{k} Major</option>)}</optgroup>
+          <optgroup label={isAr?'مينور':'Minor'}>{MINOR_KEYS.map(k=><option key={k} value={k}>{k} Minor</option>)}</optgroup>
         </Select>
         <Input label={isAr?'الإيقاع':'BPM'} type="number" min="40" max="220" placeholder="76"
           value={value.bpm||''} onChange={e=>onChange({...value,bpm:Number(e.target.value)||''})}/>
@@ -114,7 +115,7 @@ export default function Songs() {
             aria-label={isAr?'تصفية حسب الطبقة':'Filter by key'}
             className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="all">{isAr?'كل الطبقات':'All Keys'}</option>
-            {KEYS.map(k=><option key={k} value={k}>{k}</option>)}
+            {MUSICAL_KEYS.map(k=><option key={k} value={k}>{k}</option>)}
           </select>
         </div>
         {canManage&&<Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>}
