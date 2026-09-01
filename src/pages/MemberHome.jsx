@@ -7,6 +7,7 @@ import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Badge, Btn, Modal, Textarea } from '../components/ui'
 import InstrumentDisplay, { INSTRUMENT_COLORS } from '../components/instruments/InstrumentDisplay.jsx'
+import { hasPermission } from '../lib/permissions.js'
 
 function TimeUntil({ dateStr, timeStr, isAr }) {
   const [now, setNow] = useState(new Date())
@@ -229,9 +230,9 @@ export default function MemberHome() {
               {[
                 {icon:<Calendar size={18}/>,label:isAr?'الجدول':'Schedule',to:'/schedule',color:'bg-indigo-50 text-indigo-600'},
                 {icon:<Music2 size={18}/>,label:isAr?'الترانيم':'Songs',to:'/songs',color:'bg-violet-50 text-violet-600'},
-                {icon:<Users size={18}/>,label:isAr?'الفريق':'Team',to:'/people',color:'bg-emerald-50 text-emerald-600'},
+                {icon:<Users size={18}/>,label:isAr?'الفريق':'Team',to:'/people',color:'bg-emerald-50 text-emerald-600',permission:'users.view'},
                 {icon:<AlertCircle size={18}/>,label:isAr?'الإعلانات':'Announcements',to:'/announcements',color:'bg-amber-50 text-amber-600'},
-              ].map(({icon,label,to,color})=>(
+              ].filter(item=>!item.permission||hasPermission(currentUser,item.permission)).map(({icon,label,to,color})=>(
                 <button key={to} onClick={()=>navigate(to)}
                   className={`${color} rounded-xl p-3 flex flex-col items-center gap-1.5 text-xs font-medium hover:opacity-80 cursor-pointer transition-all`}>
                   {icon}<span>{label}</span>

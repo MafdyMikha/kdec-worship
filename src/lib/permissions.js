@@ -14,6 +14,11 @@ export const SYSTEM_PERMISSIONS = [
   'invitations.manage','reports.view','settings.manage',
 ]
 
+export const ADMIN_CONTROL_PERMISSIONS = [
+  'users.edit','roles.manage','permissions.manage',
+  'invitations.manage','settings.manage',
+]
+
 const DEFAULT_ACCESS_PERMISSIONS = {
   super_admin:['*'],
   admin:SYSTEM_PERMISSIONS.filter(permission=>permission!=='permissions.manage'),
@@ -50,6 +55,14 @@ export function hasPermission(user, permission) {
   if (!user || user.status==='inactive') return false
   const assigned=Array.isArray(user.permissions) ? user.permissions : DEFAULT_ACCESS_PERMISSIONS[getAccessLevel(user)] || []
   return assigned.includes('*') || assigned.includes(permission)
+}
+
+export function hasAnyPermission(user, permissions) {
+  return Array.isArray(permissions) && permissions.some(permission=>hasPermission(user,permission))
+}
+
+export function canAccessAdminControl(user) {
+  return hasAnyPermission(user, ADMIN_CONTROL_PERMISSIONS)
 }
 
 export function canManageWorship(user) {

@@ -3,7 +3,8 @@ import { Plus, Mail, Copy, Check, X, Clock, UserPlus } from 'lucide-react'
 import { useStore, buildInvitationMsg } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Modal, Input, Select, EmptyState } from '../components/ui'
-import { isAdminUser, isSuperAdminUser } from '../lib/permissions.js'
+import { hasPermission, isSuperAdminUser } from '../lib/permissions.js'
+import { isValidEmail, normalizeEmail } from '../lib/validation.js'
 
 const WA = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -19,19 +20,25 @@ export default function Invitations() {
   const [created, setCreated] = useState(null)
   const [copied,  setCopied]  = useState(null)
 
-  const isAdmin=isAdminUser(currentUser)
+  const canManageInvitations=hasPermission(currentUser,'invitations.manage')
+  const [formError,setFormError]=useState('')
   const senderName = currentUser?.name || currentUser?.email?.split('@')[0] || (isAr?'المسؤول':'Admin')
 
-  if (!isAdmin) return (
+  if (!canManageInvitations) return (
     <EmptyState icon={<UserPlus size={28}/>}
       title={isAr ? 'للمسؤولين فقط' : 'Admins Only'}
       description={isAr ? 'فقط المسؤولون يمكنهم إدارة الدعوات.' : 'Only admins can manage invitations.'}/>
   )
 
   const handleCreate = async () => {
-    if (!form.email || !form.roles || form.roles.length === 0) return
+    if (!isValidEmail(form.email)) {
+      setFormError(isAr?'أدخل عنوان بريد إلكتروني صالحاً.':'Enter a valid email address.')
+      return
+    }
+    if (!form.roles || form.roles.length === 0) return
+    setFormError('')
     const primaryRoleId=worshipRoles.find(role=>role.name===form.primaryRole)?.id
-    const inv=await createInvitation(form.email,form.roles,form.method,{primaryRoleId,accessLevel:form.accessLevel})
+    const inv=await createInvitation(normalizeEmail(form.email),form.roles,form.method,{primaryRoleId,accessLevel:form.accessLevel})
     if(inv){const defaultRole=ROLES[0]||'';setCreated({...inv,phone:form.phone});setShowAdd(false);setForm({email:'',roles:defaultRole?[defaultRole]:[],primaryRole:defaultRole,accessLevel:'member',method:'whatsapp',phone:''})}
   }
 
@@ -165,11 +172,12 @@ export default function Invitations() {
         title={isAr?'إرسال دعوة جديدة':'Send New Invitation'} size="sm"
         footer={<>
           <Btn variant="secondary" onClick={()=>setShowAdd(false)}>{t('cancel')}</Btn>
-          <Btn onClick={handleCreate} disabled={!form.email || form.roles.length === 0}>{isAr?'إنشاء الدعوة':'Create Invitation'}</Btn>
+          <Btn type="submit" form="create-invitation-form" disabled={!isValidEmail(form.email) || form.roles.length === 0}>{isAr?'إنشاء الدعوة':'Create Invitation'}</Btn>
         </>}>
-        <div className="space-y-4">
+        <form id="create-invitation-form" className="space-y-4" onSubmit={event=>{event.preventDefault();void handleCreate()}}>
           <Input label={t('email')} required type="email" placeholder="member@email.com"
             value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>
+          {formError&&<p className="text-sm text-red-600" role="alert">{formError}</p>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               {isAr ? 'الأدوار' : 'Roles'} <span className="text-red-500">*</span>
@@ -221,7 +229,7 @@ export default function Invitations() {
           <p className="text-xs text-slate-400">
             {isAr?'سيتم إنشاء رابط دعوة صالح لمدة 7 أيام.':'An invitation link valid for 7 days will be created.'}
           </p>
-        </div>
+        </form>
       </Modal>
     </div>
   )

@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { AppProvider, useStore } from './store/useStore.jsx'
-import { hasPermission, isAdminUser } from './lib/permissions.js'
+import { ADMIN_CONTROL_PERMISSIONS, hasAnyPermission, hasPermission, isAdminUser } from './lib/permissions.js'
 import Layout from './components/layout'
 import { Notifications } from './components/ui'
 const Login = lazy(() => import('./pages/Login'))
@@ -60,6 +60,11 @@ function PermissionOnly({ permission, children }) {
   return hasPermission(currentUser,permission) ? children : <Navigate to="/" replace />
 }
 
+function PermissionOnlyAny({ permissions, children }) {
+  const { currentUser } = useStore()
+  return hasAnyPermission(currentUser,permissions) ? children : <Navigate to="/" replace />
+}
+
 function AuthGate() {
   const { currentUser, authLoading, configurationError, isPasswordRecovery, notifications } = useStore()
   const inviteCode = new URLSearchParams(window.location.search).get('invite')
@@ -83,7 +88,7 @@ function AuthGate() {
           <Route path="/services"      element={<Services/>}/>
           <Route path="/services/:id"  element={<ServiceDetail/>}/>
           <Route path="/songs"         element={<Songs/>}/>
-          <Route path="/people"        element={<People/>}/>
+          <Route path="/people"        element={<PermissionOnly permission="users.view"><People/></PermissionOnly>}/>
           <Route path="/schedule"      element={<Schedule/>}/>
           <Route path="/reports"       element={<PermissionOnly permission="reports.view"><Reports/></PermissionOnly>}/>
           <Route path="/announcements" element={<Announcements/>}/>
@@ -93,9 +98,9 @@ function AuthGate() {
           <Route path="/requests"      element={<Requests/>}/>
           <Route path="/settings"      element={<Settings/>}/>
           <Route path="/profile"       element={<Profile/>}/>
-          <Route path="/invitations"   element={<AdminOnly><Invitations/></AdminOnly>}/>
-          <Route path="/whatsapp"      element={<AdminOnly><WhatsAppBulk/></AdminOnly>}/>
-          <Route path="/admin/settings" element={<AdminOnly><AdminControl/></AdminOnly>}/>
+          <Route path="/invitations"   element={<PermissionOnly permission="invitations.manage"><Invitations/></PermissionOnly>}/>
+          <Route path="/whatsapp"      element={<PermissionOnly permission="users.view"><WhatsAppBulk/></PermissionOnly>}/>
+          <Route path="/admin/settings" element={<PermissionOnlyAny permissions={ADMIN_CONTROL_PERMISSIONS}><AdminControl/></PermissionOnlyAny>}/>
           <Route path="*"              element={<Navigate to="/" replace/>}/>
         </Routes></Suspense>
       </Layout>

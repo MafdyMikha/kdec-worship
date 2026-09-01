@@ -6,10 +6,10 @@ import { format, formatDistanceToNow } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { isAdminUser } from '../lib/permissions.js'
+import { hasPermission } from '../lib/permissions.js'
 import { Card, Btn, Badge, Avatar, Modal, StatCard, Tabs, Input, Select } from '../components/ui'
 import { KDEC_LOGO } from '../assets/kdecLogo.js'
-import { addMinutesToTime, attendanceOccurrenceDate, attendanceTiming, dateKeyInTimezone } from '../lib/attendance.js'
+import { addMinutesToTime, attendanceOccurrenceDate, attendanceTiming, dateKeyInTimezone, validateAttendanceSessionSchedule } from '../lib/attendance.js'
 import AttendanceSessionDetails from '../components/attendance/AttendanceSessionDetails.jsx'
 
 const SESSION_TYPES = [
@@ -214,7 +214,7 @@ export default function Attendance() {
     createAttendanceSession, closeAttendanceSession,
     resolveAttendanceSession, checkInAttendance, checkOutAttendance,
   } = useStore()
-  const isAdmin = isAdminUser(currentUser)
+  const isAdmin = hasPermission(currentUser,'reports.view')
 
   const [tab,          setTab]          = useState(routeToken ? 'checkin' : (isAdmin ? 'sessions' : 'checkin'))
   const [showCreate,   setShowCreate]   = useState(false)
@@ -288,6 +288,11 @@ export default function Attendance() {
   const handleCreate = async () => {
     if (!createForm.label || !createForm.sessionDate || !createForm.sessionTime || !createForm.endTime) {
       setCreateError(isAr ? 'التاريخ ووقت البداية ووقت النهاية مطلوبة.' : 'Date, start time, and end time are required.')
+      return
+    }
+    const scheduleValidation=validateAttendanceSessionSchedule(createForm,organizationSettings.timezone)
+    if(!scheduleValidation.valid){
+      setCreateError(isAr?'انتهت هذه الجلسة بالفعل. اختر تاريخاً قادماً أو اجعلها متكررة.':scheduleValidation.error)
       return
     }
     setCreateError('')

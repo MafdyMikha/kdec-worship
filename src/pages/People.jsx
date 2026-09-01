@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog, StatusDot } from '../components/ui'
 import { buildAttendanceReport, downloadAttendanceReport, formatAttendanceTimestamp } from '../lib/attendanceReport.js'
-import { isAdminUser } from '../lib/permissions.js'
+import { hasPermission } from '../lib/permissions.js'
 
 const ROLE_COLOR = {
   'Worship Leader':'indigo','Music Director':'purple','Pianist/Keys':'blue',
@@ -322,7 +322,7 @@ export default function People() {
   const {people,updatePerson,deletePerson,currentUser,ROLES,worshipRoles,attendanceSessions,attendanceRecords,organizationSettings}=useStore()
   const { isAr, t } = useLang()
   const navigate = useNavigate()
-  const isAdmin=isAdminUser(currentUser)
+  const isAdmin=hasPermission(currentUser,'users.edit')
 
   const [search,       setSearch]       = useState('')
   const [filterRole,   setFilterRole]   = useState('all')

@@ -80,8 +80,9 @@ src/lib/runtimeConfig.js    fail-closed live/demo environment validation
 src/lib/supabase.js         Supabase client creation
 src/lib/recurrence.js       tested recurrence generation
 src/lib/attendance.js       timezone-safe occurrence and attendance-timing helpers
-supabase-schema-FULL.sql    fresh-project base schema and RLS (follow with the dynamic-role migration)
+supabase-schema-FULL.sql    fresh-project base schema and RLS
 MIGRATION_dynamic_roles_admin.sql dynamic role/access/admin-control upgrade for existing projects
+MIGRATION_qa_hardening.sql  private member directory, validation, and attendance-expiry hardening
 MIGRATION_security_data_integrity.sql current rerunnable upgrade migration
 MIGRATION_attendance_session_timing.sql small upgrade for already-migrated live databases
 MIGRATION_multi_role.sql    superseded legacy migration; do not combine

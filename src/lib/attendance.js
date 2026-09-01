@@ -36,6 +36,56 @@ function dateOrdinal(value) {
   return Math.floor(Date.UTC(year, month - 1, day) / 86400000)
 }
 
+function dateKeyFromOrdinal(ordinal) {
+  if (!Number.isInteger(ordinal)) return ''
+  return new Date(ordinal * 86400000).toISOString().slice(0,10)
+}
+
+export function zonedDateTimeToUtc(dateKey, time, timezone = 'Africa/Cairo') {
+  const ordinal=dateOrdinal(dateKey)
+  const minutes=timeToMinutes(time)
+  if(ordinal===null||minutes===null)return null
+  const [year,month,day]=dateKey.split('-').map(Number)
+  let timestamp=Date.UTC(year,month-1,day,Math.floor(minutes/60),minutes%60)
+  const targetMinutes=(ordinal*1440)+minutes
+  try {
+    for(let attempt=0;attempt<3;attempt+=1){
+      const observed=localDateTimeParts(new Date(timestamp),timezone)
+      const observedOrdinal=dateOrdinal(observed.date)
+      if(observedOrdinal===null)return null
+      const difference=((observedOrdinal*1440)+observed.minutes)-targetMinutes
+      if(difference===0)break
+      timestamp-=difference*60000
+    }
+  } catch {
+    return null
+  }
+  return new Date(timestamp)
+}
+
+export function attendanceSessionExpiry(session, timezone = 'Africa/Cairo', graceHours = 6) {
+  const sessionDate=session?.sessionDate||session?.session_date
+  const startTime=session?.sessionTime||session?.session_time
+  const endTime=session?.endTime||session?.end_time
+  const ordinal=dateOrdinal(sessionDate)
+  const startMinutes=timeToMinutes(startTime)
+  const endMinutes=timeToMinutes(endTime)
+  if(ordinal===null||startMinutes===null||endMinutes===null)return null
+  const endDate=dateKeyFromOrdinal(ordinal+(endMinutes<=startMinutes?1:0))
+  const scheduledEnd=zonedDateTimeToUtc(endDate,endTime,timezone)
+  return scheduledEnd ? new Date(scheduledEnd.getTime()+(Math.max(0,Number(graceHours)||0)*3600000)) : null
+}
+
+export function validateAttendanceSessionSchedule(session, timezone = 'Africa/Cairo', now = new Date()) {
+  if(!session?.sessionDate&&!session?.session_date)return {valid:false,error:'Session date is required.'}
+  if(!session?.sessionTime&&!session?.session_time)return {valid:false,error:'Start time is required.'}
+  if(!session?.endTime&&!session?.end_time)return {valid:false,error:'End time is required.'}
+  const expiresAt=attendanceSessionExpiry(session,timezone)
+  if(!expiresAt)return {valid:false,error:'Enter a valid session date and time.'}
+  if(!session?.repeatable&&expiresAt.getTime()<=now.getTime())return {valid:false,error:'This session has already ended. Choose a future date or make it repeatable.'}
+  return {valid:true,expiresAt}
+}
+
 export function addMinutesToTime(value, amount) {
   const minutes = timeToMinutes(value)
   if (minutes === null) return ''

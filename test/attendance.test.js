@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addMinutesToTime, attendanceOccurrenceDate, attendanceTiming } from '../src/lib/attendance.js'
+import { addMinutesToTime, attendanceOccurrenceDate, attendanceSessionExpiry, attendanceTiming, validateAttendanceSessionSchedule, zonedDateTimeToUtc } from '../src/lib/attendance.js'
 
 const cairo = 'Africa/Cairo'
 const session = {
@@ -36,4 +36,16 @@ test('overnight sessions treat an after-midnight checkout as the scheduled end',
 test('default end-time suggestion wraps across midnight', () => {
   assert.equal(addMinutesToTime('16:00', 120), '18:00')
   assert.equal(addMinutesToTime('23:30', 120), '01:30')
+})
+
+test('session expiry is derived in the organization timezone, not the browser timezone',()=>{
+  assert.equal(zonedDateTimeToUtc('2026-08-10','18:00',cairo)?.toISOString(),'2026-08-10T15:00:00.000Z')
+  assert.equal(attendanceSessionExpiry(session,cairo)?.toISOString(),'2026-08-10T21:00:00.000Z')
+})
+
+test('expired one-time sessions are rejected while repeatable sessions remain reusable',()=>{
+  const now=new Date('2026-08-10T21:00:01.000Z')
+  assert.equal(validateAttendanceSessionSchedule(session,cairo,now).valid,false)
+  assert.equal(validateAttendanceSessionSchedule({...session,repeatable:true},cairo,now).valid,true)
+  assert.equal(validateAttendanceSessionSchedule({...session,session_date:'2026-08-11'},cairo,now).valid,true)
 })

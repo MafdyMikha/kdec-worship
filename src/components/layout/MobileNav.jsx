@@ -4,11 +4,11 @@ import {
   MessageSquare, Home, BarChart3, Megaphone, Settings, User,
   ChevronUp, X, ClipboardList, ShieldCog
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { Badge } from '../ui'
-import { canManageWorship, isAdminUser } from '../../lib/permissions.js'
+import { canAccessAdminControl, canManageWorship, hasPermission, isAdminUser } from '../../lib/permissions.js'
 
 const WaIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -22,13 +22,51 @@ export default function MobileNav() {
   const isAdmin = isAdminUser(currentUser)
   const isManager = canManageWorship(currentUser)
   const [moreOpen, setMoreOpen] = useState(false)
+  const drawerRef = useRef(null)
+  const moreButtonRef = useRef(null)
+
+  useEffect(() => {
+    if (!moreOpen) return undefined
+    const trigger=moreButtonRef.current
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const focusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    const focusFirst = () => drawerRef.current?.querySelector(focusableSelector)?.focus()
+    const frame = window.requestAnimationFrame(focusFirst)
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMoreOpen(false)
+        return
+      }
+      if (event.key !== 'Tab' || !drawerRef.current) return
+      const focusable = [...drawerRef.current.querySelectorAll(focusableSelector)]
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown',handleKeyDown)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('keydown',handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      trigger?.focus()
+    }
+  }, [moreOpen])
 
   // 4 primary tabs always visible + "More" button
   const adminPrimary = [
     { to: '/',           icon: <LayoutDashboard size={22}/>, label: t('dashboard')    },
     { to: '/services',   icon: <Calendar size={22}/>,        label: t('services')     },
     { to: '/songs',      icon: <Music2 size={22}/>,          label: t('songs')        },
-    { to: '/people',     icon: <Users size={22}/>,           label: t('people')       },
+    { to: '/people',     icon: <Users size={22}/>,           label: t('people'), permission:'users.view' },
   ]
 
   const memberPrimary = [
@@ -50,11 +88,11 @@ export default function MobileNav() {
     { to: '/attendance',    icon: <QrCode size={20}/>,       label: t('attendance')    },
     { to: '/events',        icon: <Megaphone size={20}/>,    label: t('events')        },
     { to: '/requests',      icon: <ClipboardList size={20}/>,label: t('requests')      },
-    { to: '/whatsapp',      icon: <WaIcon/>,                 label: t('whatsappBulk') },
-    { to: '/reports',       icon: <BarChart3 size={20}/>,    label: t('reports')       },
+    { to: '/whatsapp',      icon: <WaIcon/>,                 label: t('whatsappBulk'), permission:'users.view' },
+    { to: '/reports',       icon: <BarChart3 size={20}/>,    label: t('reports'), permission:'reports.view' },
     { to: '/announcements', icon: <MessageSquare size={20}/>,label: t('announcements'), badge: announcements.length },
-    { to: '/invitations',   icon: <Users size={20}/>,        label: t('invitations')   },
-    { to: '/admin/settings',icon: <ShieldCog size={20}/>,    label: t('adminControl')  },
+    { to: '/invitations',   icon: <Users size={20}/>,        label: t('invitations'), permission:'invitations.manage' },
+    { to: '/admin/settings',icon: <ShieldCog size={20}/>,    label: t('adminControl'), adminControl:true },
     { to: '/profile',       icon: <User size={20}/>,         label: t('profile')       },
     { to: '/settings',      icon: <Settings size={20}/>,     label: t('settings')      },
   ]
@@ -72,8 +110,20 @@ export default function MobileNav() {
     ...memberMore,
   ]
 
-  const primary = isAdmin ? adminPrimary : isManager ? managerPrimary : memberPrimary
-  const more    = isAdmin ? adminMore    : isManager ? managerMore : memberMore
+  const permissionMore = [
+    { to:'/people', icon:<Users size={20}/>, label:t('people'), permission:'users.view' },
+    { to:'/whatsapp', icon:<WaIcon/>, label:t('whatsappBulk'), permission:'users.view' },
+    { to:'/reports', icon:<BarChart3 size={20}/>, label:t('reports'), permission:'reports.view' },
+    { to:'/invitations', icon:<Users size={20}/>, label:t('invitations'), permission:'invitations.manage' },
+    { to:'/admin/settings', icon:<ShieldCog size={20}/>, label:t('adminControl'), adminControl:true },
+  ]
+  const basePrimary = isAdmin ? adminPrimary : isManager ? managerPrimary : memberPrimary
+  const baseMore = isAdmin ? adminMore : isManager ? managerMore : memberMore
+  const primary = basePrimary.filter(item=>!item.permission||hasPermission(currentUser,item.permission))
+  const more = [
+    ...baseMore.filter(item=>(!item.permission||hasPermission(currentUser,item.permission))&&(!item.adminControl||canAccessAdminControl(currentUser))),
+    ...permissionMore.filter(item=>(item.adminControl?canAccessAdminControl(currentUser):hasPermission(currentUser,item.permission))&&!basePrimary.some(base=>base.to===item.to)&&!baseMore.some(base=>base.to===item.to)),
+  ]
 
   return (
     <>
@@ -82,10 +132,15 @@ export default function MobileNav() {
         <div className="md:hidden fixed inset-0 z-40" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
           <div
+            id="mobile-more-dialog"
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-more-title"
             className={`absolute bottom-16 ${isAr ? 'left-2 right-2' : 'left-2 right-2'} bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700 rounded-2xl shadow-2xl p-4 z-50`}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-slate-700">
+              <span id="mobile-more-title" className="text-sm font-semibold text-slate-700">
                 {isAr ? 'المزيد' : 'More'}
               </span>
               <button onClick={() => setMoreOpen(false)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg cursor-pointer">
@@ -138,8 +193,10 @@ export default function MobileNav() {
 
           {/* More button */}
           <button
+            ref={moreButtonRef}
             onClick={() => setMoreOpen(!moreOpen)}
             aria-expanded={moreOpen}
+            aria-controls="mobile-more-dialog"
             aria-label={isAr ? 'المزيد' : 'More'}
             className={`flex-1 flex flex-col items-center gap-1 py-2.5 cursor-pointer transition-all ${moreOpen ? 'text-indigo-600' : 'text-slate-400'}`}>
             <ChevronUp size={22} className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`}/>

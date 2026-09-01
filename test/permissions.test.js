@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { canManageWorship, getAccessLevel, getUserRoles, hasPermission, isAdminUser, isSuperAdminUser, normalizeRoleName } from '../src/lib/permissions.js'
+import { canAccessAdminControl, canManageWorship, getAccessLevel, getUserRoles, hasAnyPermission, hasPermission, isAdminUser, isSuperAdminUser, normalizeRoleName } from '../src/lib/permissions.js'
 
 test('worship roles do not grant system permissions',()=>{
   const user={roles:['Worship Leader'],accessLevel:'member',status:'active'}
@@ -28,4 +28,13 @@ test('database role assignments take precedence over legacy role strings',()=>{
 test('legacy admin and normalized role names remain compatible',()=>{
   assert.equal(getAccessLevel({is_admin:true}),'admin')
   assert.equal(normalizeRoleName('  PIANO   Player '),'piano player')
+})
+
+test('granular permissions unlock only their matching administration surfaces',()=>{
+  const reportsUser={accessLevel:'member',status:'active',permissions:['reports.view']}
+  assert.equal(hasPermission(reportsUser,'reports.view'),true)
+  assert.equal(hasPermission(reportsUser,'users.view'),false)
+  assert.equal(hasAnyPermission(reportsUser,['users.view','reports.view']),true)
+  assert.equal(canAccessAdminControl(reportsUser),false)
+  assert.equal(canAccessAdminControl({...reportsUser,permissions:['settings.manage']}),true)
 })

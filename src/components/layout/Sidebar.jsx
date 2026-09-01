@@ -5,7 +5,7 @@ import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { KDEC_LOGO } from '../../assets/kdecLogo.js'
 import { Badge } from '../ui'
-import { canManageWorship, isAdminUser } from '../../lib/permissions.js'
+import { canAccessAdminControl, canManageWorship, hasPermission, isAdminUser } from '../../lib/permissions.js'
 
 const WaIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -24,13 +24,13 @@ export default function Sidebar() {
     { to:'/',              icon:<LayoutDashboard size={20}/>, key:'dashboard'    },
     { to:'/services',      icon:<Calendar size={20}/>,        key:'services'     },
     { to:'/songs',         icon:<Music2 size={20}/>,          key:'songs'        },
-    { to:'/people',        icon:<Users size={20}/>,           key:'people'       },
+    { to:'/people',        icon:<Users size={20}/>,           key:'people', permission:'users.view' },
     { to:'/schedule',      icon:<BookOpen size={20}/>,        key:'schedule'     },
     { to:'/attendance',    icon:<QrCode size={20}/>,          key:'attendance'   },
     { to:'/events',        icon:<Megaphone size={20}/>,       key:'events'       },
     { to:'/requests',      icon:<ClipboardList size={20}/>,   key:'requests'     },
-    { to:'/whatsapp',      icon:<WaIcon/>,                    key:'whatsappBulk' },
-    { to:'/reports',       icon:<BarChart3 size={20}/>,       key:'reports'      },
+    { to:'/whatsapp',      icon:<WaIcon/>,                    key:'whatsappBulk', permission:'users.view' },
+    { to:'/reports',       icon:<BarChart3 size={20}/>,       key:'reports', permission:'reports.view' },
     { to:'/announcements', icon:<MessageSquare size={20}/>,   key:'announcements', badge: announcements.length },
   ]
 
@@ -50,7 +50,16 @@ export default function Sidebar() {
     ...memberNav.slice(1),
   ]
 
-  const nav = isAdmin ? adminNav : isManager ? managerNav : memberNav
+  const baseNav = isAdmin ? adminNav : isManager ? managerNav : memberNav
+  const permissionNav = [
+    { to:'/people', icon:<Users size={20}/>, key:'people', permission:'users.view' },
+    { to:'/whatsapp', icon:<WaIcon/>, key:'whatsappBulk', permission:'users.view' },
+    { to:'/reports', icon:<BarChart3 size={20}/>, key:'reports', permission:'reports.view' },
+  ]
+  const nav = [
+    ...baseNav.filter(item=>!item.permission||hasPermission(currentUser,item.permission)),
+    ...permissionNav.filter(item=>hasPermission(currentUser,item.permission)&&!baseNav.some(base=>base.to===item.to)),
+  ]
 
   return (
     <aside className={`${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 bg-slate-900 flex-col transition-all duration-300 relative hidden md:flex`}>
@@ -84,8 +93,7 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Invitations — admin only */}
-        {isAdmin && (
+        {hasPermission(currentUser,'invitations.manage') && (
           <NavLink to="/invitations"
             aria-label={t('invitations')}
             className={({ isActive }) =>
@@ -96,7 +104,7 @@ export default function Sidebar() {
             {!collapsed && <span>{t('invitations')}</span>}
           </NavLink>
         )}
-        {isAdmin && (
+        {canAccessAdminControl(currentUser) && (
           <NavLink to="/admin/settings" aria-label={t('adminControl')}
             className={({isActive})=>`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${isActive?'bg-indigo-600 text-white':'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
             <ShieldCog size={20}/>{!collapsed&&<span>{t('adminControl')}</span>}

@@ -7,7 +7,7 @@ import { Avatar } from '../ui'
 import { KDEC_LOGO } from '../../assets/kdecLogo.js'
 import { format } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
-import { ACCESS_LEVEL_LABELS, isAdminUser } from '../../lib/permissions.js'
+import { ACCESS_LEVEL_LABELS, hasPermission } from '../../lib/permissions.js'
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
@@ -26,7 +26,7 @@ export default function Header({ title }) {
   const [open, setOpen]   = useState(false)
   const [dark, toggleDark] = useDarkMode()
   const ref  = useRef(null)
-  const isAdmin=isAdminUser(currentUser)
+  const canManageInvitations=hasPermission(currentUser,'invitations.manage')
   const isAr    = lang === 'ar'
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function Header({ title }) {
                 {t('profile')}
               </button>
 
-              {isAdmin && (
+              {canManageInvitations && (
                 <button
                   onClick={() => { navigate('/invitations'); setOpen(false) }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">

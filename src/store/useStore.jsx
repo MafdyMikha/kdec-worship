@@ -2,11 +2,12 @@
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } from '../lib/supabase.js'
-import { attendanceOccurrenceDate, attendanceTiming } from '../lib/attendance.js'
+import { attendanceOccurrenceDate, attendanceTiming, validateAttendanceSessionSchedule } from '../lib/attendance.js'
 import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
 import { ACCESS_LEVELS, SYSTEM_PERMISSIONS, hasPermission, isAdminUser, isSuperAdminUser } from '../lib/permissions.js'
 import { parseLyricsSections, slugifySongPath } from '../lib/songImport.js'
+import { isBlankText, isValidEmail, normalizeEmail, normalizeRequiredText } from '../lib/validation.js'
 
 // ─────────────────────────────────────────────────────────
 // Helpers
@@ -611,13 +612,14 @@ export function AppProvider({ children }) {
     try {
       const queries = [
         ['profiles', supabase.from('profiles').select('*, roleAssignments:profile_worship_roles!profile_worship_roles_profile_id_fkey(*, worshipRole:worship_roles(*, category:role_categories(*)))').order('name')],
+        ['memberDirectory',supabase.rpc('get_member_directory')],
         ['roleCategories',supabase.from('role_categories').select('*').order('display_order').order('name')],
         ['worshipRoles',supabase.from('worship_roles').select('*, category:role_categories(*)').order('display_order').order('name')],
         ['permissionDefinitions',supabase.from('system_permissions').select('*').eq('active',true).order('display_order')],
         ['permissionMatrix',supabase.from('access_level_permissions').select('*')],
         ['songs', supabase.from('songs').select('*, lyrics:song_lyrics(*), charts:song_charts(*, versions:song_chart_versions(*))').order('title')],
-        ['services', supabase.from('services').select('*, setlist:setlist_items(*, song:songs(*)), team:service_team(*, person:profiles(*), roleDefinition:worship_roles(*))').order('date')],
-        ['announcements', supabase.from('announcements').select('*, author:profiles(name)').order('created_at',{ascending:false})],
+        ['services', supabase.from('services').select('*, setlist:setlist_items(*, song:songs(*)), team:service_team(*, roleDefinition:worship_roles(*))').order('date')],
+        ['announcements', supabase.from('announcements').select('*').order('created_at',{ascending:false})],
         ['events', supabase.from('events').select('*').order('date')],
         ['eventResponses', supabase.from('event_responses').select('*')],
         ['attendanceRecords', supabase.from('attendance_records').select('*').order('created_at',{ascending:false})],
@@ -641,7 +643,12 @@ export function AppProvider({ children }) {
       const songsResult = resultByKey.songs
       const servicesResult = resultByKey.services
       const announcementsResult = resultByKey.announcements
-      if (profilesResult.data) setPeople(profilesResult.data.map(normalizeProfile))
+      const directoryProfiles=(resultByKey.memberDirectory?.data||[]).map(normalizeProfile)
+      const privateProfiles=(profilesResult.data||[]).map(normalizeProfile)
+      const profileById=new Map(directoryProfiles.map(profile=>[profile.id,profile]))
+      privateProfiles.forEach(profile=>profileById.set(profile.id,{...profileById.get(profile.id),...profile}))
+      const loadedPeople=[...profileById.values()].sort((left,right)=>String(left.name||'').localeCompare(String(right.name||'')))
+      if (resultByKey.memberDirectory?.data || profilesResult.data) setPeople(loadedPeople)
       if(resultByKey.roleCategories?.data)setRoleCategories(resultByKey.roleCategories.data.map(normalizeRoleCategory))
       if(resultByKey.worshipRoles?.data)setWorshipRoles(resultByKey.worshipRoles.data.map(normalizeWorshipRole))
       if(resultByKey.permissionDefinitions?.data)setPermissionDefinitions(resultByKey.permissionDefinitions.data)
@@ -654,12 +661,15 @@ export function AppProvider({ children }) {
       if(resultByKey.auditLogs?.data)setAuditLogs(resultByKey.auditLogs.data)
       if (songsResult.data) setSongs(songsResult.data.map(normalizeSong))
       if (resultByKey.songImportHistory?.data) setSongImportHistory(resultByKey.songImportHistory.data)
-      if (servicesResult.data) setServices(servicesResult.data.map(normalizeService))
+      if (servicesResult.data) setServices(servicesResult.data.map(normalizeService).map(service=>({
+        ...service,
+        team:service.team.map(member=>({...member,person:profileById.get(member.personId)||null})),
+      })))
       if (announcementsResult.data) {
         setAnnouncements(announcementsResult.data.map(announcement => ({
           ...announcement,
           author: announcement.author_id,
-          authorName: announcement.author?.name,
+          authorName: profileById.get(announcement.author_id)?.name,
         })))
       }
       if (resultByKey.events?.data) setEvents(resultByKey.events.data.map(normalizeEvent))
@@ -773,7 +783,7 @@ export function AppProvider({ children }) {
         localStorage.setItem('kdec_demo_user', JSON.stringify(user))
         return { success: true }
       }
-      return { error: 'Unknown demo account. Use mafdy@kdec.org (admin) or sarah@kdec.org (member).' }
+      return { error: 'Unknown demo account. Use mafdy@kdec.org (admin), sarah@kdec.org (leader), or david@kdec.org (member).' }
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return { error: error.message }
@@ -865,6 +875,10 @@ export function AppProvider({ children }) {
 
   // ── INVITATIONS ─────────────────────────────────────────
   const createInvitation = async (email, roles, method, options={}) => {
+    if(!hasPermission(currentUser,'invitations.manage')){toast('You do not have permission to create invitations.','error');return null}
+    const normalizedEmail=normalizeEmail(email)
+    if(!isValidEmail(normalizedEmail)){toast('Enter a valid email address.','error');return null}
+    if(invitations.some(invitation=>normalizeEmail(invitation.email)===normalizedEmail&&invitation.status==='pending'&&(!invitation.expires_at||new Date(invitation.expires_at)>new Date()))){toast('A pending invitation already exists for this email.','error');return null}
     const code = createSecureToken()
     const roleValues=Array.isArray(roles)?roles:[roles]
     const selectedRoles=roleValues.map(value=>worshipRoles.find(role=>role.id===value||role.name===value)).filter(Boolean)
@@ -876,11 +890,11 @@ export function AppProvider({ children }) {
     const accessLevel=options.accessLevel||'member'
     if (isDemoMode) {
       if(accessLevel==='admin'&&!isSuperAdminUser(currentUser)){toast('Only a Super Admin can invite another Admin.','error');return null}
-      const inv = { id:'inv_'+Date.now(), code, email, role:primaryRole, roles:rolesArr,roleIds,primaryRoleId,access_level:accessLevel,accessLevel,method,status:'pending',created_by:currentUser.id,expires_at:new Date(Date.now()+7*86400000).toISOString(),created_at:new Date().toISOString(),roleAssignments:selectedRoles.map(role=>({roleId:role.id,isPrimary:role.id===primaryRoleId,worshipRole:role})) }
-      setInvitations(prev => [inv, ...prev]); toast(`Invitation created for ${email}`); return inv
+      const inv = { id:'inv_'+Date.now(), code, email:normalizedEmail, role:primaryRole, roles:rolesArr,roleIds,primaryRoleId,access_level:accessLevel,accessLevel,method,status:'pending',created_by:currentUser.id,expires_at:new Date(Date.now()+7*86400000).toISOString(),created_at:new Date().toISOString(),roleAssignments:selectedRoles.map(role=>({roleId:role.id,isPrimary:role.id===primaryRoleId,worshipRole:role})) }
+      setInvitations(prev => [inv, ...prev]); toast(`Invitation created for ${normalizedEmail}`); return inv
     }
-    const {data,error}=await supabase.rpc('admin_create_invitation',{p_email:email,p_role_ids:roleIds,p_primary_role_id:primaryRoleId,p_access_level:accessLevel,p_method:method,p_code:code})
-    if(!error){await loadAll(true);toast(`Invitation created for ${email}`);return data}
+    const {data,error}=await supabase.rpc('admin_create_invitation',{p_email:normalizedEmail,p_role_ids:roleIds,p_primary_role_id:primaryRoleId,p_access_level:accessLevel,p_method:method,p_code:code})
+    if(!error){await loadAll(true);toast(`Invitation created for ${normalizedEmail}`);return data}
     toast(error.message,'error');return null
   }
 
@@ -1011,20 +1025,31 @@ export function AppProvider({ children }) {
 
   // ── SONGS ───────────────────────────────────────────────
   const addSong = async (data) => {
-    const song = { ...data, id:'s'+Date.now(), usageCount:0, status:'active', titleAr:data.title||'', arrangements:data.arrangements||[], themes:data.themes||[], sequence:data.sequence||[] }
+    if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
+    const title=normalizeRequiredText(data.title)
+    const titleEn=normalizeRequiredText(data.titleEn)
+    if(isBlankText(title)&&isBlankText(titleEn)){const message='Song title is required.';toast(message,'error');return {error:message}}
+    const cleanData={...data,title,titleEn}
+    const song = { ...cleanData, id:'s'+Date.now(), usageCount:0, status:'active', titleAr:title, arrangements:data.arrangements||[], themes:data.themes||[], sequence:data.sequence||[] }
     if (isDemoMode) { setSongs(prev => [...prev, song]); toast('Song added'); return { success:true } }
-    const { data:s, error } = await supabase.from('songs').insert({ title:data.titleEn||data.title, title_ar:data.title, author:data.author||'', key:data.key, bpm:data.bpm||null, time_signature:data.timeSignature||'4/4', language:data.language||'ar', sequence:data.sequence||[], themes:data.themes||[], notes:data.notes||'', ccli_number:data.ccliNumber||'', usage_count:0, status:'active', created_by:currentUser.id }).select().single()
+    const { data:s, error } = await supabase.from('songs').insert({ title:titleEn||title, title_ar:title, author:data.author||'', key:data.key, bpm:data.bpm||null, time_signature:data.timeSignature||'4/4', language:data.language||'ar', sequence:data.sequence||[], themes:data.themes||[], notes:data.notes||'', ccli_number:data.ccliNumber||'', usage_count:0, status:'active', created_by:currentUser.id }).select().single()
     if (error) { toast(error.message,'error'); return { error:error.message } }
     setSongs(prev => [...prev, normalizeSong(s)]); toast('Song added'); return { success:true }
   }
   const updateSong = async (id, data) => {
-    if (isDemoMode) { setSongs(prev => prev.map(s => s.id===id?{...s,...data,titleAr:data.title}:s)); toast('Song updated'); return { success:true } }
-    const { error } = await supabase.from('songs').update({ title:data.titleEn||data.title, title_ar:data.title, author:data.author, key:data.key, bpm:data.bpm||null, time_signature:data.timeSignature, language:data.language, sequence:data.sequence||[], themes:data.themes||[], notes:data.notes||'', ccli_number:data.ccliNumber||'' }).eq('id',id).select('id').single()
+    if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
+    const title=normalizeRequiredText(data.title)
+    const titleEn=normalizeRequiredText(data.titleEn)
+    if(isBlankText(title)&&isBlankText(titleEn)){const message='Song title is required.';toast(message,'error');return {error:message}}
+    const cleanData={...data,title,titleEn}
+    if (isDemoMode) { setSongs(prev => prev.map(s => s.id===id?{...s,...cleanData,titleAr:title}:s)); toast('Song updated'); return { success:true } }
+    const { error } = await supabase.from('songs').update({ title:titleEn||title, title_ar:title, author:data.author, key:data.key, bpm:data.bpm||null, time_signature:data.timeSignature, language:data.language, sequence:data.sequence||[], themes:data.themes||[], notes:data.notes||'', ccli_number:data.ccliNumber||'' }).eq('id',id).select('id').single()
     if (error) { toast(error.message,'error'); return { error:error.message } }
-    setSongs(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Song updated')
+    setSongs(prev => prev.map(s => s.id===id?{...s,...cleanData}:s)); toast('Song updated')
     return { success:true }
   }
   const deleteSong = async (id) => {
+    if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
     if (isDemoMode) { setSongs(prev => prev.map(s => s.id===id?{...s,status:'inactive'}:s)); toast('Song archived'); return }
     const { error } = await supabase.from('songs').update({ status:'inactive' }).eq('id',id).select('id').single()
     if (error) { toast(error.message,'error'); return { error:error.message } }
@@ -1162,6 +1187,10 @@ export function AppProvider({ children }) {
 
   // ── SERVICES ────────────────────────────────────────────
   const addService = async (data) => {
+    if(!hasPermission(currentUser,'services.create'))return {error:'You do not have permission to create services.'}
+    const title=normalizeRequiredText(data.title)
+    if(isBlankText(title)){const message='Service title is required.';toast(message,'error');return {error:message}}
+    data={...data,title}
     const totalOccurrences = data.recurrence?.enabled
       ? Math.max(2, Number(data.recurrence?.count) || 2)
       : 1
@@ -1211,6 +1240,8 @@ export function AppProvider({ children }) {
   }
 
   const updateService = async (id, data) => {
+    if(!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to edit services.'}
+    if(data.title!==undefined){const title=normalizeRequiredText(data.title);if(isBlankText(title)){const message='Service title is required.';toast(message,'error');return {error:message}};data={...data,title}}
     if (isDemoMode) { setServices(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Service updated'); return { success:true } }
     const u = {}
     ;['title','date','time','type','status','notes','practice'].forEach(k => { if (data[k]!==undefined) u[k]=data[k] })
@@ -1371,6 +1402,11 @@ export function AppProvider({ children }) {
 
   // ── ANNOUNCEMENTS ───────────────────────────────────────
   const addAnnouncement = async (data) => {
+    if(!hasPermission(currentUser,'announcements.manage'))return {error:'You do not have permission to manage announcements.'}
+    const title=normalizeRequiredText(data.title)
+    const content=normalizeRequiredText(data.content)
+    if(isBlankText(title)||isBlankText(content)){const message='Announcement title and message are required.';toast(message,'error');return {error:message}}
+    data={...data,title,content}
     const ann = { ...data, id:'a'+Date.now(), author_id:currentUser.id, authorName:currentUser.name||currentUser.email, created_at:new Date().toISOString() }
     if (isDemoMode) { setAnnouncements(prev => [ann,...prev]); toast('Posted'); return }
     const { data:a, error } = await supabase.from('announcements').insert({ title:data.title, content:data.content, priority:data.priority||'normal', author_id:currentUser.id }).select('*, author:profiles(name)').single()
@@ -1380,6 +1416,7 @@ export function AppProvider({ children }) {
   }
 
   const deleteAnnouncement = async (id) => {
+    if(!hasPermission(currentUser,'announcements.manage'))return {error:'You do not have permission to manage announcements.'}
     if (isDemoMode) { setAnnouncements(prev => prev.filter(a => a.id!==id)); toast('Deleted','error'); return }
     const { error } = await supabase.from('announcements').delete().eq('id',id).select('id').single()
     if (error) { toast(error.message,'error'); return { error:error.message } }
@@ -1411,6 +1448,11 @@ export function AppProvider({ children }) {
 
   // ── EVENTS & RSVP ───────────────────────────────────────
   const addEvent = async (data) => {
+    if(!hasPermission(currentUser,'events.manage'))return {error:'You do not have permission to manage events.'}
+    const title=normalizeRequiredText(data.title)
+    const titleEn=normalizeRequiredText(data.titleEn)
+    if(isBlankText(title)&&isBlankText(titleEn)){const message='Event title is required.';toast(message,'error');return {error:message}}
+    data={...data,title,titleEn}
     const localEvent = { ...data, id:`evt_${Date.now()}`, created_by:currentUser.id, created_at:new Date().toISOString() }
     if (isDemoMode) { setEvents(prev => [localEvent, ...prev]); toast('Event created'); return { success:true, data:localEvent } }
     const payload = {
@@ -1426,6 +1468,11 @@ export function AppProvider({ children }) {
   }
 
   const updateEvent = async (id, data) => {
+    if(!hasPermission(currentUser,'events.manage'))return {error:'You do not have permission to manage events.'}
+    const title=normalizeRequiredText(data.title)
+    const titleEn=normalizeRequiredText(data.titleEn)
+    if(isBlankText(title)&&isBlankText(titleEn)){const message='Event title is required.';toast(message,'error');return {error:message}}
+    data={...data,title,titleEn}
     if (isDemoMode) { setEvents(prev => prev.map(event => event.id===id ? { ...event, ...data } : event)); toast('Event updated'); return { success:true } }
     const payload = {
       title:data.titleEn||data.title, title_ar:data.title,
@@ -1440,6 +1487,7 @@ export function AppProvider({ children }) {
   }
 
   const deleteEvent = async (id) => {
+    if(!hasPermission(currentUser,'events.manage'))return {error:'You do not have permission to manage events.'}
     if (isDemoMode) {
       setEvents(prev => prev.map(event => event.id===id?{...event,status:'cancelled'}:event))
       toast('Event cancelled'); return { success:true }
@@ -1464,6 +1512,7 @@ export function AppProvider({ children }) {
 
   // ── ATTENDANCE ──────────────────────────────────────────
   const createAttendanceSession = async (form) => {
+    if(!hasPermission(currentUser,'reports.view')&&!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to manage attendance sessions.'}
     const service = form.serviceId ? services.find(item => item.id===form.serviceId) : null
     const sessionDate = form.sessionDate || service?.date
     const sessionTime = form.sessionTime || service?.time || null
@@ -1473,15 +1522,13 @@ export function AppProvider({ children }) {
       toast(message, 'error')
       return { error:message }
     }
-    const scheduledEnd = sessionDate && endTime ? new Date(`${sessionDate}T${endTime}:00`) : null
-    if (scheduledEnd && sessionTime && endTime <= sessionTime) scheduledEnd.setDate(scheduledEnd.getDate() + 1)
+    const scheduleValidation=validateAttendanceSessionSchedule({sessionDate,sessionTime,endTime,repeatable:Boolean(form.repeatable)},organizationSettings.timezone)
+    if(!scheduleValidation.valid){toast(scheduleValidation.error,'error');return {error:scheduleValidation.error}}
     const expiresAt = form.repeatable
       ? new Date(Date.now() + 90 * 86400000).toISOString()
-      : scheduledEnd && !Number.isNaN(scheduledEnd.getTime())
-        ? new Date(scheduledEnd.getTime() + 6 * 3600000).toISOString()
-        : new Date(Date.now() + 86400000).toISOString()
+      : scheduleValidation.expiresAt.toISOString()
     const localSession = {
-      id:`sess_${Date.now()}`, name:form.name || service?.title || form.label,
+      id:`sess_${Date.now()}`, name:normalizeRequiredText(form.name) || service?.title || form.label,
       service_id:form.serviceId||null, service:service||null, label:form.label,
       session_date:sessionDate, session_time:sessionTime, end_time:endTime,
       max_attendees:form.maxAttendees?Number(form.maxAttendees):null,
@@ -1508,6 +1555,7 @@ export function AppProvider({ children }) {
   }
 
   const closeAttendanceSession = async (sessionId) => {
+    if(!hasPermission(currentUser,'reports.view')&&!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to manage attendance sessions.'}
     if (!isDemoMode) {
       const { error } = await supabase.from('attendance_sessions').update({ active:false }).eq('id',sessionId).select('id').single()
       if (error) { toast(error.message,'error'); return { error:error.message } }

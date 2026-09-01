@@ -2373,6 +2373,7 @@ create policy "Worship managers resolve substitute requests"
   with check (public.can_manage_worship());
 
 -- IMPORTANT FOR FRESH INSTALLS
--- Apply MIGRATION_dynamic_roles_admin.sql immediately after this base schema.
+-- Apply MIGRATION_dynamic_roles_admin.sql and then MIGRATION_qa_hardening.sql
+-- immediately after this base schema.
 -- It is kept as a separate transaction so the same reviewed, rerunnable SQL is
 -- used for both fresh projects and existing production upgrades without drift.

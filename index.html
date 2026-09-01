@@ -7,19 +7,7 @@
     <title>KDEC Worship Platform</title>
     <meta name="description" content="Worship team planning and scheduling platform for Kasr El Doubara Evangelical Church" />
     <meta name="color-scheme" content="light dark" />
-    <script>
-      // Apply the saved/system theme before styles and React render to prevent a light flash.
-      (() => {
-        try {
-          const saved = localStorage.getItem('kdec_theme')
-          const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
-          document.documentElement.classList.toggle('dark', dark)
-          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
-        } catch {
-          document.documentElement.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches)
-        }
-      })()
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

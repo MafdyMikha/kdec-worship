@@ -3,6 +3,7 @@ import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle, CheckCircle, ArrowLeft, Ke
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { KDEC_LOGO } from '../assets/kdecLogo.js'
+import { getDemoAccount } from '../lib/demoAccounts.js'
 
 export default function Login({ inviteCode }) {
   const { login, registerWithInvite, forgotPassword, isDemoMode } = useStore()
@@ -227,12 +228,16 @@ export default function Login({ inviteCode }) {
                 <p className="text-xs font-semibold text-indigo-800 mb-2">
                   {isAr ? 'وضع العرض التجريبي — اختر حساباً للمتابعة' : 'Demo mode — choose an account to continue'}
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button type="button" disabled={loading} onClick={() => handleDemoLogin('mafdy@kdec.org')}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button type="button" disabled={loading} onClick={() => handleDemoLogin(getDemoAccount('admin').email)}
                     className="min-h-10 rounded-lg bg-white border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">
                     {isAr ? 'الدخول كمسؤول' : 'Continue as admin'}
                   </button>
-                  <button type="button" disabled={loading} onClick={() => handleDemoLogin('sarah@kdec.org')}
+                  <button type="button" disabled={loading} onClick={() => handleDemoLogin(getDemoAccount('leader').email)}
+                    className="min-h-10 rounded-lg bg-white border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">
+                    {isAr ? 'الدخول كقائد' : 'Continue as leader'}
+                  </button>
+                  <button type="button" disabled={loading} onClick={() => handleDemoLogin(getDemoAccount('member').email)}
                     className="min-h-10 rounded-lg bg-white border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">
                     {isAr ? 'الدخول كعضو' : 'Continue as member'}
                   </button>
