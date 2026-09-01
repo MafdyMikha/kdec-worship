@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog, StatusDot } from '../components/ui'
 import { buildAttendanceReport, downloadAttendanceReport, formatAttendanceTimestamp } from '../lib/attendanceReport.js'
-import { hasPermission } from '../lib/permissions.js'
+import { getAccessLevelLabel, hasPermission } from '../lib/permissions.js'
 
 const ROLE_COLOR = {
   'Worship Leader':'indigo','Music Director':'purple','Pianist/Keys':'blue',
@@ -30,6 +30,7 @@ function PersonCard({ person, isAdmin, currentUserId, onEdit, onDelete, onAttend
   const phone     = person.whatsapp || person.phone
   const availDays = DAYS_CONFIG.filter(d => person.availability?.[d.key])
   const roles     = getRoles(person)
+  const accessLabel = getAccessLevelLabel(person, isAr ? 'ar' : 'en')
 
   return (
     <Card className="p-4 group hover:shadow-md transition-all">
@@ -41,7 +42,7 @@ function PersonCard({ person, isAdmin, currentUserId, onEdit, onDelete, onAttend
             <span aria-hidden="true"><StatusDot status={person.status}/></span>
             <span className="sr-only">{person.status === 'active' ? t('active') : person.status === 'inactive' ? t('inactive') : t('onLeave')}</span>
           </div>
-          <div className="text-xs text-slate-400">{person.position || t('member') || 'Member'}</div>
+          <div className="text-xs font-medium text-slate-500">{accessLabel}</div>
         </div>
         {isAdmin && (
           <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
@@ -115,12 +116,6 @@ function ByRoleView({ people, isAdmin, currentUserId, onEdit, onDelete, onAttend
 
 // ── Roster (Printable Table) ────────────────────────────────
 function RosterView({ people, t, isAr }) {
-  const POSITION_LABEL = {
-    Leader: isAr ? 'قائد' : 'Leader',
-    Member: isAr ? 'عضو' : 'Member',
-    Volunteer: isAr ? 'متطوع' : 'Volunteer',
-    Admin: isAr ? 'مسؤول' : 'Admin',
-  }
   const STATUS_LABEL = {
     active:    isAr ? 'نشط' : 'Active',
     inactive:  isAr ? 'غير نشط' : 'Inactive',
@@ -140,7 +135,7 @@ function RosterView({ people, t, isAr }) {
                 <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">#</th>
                 <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('name')}</th>
                 <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('role')}</th>
-                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('position')}</th>
+                <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{isAr ? 'صلاحية النظام' : 'System access'}</th>
                 <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('phone')}</th>
                 <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('email')}</th>
                 <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('active')}</th>
@@ -162,7 +157,7 @@ function RosterView({ people, t, isAr }) {
                       {getRoles(p).length === 0 && '—'}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{POSITION_LABEL[p.position] || p.position || '—'}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs">{getAccessLevelLabel(p, isAr ? 'ar' : 'en')}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs" dir="ltr">{p.whatsapp || p.phone || '—'}</td>
                   <td className="px-4 py-3 text-slate-500 text-xs truncate max-w-[150px]">{p.email || '—'}</td>
                   <td className="px-4 py-3"><StatusDot status={p.status}/> <span className="text-xs text-slate-500">{STATUS_LABEL[p.status] || p.status}</span></td>

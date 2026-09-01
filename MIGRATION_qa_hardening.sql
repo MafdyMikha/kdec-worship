@@ -21,7 +21,7 @@ returns table (
   avatar_url text,
   role text,
   roles jsonb,
-  position text,
+  "position" text,
   status text
 )
 language sql stable security definer
@@ -72,7 +72,7 @@ begin
   if exists(select 1 from public.invitations where lower(email)=v_email and status='pending' and expires_at>now()) then raise exception 'A pending invitation already exists for this email'; end if;
   if coalesce(cardinality(p_role_ids),0)=0 or p_primary_role_id is null or not(p_primary_role_id=any(p_role_ids)) then raise exception 'Select roles and a primary role'; end if;
   if exists(select 1 from unnest(p_role_ids) as selected(role_id) left join public.worship_roles role on role.id=selected.role_id where role.id is null or not role.active) then raise exception 'Invitations require active roles'; end if;
-  select array_agg(role.name order by mapping.position),max(role.name) filter(where role.id=p_primary_role_id) into v_names,v_primary_name from unnest(p_role_ids) with ordinality mapping(role_id,position) join public.worship_roles role on role.id=mapping.role_id;
+  select array_agg(role.name order by mapping.role_order),max(role.name) filter(where role.id=p_primary_role_id) into v_names,v_primary_name from unnest(p_role_ids) with ordinality mapping(role_id,role_order) join public.worship_roles role on role.id=mapping.role_id;
   insert into public.invitations(code,email,role,roles,method,status,created_by,expires_at,access_level)
   values(p_code,v_email,v_primary_name,to_jsonb(v_names),p_method,'pending',auth.uid(),now()+interval '7 days',p_access_level) returning * into v_invitation;
   insert into public.invitation_worship_roles(invitation_id,role_id,is_primary)
@@ -114,5 +114,7 @@ create trigger attendance_session_schedule_guard
   before insert or update of session_date,session_time,end_time,repeatable
   on public.attendance_sessions
   for each row execute function public.guard_attendance_session_schedule();
+
+notify pgrst, 'reload schema';
 
 commit;

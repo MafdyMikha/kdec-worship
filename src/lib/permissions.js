@@ -43,6 +43,11 @@ export function getAccessLevel(user) {
   return String(user?.position||'').toLowerCase()==='leader' ? 'leader' : 'member'
 }
 
+export function getAccessLevelLabel(user, language = 'en') {
+  const level=getAccessLevel(user)
+  return ACCESS_LEVEL_LABELS[level]?.[language==='ar'?'ar':'en'] || level
+}
+
 export function isSuperAdminUser(user) {
   return getAccessLevel(user)==='super_admin'
 }

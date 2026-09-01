@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { canAccessAdminControl, canManageWorship, getAccessLevel, getUserRoles, hasAnyPermission, hasPermission, isAdminUser, isSuperAdminUser, normalizeRoleName } from '../src/lib/permissions.js'
+import { canAccessAdminControl, canManageWorship, getAccessLevel, getAccessLevelLabel, getUserRoles, hasAnyPermission, hasPermission, isAdminUser, isSuperAdminUser, normalizeRoleName } from '../src/lib/permissions.js'
 
 test('worship roles do not grant system permissions',()=>{
   const user={roles:['Worship Leader'],accessLevel:'member',status:'active'}
@@ -18,6 +18,8 @@ test('super admin receives all permissions',()=>{
   const user={accessLevel:'super_admin',status:'active'}
   assert.equal(isSuperAdminUser(user),true)
   assert.equal(hasPermission(user,'permissions.manage'),true)
+  assert.equal(getAccessLevelLabel(user,'en'),'Super Admin')
+  assert.equal(getAccessLevelLabel(user,'ar'),'مسؤول أعلى')
 })
 
 test('database role assignments take precedence over legacy role strings',()=>{
