@@ -10,12 +10,10 @@ import { ar as arLocale } from 'date-fns/locale'
 import { ACCESS_LEVEL_LABELS, isAdminUser } from '../../lib/permissions.js'
 
 function useDarkMode() {
-  const [dark, setDark] = useState(() => {
-    const saved = localStorage.getItem('kdec_theme')
-    return saved ? saved === 'dark' : false
-  })
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
   useEffect(() => {
     dark ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark')
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
     localStorage.setItem('kdec_theme', dark ? 'dark' : 'light')
   }, [dark])
   return [dark, () => setDark(d => !d)]
@@ -44,7 +42,7 @@ export default function Header({ title }) {
     : format(new Date(), 'EEE, MMM d')
 
   return (
-    <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-3 md:px-6 flex-shrink-0 gap-2 z-20">
+    <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-3 md:px-6 flex-shrink-0 gap-2 z-20">
       {/* Page title */}
       <h1 className="font-display font-semibold text-slate-800 text-base md:text-lg truncate flex-1">
         {title}
@@ -61,14 +59,14 @@ export default function Header({ title }) {
             onClick={() => setLang('ar')}
             aria-pressed={lang === 'ar'}
             aria-label="العربية"
-            className={`px-2 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-all select-none ${lang === 'ar' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+            className={`px-2 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-all select-none ${lang === 'ar' ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
             AR
           </button>
           <button
             onClick={() => setLang('en')}
             aria-pressed={lang === 'en'}
             aria-label="English"
-            className={`px-2 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-all select-none ${lang === 'en' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+            className={`px-2 py-1.5 rounded-md text-xs font-bold cursor-pointer transition-all select-none ${lang === 'en' ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
             EN
           </button>
         </div>
@@ -115,7 +113,7 @@ export default function Header({ title }) {
           </button>
 
           {open && (
-            <div role="menu" className={`absolute ${isAr ? 'left-0' : 'right-0'} top-full mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-50 animate-scale-in`}>
+            <div role="menu" className={`absolute ${isAr ? 'left-0' : 'right-0'} top-full mt-1.5 w-52 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1.5 z-50 animate-scale-in`}>
               {/* User info */}
               <div className="px-3 py-2.5 border-b border-slate-100 mb-1">
                 <div className="text-sm font-semibold text-slate-700" dir="auto">{currentUser?.name}</div>

@@ -63,7 +63,7 @@ function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{isAr?`البدائل المتاحة (${subs.length})`:`Available Substitutes (${subs.length})`}</p>
             {subs.map(p=>(
               <div key={p.id} className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold">
+                <div className="w-8 h-8 rounded-full bg-emerald-700 flex items-center justify-center text-white text-xs font-bold">
                   {p.name.split(' ').map(w=>w[0]).join('').slice(0,2)}
                 </div>
                 <div><div className="text-sm font-medium text-slate-800">{p.name}</div><div className="text-xs text-slate-500">{((Array.isArray(p.roles) && p.roles.length>0) ? p.roles : (p.role?[p.role]:[])).join(', ')}</div></div>

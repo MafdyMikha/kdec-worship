@@ -484,7 +484,7 @@ export default function WhatsAppBulk() {
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
                             wasOpened
                               ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                              : 'bg-emerald-700 hover:bg-emerald-800 text-white'
                           } disabled:opacity-40 disabled:cursor-not-allowed`}>
                           {wasOpened ? <><Check size={12} aria-hidden="true"/> {isAr ? 'فتح مجدداً' : 'Open again'}</> : <><WaIcon size={12}/> {isAr ? 'فتح' : 'Open'}</>}
                         </button>

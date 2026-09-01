@@ -94,7 +94,7 @@ export default function Invitations() {
           </div>
           <div className="flex gap-3">
             <button onClick={()=>handleWhatsApp(created)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 cursor-pointer">
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 text-white rounded-xl text-sm font-medium hover:bg-emerald-800 cursor-pointer">
               <WA/> {isAr?'واتساب':'WhatsApp'}
             </button>
             <button onClick={()=>handleEmail(created)}

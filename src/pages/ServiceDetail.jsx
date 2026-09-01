@@ -287,7 +287,7 @@ export default function ServiceDetail() {
                     ? await addTeamMember(id,p.id,subModal.role)
                     : await requestSubstitute(id,subModal.role,`${isAr?'البديل المفضل':'Preferred substitute'}: ${p.name}`)
                     if(!result?.error)setSubModal(null)}}
-                    className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-medium rounded-lg cursor-pointer hover:bg-emerald-600">
+                    className="px-3 py-1.5 bg-emerald-700 text-white text-xs font-medium rounded-lg cursor-pointer hover:bg-emerald-800">
                     {canEdit?t('addAsSub'):(isAr?'طلب هذا البديل':'Request this substitute')}
                   </button>
                 </div>

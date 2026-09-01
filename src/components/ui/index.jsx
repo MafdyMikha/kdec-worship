@@ -5,14 +5,14 @@ import { useLang } from '../../lib/i18n.jsx'
 
 // Button
 export function Btn({ children, onClick, variant = 'primary', size = 'md', className = '', disabled, type = 'button', icon, ...props }) {
-  const base = 'inline-flex items-center gap-2 font-medium rounded-lg cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95'
+  const base = 'inline-flex items-center gap-2 font-medium rounded-lg cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95'
   const variants = {
     primary:   'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm',
-    secondary: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm',
-    ghost:     'text-slate-600 hover:bg-slate-100 hover:text-slate-800',
+    secondary: 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm',
+    ghost:     'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white',
     danger:    'bg-red-600 text-white hover:bg-red-700 shadow-sm',
     success:   'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
-    outline:   'border border-indigo-200 text-indigo-700 hover:bg-indigo-50',
+    outline:   'border border-indigo-200 dark:border-indigo-500/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10',
   }
   const sizes = {
     xs: 'px-2.5 py-1.5 text-xs min-h-[32px]',
@@ -32,15 +32,15 @@ export function Btn({ children, onClick, variant = 'primary', size = 'md', class
 // Badge
 export function Badge({ children, color = 'slate', size = 'sm', className='' }) {
   const colors = {
-    slate: 'bg-slate-100 text-slate-700',
-    indigo: 'bg-indigo-100 text-indigo-700',
-    green: 'bg-emerald-100 text-emerald-700',
-    red: 'bg-red-100 text-red-700',
-    yellow: 'bg-amber-100 text-amber-700',
-    blue: 'bg-blue-100 text-blue-700',
-    purple: 'bg-purple-100 text-purple-700',
-    orange: 'bg-orange-100 text-orange-700',
-    pink: 'bg-pink-100 text-pink-700',
+    slate: 'bg-slate-100 dark:bg-slate-700/70 text-slate-700 dark:text-slate-200',
+    indigo: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300',
+    green: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300',
+    red: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300',
+    yellow: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300',
+    blue: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300',
+    purple: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300',
+    orange: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300',
+    pink: 'bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300',
   }
   const sizes = { xs: 'px-1.5 py-0.5 text-xs', sm: 'px-2 py-0.5 text-xs', md: 'px-2.5 py-1 text-sm' }
   return <span className={`inline-flex items-center font-medium rounded-full ${colors[color]} ${sizes[size]} ${className}`}>{children}</span>
@@ -49,7 +49,8 @@ export function Badge({ children, color = 'slate', size = 'sm', className='' }) 
 // Avatar
 export function Avatar({ name, size = 'md', color }) {
   const initials = name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
-  const colors = ['bg-indigo-500', 'bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-pink-500', 'bg-cyan-500']
+  // Darker avatar fills keep white initials above WCAG contrast targets.
+  const colors = ['bg-indigo-600', 'bg-violet-600', 'bg-blue-600', 'bg-emerald-700', 'bg-amber-700', 'bg-rose-600', 'bg-pink-600', 'bg-cyan-700']
   const bg = color || colors[name?.charCodeAt(0) % colors.length] || colors[0]
   const sizes = { xs: 'w-6 h-6 text-xs', sm: 'w-8 h-8 text-xs', md: 'w-9 h-9 text-sm', lg: 'w-11 h-11 text-base', xl: 'w-14 h-14 text-lg' }
   return <div className={`${bg} ${sizes[size]} rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0`}>{initials}</div>
@@ -124,17 +125,17 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }) {
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm animate-fade-in" onClick={onClose} aria-hidden="true" />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative w-full ${sizes[size]} bg-white sm:rounded-2xl rounded-t-2xl shadow-modal animate-slide-up sm:animate-scale-in max-h-[92vh] flex flex-col`}>
+        className={`relative w-full ${sizes[size]} bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700 sm:rounded-2xl rounded-t-2xl shadow-modal animate-slide-up sm:animate-scale-in max-h-[92vh] flex flex-col`}>
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
-          <div className="w-10 h-1 bg-slate-200 rounded-full"/>
+          <div className="w-10 h-1 bg-slate-200 dark:bg-slate-600 rounded-full"/>
         </div>
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex-shrink-0">
           <h2 id={titleId} className="text-base sm:text-lg font-display font-semibold text-slate-800">{title}</h2>
@@ -162,7 +163,7 @@ export function Input({ label, required, error, className = '', ...props }) {
   return (
     <div className={className}>
       {label && <Label htmlFor={id} required={required}>{label}</Label>}
-      <input id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${error ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} {...props} />
+      <input id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${error ? 'border-red-300 dark:border-red-500 bg-red-50 dark:bg-red-500/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-600'}`} {...props} />
       {error && <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
     </div>
   )
@@ -175,7 +176,7 @@ export function Select({ label, required, error, children, className = '', ...pr
   return (
     <div className={className}>
       {label && <Label htmlFor={id} required={required}>{label}</Label>}
-      <select id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none bg-white ${error ? 'border-red-300' : 'border-slate-200 hover:border-slate-300'}`} {...props}>
+      <select id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all appearance-none bg-white dark:bg-slate-900/60 ${error ? 'border-red-300 dark:border-red-500' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`} {...props}>
         {children}
       </select>
       {error && <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
@@ -190,7 +191,7 @@ export function Textarea({ label, required, error, className = '', ...props }) {
   return (
     <div className={className}>
       {label && <Label htmlFor={id} required={required}>{label}</Label>}
-      <textarea id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none ${error ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'}`} rows={3} {...props} />
+      <textarea id={id} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']} className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none ${error ? 'border-red-300 dark:border-red-500 bg-red-50 dark:bg-red-500/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-600'}`} rows={3} {...props} />
       {error && <p id={errorId} className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
     </div>
   )
@@ -208,7 +209,7 @@ export function Card({ children, className = '', onClick, hover = false, ...prop
     : undefined
   return (
     <div onClick={onClick} onKeyDown={handleKeyDown} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} {...props}
-      className={`bg-white rounded-xl border border-slate-200/80 shadow-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer' : ''} transition-all ${className}`}>
+      className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer' : ''} transition-all ${className}`}>
       {children}
     </div>
   )
@@ -233,7 +234,7 @@ export function SearchInput({ value, onChange, placeholder = 'Search...', classN
       <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
         aria-label={placeholder}
-        className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white placeholder:text-slate-400 hover:border-slate-300 transition-all" />
+        className="w-full pl-9 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-900/60 placeholder:text-slate-400 dark:placeholder:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600 transition-all" />
     </div>
   )
 }
@@ -250,7 +251,7 @@ export function Notifications({ items }) {
   return (
     <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-live="polite" aria-atomic="true">
       {items.map(n => (
-        <div key={n.id} className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 shadow-modal border border-slate-100 animate-slide-up min-w-64">
+        <div key={n.id} className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-xl px-4 py-3 shadow-modal border border-slate-100 dark:border-slate-700 animate-slide-up min-w-64">
           {icons[n.type] || icons.success}
           <span className="text-sm font-medium text-slate-700">{n.msg}</span>
         </div>

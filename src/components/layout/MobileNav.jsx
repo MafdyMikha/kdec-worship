@@ -82,7 +82,7 @@ export default function MobileNav() {
         <div className="md:hidden fixed inset-0 z-40" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
           <div
-            className={`absolute bottom-16 ${isAr ? 'left-2 right-2' : 'left-2 right-2'} bg-white rounded-2xl shadow-2xl p-4 z-50`}
+            className={`absolute bottom-16 ${isAr ? 'left-2 right-2' : 'left-2 right-2'} bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700 rounded-2xl shadow-2xl p-4 z-50`}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold text-slate-700">
@@ -120,7 +120,7 @@ export default function MobileNav() {
       )}
 
       {/* Bottom nav bar — mobile only */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 safe-bottom">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-bottom">
         <div className="flex items-center">
           {primary.map(item => (
             <NavLink

@@ -102,7 +102,7 @@ export default function WhatsAppNotify({ service }) {
                       className={`p-1.5 rounded-lg cursor-pointer transition-all flex items-center gap-1.5 text-xs font-medium px-2.5 ${
                         sent[entry.personId]
                           ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                          : 'bg-emerald-700 text-white hover:bg-emerald-800'
                       }`}>
                       {sent[entry.personId] ? <><Check size={13}/> {t('sent')}</> : <><WA size={13}/> {t('send')}</>}
                     </button>

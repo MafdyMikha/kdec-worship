@@ -182,7 +182,7 @@ function CheckInWidget({ record, session, timezone, lateMins, onCheckIn, onCheck
         </div>
         {error&&<p className="text-sm text-red-600" role="alert">{error}</p>}
         <button onClick={() => doAction('out')} disabled={loading}
-          className="px-6 py-2.5 bg-amber-500 text-white text-sm font-medium rounded-xl cursor-pointer hover:bg-amber-600 disabled:opacity-60 transition-all flex items-center gap-2 mx-auto">
+          className="px-6 py-2.5 bg-amber-700 text-white text-sm font-medium rounded-xl cursor-pointer hover:bg-amber-800 disabled:opacity-60 transition-all flex items-center gap-2 mx-auto">
           {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <X size={15}/>}
           {loading ? '...' : t('checkOut')}
         </button>
