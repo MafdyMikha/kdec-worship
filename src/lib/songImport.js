@@ -317,6 +317,20 @@ function unwrapChordToken(value) {
   return null
 }
 
+function unwrapChordProgression(value) {
+  let token=value
+  let suffix=''
+  while(/[|,;:]$/.test(token)){suffix=token.at(-1)+suffix;token=token.slice(0,-1)}
+  const parts=token.split(/([-–—])/)
+  const chords=parts.filter((_,index)=>index%2===0)
+  if(chords.length<2||chords.some(chord=>!parseChordSymbol(chord)))return null
+  return {parts,suffix}
+}
+
+function transposeChordProgression(progression,semitones) {
+  return `${progression.parts.map((part,index)=>index%2===0?transposeChordSymbol(part,semitones):part).join('')}${progression.suffix}`
+}
+
 function transposeChordLine(line,semitones) {
   let next=line.replace(/\[([^\]]+)]/g,(match,content)=>{
     const parts=content.split(/(\s+|\||,)/)
@@ -330,7 +344,11 @@ function transposeChordLine(line,semitones) {
   })
 
   const parts=next.split(/(\s+|\|)/)
-  const candidates=parts.map((part,index)=>({index,parsed:part.startsWith('[')?null:unwrapChordToken(part)})).filter(item=>item.parsed)
+  const candidates=parts.map((part,index)=>({
+    index,
+    parsed:part.startsWith('[')?null:unwrapChordToken(part),
+    progression:part.startsWith('[')?null:unwrapChordProgression(part),
+  })).filter(item=>item.parsed||item.progression)
   const visibleParts=parts.filter(part=>part.trim()&&part!=='|').length
   const chordLine=candidates.length>0&&(
     candidates.length>=2 ||
@@ -339,8 +357,10 @@ function transposeChordLine(line,semitones) {
     /[\u0600-\u06ff]/.test(next)
   )
   if(!chordLine)return next
-  candidates.forEach(({index,parsed})=>{
-    parts[index]=`${parsed.prefix}${transposeChordSymbol(parsed.core,semitones)}${parsed.suffix}`
+  candidates.forEach(({index,parsed,progression})=>{
+    parts[index]=progression
+      ? transposeChordProgression(progression,semitones)
+      : `${parsed.prefix}${transposeChordSymbol(parsed.core,semitones)}${parsed.suffix}`
   })
   return parts.join('')
 }

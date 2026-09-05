@@ -67,6 +67,40 @@ test('transposition preserves chart spacing, bar lines, directives, and unsuppor
   assert.equal(transposeChord(chart,2),'{key: C}\n| C | G/B | Am7 | Fadd9 |\nN.C.')
 })
 
+test('transposition keeps a plain title intact and transposes every chord in the reported chart layout', () => {
+  const chart=[
+    'Draw Me Close To You',
+    'Intro:',
+    'F# - B - F# - B - E/A - A',
+    'Verse 1',
+    'A D/A',
+    'Draw me close to You',
+    'E/A A',
+    'Never let me go E/A D/G',
+    'F#m E D',
+    'A/F D/F',
+    'Help me find the way,',
+    'A–D–E',
+    'Bring me back to You',
+  ].join('\n')
+  const expected=[
+    'Draw Me Close To You',
+    'Intro:',
+    'G - C - G - C - F/A# - A#',
+    'Verse 1',
+    'A# D#/A#',
+    'Draw me close to You',
+    'F/A# A#',
+    'Never let me go F/A# D#/G#',
+    'Gm F D#',
+    'A#/F# D#/F#',
+    'Help me find the way,',
+    'A#–D#–F',
+    'Bring me back to You',
+  ].join('\n')
+  assert.equal(transposeChord(chart,1),expected)
+})
+
 test('chart matching uses normalized filenames and detects musical key', () => {
   const result = matchChordFile({ fileName:'Worthy-of-It-All-G.pdf' }, [{ id:'s1', title:'Worthy of It All', author:'David Brymer' }])
   assert.equal(result.matchedSongId, 's1')
