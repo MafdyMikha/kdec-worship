@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   buildSongImportPreview, buildSongTemplateCsv, detectSongLanguage, findDuplicateSong,
   matchChordFile, normalizeSongIdentity, parseChordPro, parseDelimitedText,
-  parseLyricsSections, parsePastedSongs, rowsToSongImports, slugifySongPath,
+  parseLyricsSections, parsePastedSongs, rowsToSongImports, slugifySongPath, transposeChord,
 } from '../src/lib/songImport.js'
 
 test('CSV parsing preserves quoted multiline Arabic lyrics', () => {
@@ -50,6 +50,21 @@ test('ChordPro parser preserves Arabic lyrics and separates LTR chord symbols', 
   assert.equal(parsed.metadata.key, 'G')
   assert.deepEqual(parsed.lines.at(-1).segments.filter(segment => segment.type === 'chord').map(segment => segment.text), ['G','C'])
   assert.equal(parsed.lines.at(-1).direction, 'rtl')
+})
+
+test('transposition handles full chord lines, extensions, accidentals, and slash bass notes', () => {
+  const chart='G  C/E  Am7  F#m  Bbmaj7  Gsus4  Cadd9  D/F#'
+  assert.equal(transposeChord(chart,2),'A  D/F#  Bm7  G#m  Cmaj7  Asus4  Dadd9  E/G#')
+})
+
+test('transposition handles ChordPro brackets and Arabic inline chord tokens without changing lyrics', () => {
+  const chart='[Verse 1]\n[G]Amazing grace [C/E]how sweet\nأنت صالح C\nA mighty God is here'
+  assert.equal(transposeChord(chart,2),'[Verse 1]\n[A]Amazing grace [D/F#]how sweet\nأنت صالح D\nA mighty God is here')
+})
+
+test('transposition preserves chart spacing, bar lines, directives, and unsupported notation', () => {
+  const chart='{key: Bb}\n| Bb | F/A | Gm7 | Ebadd9 |\nN.C.'
+  assert.equal(transposeChord(chart,2),'{key: C}\n| C | G/B | Am7 | Fadd9 |\nN.C.')
 })
 
 test('chart matching uses normalized filenames and detects musical key', () => {

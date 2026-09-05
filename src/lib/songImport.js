@@ -282,17 +282,74 @@ export function detectChartKey(fileName, parsedChordPro = null) {
 const SHARP_NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
 const FLAT_NOTES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B']
 
+const CHORD_SUFFIX = /^(?:m(?:aj)?|maj|min|dim|aug|sus|add|no|M|Δ|ø|°|\+|-|\d|[#b]\d|\([^()\s]*\))*$/
+
+function parseChordSymbol(value) {
+  const match=String(value).match(/^([A-G])([#b]?)([^/\s]*)(?:\/([A-G])([#b]?))?$/)
+  if(!match||!CHORD_SUFFIX.test(match[3]))return null
+  return {root:`${match[1]}${match[2]}`,suffix:match[3],bass:match[4]?`${match[4]}${match[5]}`:''}
+}
+
+function transposeNote(note,semitones) {
+  let index=SHARP_NOTES.indexOf(note)
+  if(index<0)index=FLAT_NOTES.indexOf(note)
+  if(index<0)return note
+  const notes=note.endsWith('b')?FLAT_NOTES:SHARP_NOTES
+  return notes[(index+Number(semitones)+120)%12]
+}
+
+function transposeChordSymbol(value,semitones) {
+  const parsed=parseChordSymbol(value)
+  if(!parsed)return value
+  const root=transposeNote(parsed.root,semitones)
+  const bass=parsed.bass?`/${transposeNote(parsed.bass,semitones)}`:''
+  return `${root}${parsed.suffix}${bass}`
+}
+
+function unwrapChordToken(value) {
+  let token=value
+  let prefix=''
+  let suffix=''
+  while(token.startsWith('|')){prefix+='|';token=token.slice(1)}
+  while(/[|,;:]$/.test(token)){suffix=token.at(-1)+suffix;token=token.slice(0,-1)}
+  if(parseChordSymbol(token))return {prefix,core:token,suffix}
+  if(token.startsWith('(')&&token.endsWith(')')&&parseChordSymbol(token.slice(1,-1)))return {prefix:`${prefix}(`,core:token.slice(1,-1),suffix:`)${suffix}`}
+  return null
+}
+
+function transposeChordLine(line,semitones) {
+  let next=line.replace(/\[([^\]]+)]/g,(match,content)=>{
+    const parts=content.split(/(\s+|\||,)/)
+    const chordCount=parts.filter(part=>parseChordSymbol(part)).length
+    if(!chordCount)return match
+    return `[${parts.map(part=>transposeChordSymbol(part,semitones)).join('')}]`
+  })
+  next=next.replace(/\{(key|transpose)\s*:\s*([^}]+)}/gi,(match,directive,key)=>{
+    const parsed=unwrapChordToken(key.trim())
+    return parsed?`{${directive}: ${parsed.prefix}${transposeChordSymbol(parsed.core,semitones)}${parsed.suffix}}`:match
+  })
+
+  const parts=next.split(/(\s+|\|)/)
+  const candidates=parts.map((part,index)=>({index,parsed:part.startsWith('[')?null:unwrapChordToken(part)})).filter(item=>item.parsed)
+  const visibleParts=parts.filter(part=>part.trim()&&part!=='|').length
+  const chordLine=candidates.length>0&&(
+    candidates.length>=2 ||
+    visibleParts===1 ||
+    candidates.length/Math.max(visibleParts,1)>=0.5 ||
+    /[\u0600-\u06ff]/.test(next)
+  )
+  if(!chordLine)return next
+  candidates.forEach(({index,parsed})=>{
+    parts[index]=`${parsed.prefix}${transposeChordSymbol(parsed.core,semitones)}${parsed.suffix}`
+  })
+  return parts.join('')
+}
+
 export function transposeChord(chord, semitones = 0) {
   const value=String(chord ?? '')
   if (!semitones || !value) return value
-  return value.replace(/(^|\/)([A-G])([#b]?)/g, (match,prefix,note,accidental) => {
-    const source=`${note}${accidental}`
-    let index=SHARP_NOTES.indexOf(source)
-    if(index<0)index=FLAT_NOTES.indexOf(source)
-    if(index<0)return match
-    const notes=accidental==='b'?FLAT_NOTES:SHARP_NOTES
-    return `${prefix}${notes[(index+Number(semitones)+120)%12]}`
-  })
+  if(parseChordSymbol(value))return transposeChordSymbol(value,semitones)
+  return value.split('\n').map(line=>transposeChordLine(line,semitones)).join('\n')
 }
 
 function titleCandidates(song) {
