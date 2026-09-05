@@ -9,6 +9,16 @@ begin;
 alter table public.songs drop constraint if exists songs_language_check;
 alter table public.songs
   add constraint songs_language_check check (language in ('en','ar','both','other'));
+alter table public.songs drop constraint if exists songs_bpm_range_check;
+alter table public.songs add constraint songs_bpm_range_check
+  check (bpm is null or bpm between 20 and 300) not valid;
+alter table public.songs drop constraint if exists songs_time_signature_format_check;
+alter table public.songs add constraint songs_time_signature_format_check
+  check (time_signature ~ '^[0-9]{1,2}/[0-9]{1,2}$') not valid;
+alter table public.songs drop constraint if exists songs_key_supported_check;
+alter table public.songs add constraint songs_key_supported_check check (
+  key = any(array['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Cm','C#m','Dbm','Dm','D#m','Ebm','Em','Fm','F#m','Gbm','Gm','G#m','Abm','Am','A#m','Bbm','Bm'])
+) not valid;
 
 create table if not exists public.song_lyrics (
   id          uuid primary key default uuid_generate_v4(),
@@ -41,6 +51,7 @@ create table if not exists public.song_charts (
   chart_key         text not null default '',
   chart_type        text not null check (chart_type in ('pdf','chordpro','txt','docx','image','other')),
   notes             text not null default '',
+  is_inline         boolean not null default false,
   is_primary        boolean not null default false,
   created_by        uuid references public.profiles(id),
   created_at        timestamptz not null default now(),
@@ -49,6 +60,9 @@ create table if not exists public.song_charts (
 
 create unique index if not exists song_charts_primary_uidx
   on public.song_charts(song_id) where is_primary;
+alter table public.song_charts add column if not exists is_inline boolean not null default false;
+create unique index if not exists song_charts_inline_uidx
+  on public.song_charts(song_id) where is_inline;
 create index if not exists song_charts_song_idx on public.song_charts(song_id, created_at desc);
 
 drop trigger if exists song_charts_updated_at on public.song_charts;
@@ -60,7 +74,7 @@ create table if not exists public.song_chart_versions (
   id                 uuid primary key default uuid_generate_v4(),
   chart_id           uuid not null references public.song_charts(id) on delete cascade,
   version            integer not null check (version > 0),
-  storage_path       text not null unique,
+  storage_path       text unique,
   original_filename text not null,
   mime_type          text not null default 'application/octet-stream',
   file_size          bigint not null default 0 check (file_size >= 0 and file_size <= 20971520),
@@ -70,6 +84,17 @@ create table if not exists public.song_chart_versions (
   uploaded_at        timestamptz not null default now(),
   unique(chart_id, version),
   constraint song_chart_storage_path_check check (
+    storage_path is null or (
+      storage_path like 'songs/%'
+      and storage_path not like '%..%'
+    )
+  )
+);
+
+alter table public.song_chart_versions alter column storage_path drop not null;
+alter table public.song_chart_versions drop constraint if exists song_chart_storage_path_check;
+alter table public.song_chart_versions add constraint song_chart_storage_path_check check (
+  storage_path is null or (
     storage_path like 'songs/%'
     and storage_path not like '%..%'
   )
@@ -126,7 +151,7 @@ drop policy if exists "Members read song lyrics" on public.song_lyrics;
 drop policy if exists "Admins manage song lyrics" on public.song_lyrics;
 create policy "Members read song lyrics" on public.song_lyrics for select to authenticated
   using (public.is_active_member());
--- Lyrics are written only through the audited bulk_import_songs RPC.
+-- Lyrics are written only through the audited song-save and bulk-import RPCs.
 
 drop policy if exists "Members read song charts" on public.song_charts;
 drop policy if exists "Admins manage song charts" on public.song_charts;
@@ -156,6 +181,164 @@ create policy "Admins read song import items" on public.song_import_items for se
   using (public.has_permission('songs.manage'));
 -- Import items are server-authored by the RPCs below.
 
+-- Shared transactional writer for the primary lyrics and the manually entered
+-- Pro Chords sheet. Empty text removes that content; null leaves it unchanged.
+create or replace function public.upsert_song_text_content(
+  p_song_id uuid,
+  p_language text,
+  p_lyrics text,
+  p_lyrics_sections jsonb,
+  p_pro_chords text,
+  p_chart_key text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_lyrics_id uuid;
+  v_chart_id uuid;
+  v_version integer;
+begin
+  if p_song_id is null or not exists(select 1 from public.songs where id=p_song_id) then
+    raise exception 'Song not found' using errcode='P0002';
+  end if;
+  if p_language not in ('en','ar','both','other') then
+    raise exception 'Unsupported song language' using errcode='22023';
+  end if;
+  if p_lyrics_sections is not null and jsonb_typeof(p_lyrics_sections) <> 'array' then
+    raise exception 'Lyrics sections must be an array' using errcode='22023';
+  end if;
+  if p_lyrics is not null and char_length(p_lyrics) > 2000000 then
+    raise exception 'Lyrics are limited to 2,000,000 characters' using errcode='22023';
+  end if;
+  if p_pro_chords is not null and char_length(p_pro_chords) > 2000000 then
+    raise exception 'Pro Chords are limited to 2,000,000 characters' using errcode='22023';
+  end if;
+
+  if p_lyrics is not null then
+    if btrim(p_lyrics) = '' then
+      delete from public.song_lyrics where song_id=p_song_id;
+    else
+      update public.song_lyrics set is_primary=false where song_id=p_song_id and is_primary;
+      select id into v_lyrics_id
+        from public.song_lyrics
+       where song_id=p_song_id and language=p_language
+       order by updated_at desc limit 1
+       for update;
+      if v_lyrics_id is null then
+        insert into public.song_lyrics(song_id,language,content,sections,is_primary,created_by)
+        values(p_song_id,p_language,p_lyrics,coalesce(p_lyrics_sections,'[]'::jsonb),true,auth.uid());
+      else
+        update public.song_lyrics
+           set content=p_lyrics,sections=coalesce(p_lyrics_sections,'[]'::jsonb),is_primary=true,version=version+1
+         where id=v_lyrics_id;
+      end if;
+    end if;
+  end if;
+
+  if p_pro_chords is not null then
+    select id into v_chart_id
+      from public.song_charts
+     where song_id=p_song_id and is_inline
+     limit 1 for update;
+    if btrim(p_pro_chords) = '' then
+      if v_chart_id is not null then delete from public.song_charts where id=v_chart_id; end if;
+    else
+      if v_chart_id is null then
+        insert into public.song_charts(song_id,arrangement_name,chart_key,chart_type,notes,is_inline,is_primary,created_by)
+        values(
+          p_song_id,'Manual chords',coalesce(p_chart_key,''),'txt','',true,
+          not exists(select 1 from public.song_charts where song_id=p_song_id and is_primary),auth.uid()
+        ) returning id into v_chart_id;
+        v_version:=1;
+      else
+        update public.song_charts set chart_key=coalesce(p_chart_key,''),chart_type='txt' where id=v_chart_id;
+        select coalesce(max(version),0)+1 into v_version from public.song_chart_versions where chart_id=v_chart_id;
+      end if;
+      insert into public.song_chart_versions(
+        chart_id,version,storage_path,original_filename,mime_type,file_size,raw_content,parsed_data,uploaded_by
+      ) values (
+        v_chart_id,v_version,null,'manual-chords.txt','text/plain;charset=utf-8',octet_length(p_pro_chords),p_pro_chords,null,auth.uid()
+      );
+    end if;
+  end if;
+end;
+$$;
+
+-- One atomic save for basic song information, lyrics, and manually entered
+-- chords. The client never reports success after only part of a song saved.
+drop function if exists public.save_song_library_entry(uuid,text,text,text,text,integer,text,text,text[],text,text,text,jsonb,text);
+create or replace function public.save_song_library_entry(
+  p_song_id uuid,
+  p_title text,
+  p_title_ar text,
+  p_author text,
+  p_key text,
+  p_bpm integer,
+  p_time_signature text,
+  p_language text,
+  p_themes text[],
+  p_sequence text[],
+  p_notes text,
+  p_ccli_number text,
+  p_lyrics text,
+  p_lyrics_sections jsonb,
+  p_pro_chords text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_song_id uuid;
+  v_user uuid:=auth.uid();
+  v_old jsonb;
+  v_title text:=btrim(coalesce(p_title,''));
+  v_title_ar text:=btrim(coalesce(p_title_ar,''));
+begin
+  if v_user is null or not public.has_permission('songs.manage') then
+    raise exception 'You do not have permission to manage songs' using errcode='42501';
+  end if;
+  if v_title='' and v_title_ar='' then raise exception 'Song title is required' using errcode='22023'; end if;
+  if coalesce(p_key,'') <> all(array['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Cm','C#m','Dbm','Dm','D#m','Ebm','Em','Fm','F#m','Gbm','Gm','G#m','Abm','Am','A#m','Bbm','Bm']) then
+    raise exception 'Choose a valid musical key' using errcode='22023';
+  end if;
+  if p_bpm is not null and (p_bpm<20 or p_bpm>300) then raise exception 'BPM must be between 20 and 300' using errcode='22023'; end if;
+  if coalesce(p_time_signature,'') !~ '^[0-9]{1,2}/[0-9]{1,2}$' then raise exception 'Invalid time signature' using errcode='22023'; end if;
+  if p_language not in ('en','ar','both') then raise exception 'Unsupported song language' using errcode='22023'; end if;
+
+  if p_song_id is null then
+    insert into public.songs(title,title_ar,author,key,bpm,time_signature,language,themes,sequence,notes,ccli_number,usage_count,status,created_by)
+    values(
+      coalesce(nullif(v_title,''),v_title_ar),v_title_ar,btrim(coalesce(p_author,'')),p_key,p_bpm,p_time_signature,p_language,
+      coalesce(p_themes,'{}'::text[]),case when jsonb_array_length(coalesce(p_lyrics_sections,'[]'::jsonb))>0
+        then array(select section->>'label' from jsonb_array_elements(p_lyrics_sections) section where coalesce(section->>'label','')<>'')
+        else coalesce(p_sequence,'{}'::text[]) end,
+      coalesce(p_notes,''),btrim(coalesce(p_ccli_number,'')),0,'active',v_user
+    ) returning id into v_song_id;
+  else
+    select to_jsonb(song) into v_old from public.songs song where song.id=p_song_id for update;
+    if v_old is null then raise exception 'Song not found' using errcode='P0002'; end if;
+    update public.songs set
+      title=coalesce(nullif(v_title,''),v_title_ar),title_ar=v_title_ar,author=btrim(coalesce(p_author,'')),key=p_key,bpm=p_bpm,
+      time_signature=p_time_signature,language=p_language,themes=coalesce(p_themes,'{}'::text[]),
+      sequence=case when jsonb_array_length(coalesce(p_lyrics_sections,'[]'::jsonb))>0
+        then array(select section->>'label' from jsonb_array_elements(p_lyrics_sections) section where coalesce(section->>'label','')<>'')
+        else coalesce(p_sequence,'{}'::text[]) end,
+      notes=coalesce(p_notes,''),ccli_number=btrim(coalesce(p_ccli_number,'')),status='active'
+    where id=p_song_id;
+    v_song_id:=p_song_id;
+  end if;
+
+  perform public.upsert_song_text_content(v_song_id,p_language,p_lyrics,coalesce(p_lyrics_sections,'[]'::jsonb),p_pro_chords,p_key);
+  perform public.log_admin_action(case when p_song_id is null then 'song.created' else 'song.updated' end,'song',v_song_id::text,v_old,(select to_jsonb(song) from public.songs song where song.id=v_song_id));
+  return v_song_id;
+end;
+$$;
+
 create or replace function public.bulk_import_songs(
   p_items jsonb,
   p_source_name text default '',
@@ -171,7 +354,6 @@ declare
   v_batch_id uuid;
   v_item jsonb;
   v_song_id uuid;
-  v_lyrics_id uuid;
   v_action text;
   v_title text;
   v_language text;
@@ -206,7 +388,6 @@ begin
     v_title := trim(coalesce(v_item->>'title',''));
     v_source_index := null;
     v_song_id := null;
-    v_lyrics_id := null;
     begin
       v_source_index := nullif(v_item->>'sourceRow','')::integer;
       if jsonb_typeof(v_item->'errors') = 'array' and jsonb_array_length(v_item->'errors') > 0 then
@@ -252,7 +433,6 @@ begin
                status = 'active'
          where target.id = v_song_id;
         if not found then raise exception 'The selected song no longer exists'; end if;
-        v_updated := v_updated + 1;
       else
         insert into public.songs (
           title, title_ar, author, key, bpm, time_signature, language,
@@ -266,30 +446,23 @@ begin
           array(select section->>'label' from jsonb_array_elements(coalesce(v_item->'lyricSections','[]'::jsonb)) section where section->>'label' <> ''),
           coalesce(v_item->>'notes',''), coalesce(v_item->>'ccliNumber',''), 0, 'active', v_user
         ) returning id into v_song_id;
-        v_created := v_created + 1;
       end if;
 
-      if coalesce(v_item->>'lyrics','') <> '' then
-        update public.song_lyrics set is_primary = false where song_id = v_song_id and is_primary;
-        select id into v_lyrics_id from public.song_lyrics
-         where song_id = v_song_id and language = v_language
-         order by updated_at desc limit 1;
-        if v_lyrics_id is null then
-          insert into public.song_lyrics (song_id, language, content, sections, is_primary, created_by)
-          values (v_song_id, v_language, v_item->>'lyrics', coalesce(v_item->'lyricSections','[]'::jsonb), true, v_user);
-        else
-          update public.song_lyrics
-             set content = v_item->>'lyrics', sections = coalesce(v_item->'lyricSections','[]'::jsonb),
-                 is_primary = true, version = version + 1
-           where id = v_lyrics_id;
-        end if;
-      end if;
+      perform public.upsert_song_text_content(
+        v_song_id,v_language,
+        case when btrim(coalesce(v_item->>'lyrics',''))<>'' then v_item->>'lyrics' else null end,
+        coalesce(v_item->'lyricSections','[]'::jsonb),
+        case when btrim(coalesce(v_item->>'proChords',''))<>'' then v_item->>'proChords' else null end,
+        coalesce(nullif(v_item->>'key',''),'G')
+      );
+      if v_action='update' then v_updated:=v_updated+1; else v_created:=v_created+1; end if;
 
       insert into public.song_import_items (batch_id, source_index, source_name, action, status, song_id, details)
       values (v_batch_id, v_source_index, v_title, v_action, case when v_action='update' then 'updated' else 'created' end, v_song_id,
-              jsonb_build_object('language',v_language,'hasLyrics',coalesce(v_item->>'lyrics','')<>''));
+              jsonb_build_object('language',v_language,'hasLyrics',coalesce(v_item->>'lyrics','')<>'','hasProChords',coalesce(v_item->>'proChords','')<>''));
     exception when others then
       v_errors := v_errors + 1;
+      v_song_id := null;
       insert into public.song_import_items (batch_id, source_index, source_name, action, status, song_id, error_message, details)
       values (v_batch_id, v_source_index, v_title, case when v_action in ('create','create_new','update','skip') then v_action else 'skip' end,
               'error', v_song_id, sqlerrm, jsonb_build_object('sqlstate',sqlstate));
@@ -383,11 +556,14 @@ begin
 end;
 $$;
 
+revoke all on function public.upsert_song_text_content(uuid,text,text,jsonb,text,text) from public;
+revoke all on function public.save_song_library_entry(uuid,text,text,text,text,integer,text,text,text[],text[],text,text,text,jsonb,text) from public;
 revoke all on function public.bulk_import_songs(jsonb,text,text) from public;
 revoke all on function public.start_song_chart_import(text,integer) from public;
 revoke all on function public.register_song_chart(uuid,uuid,text,text,text,text,boolean,text,text,text,bigint,text,jsonb) from public;
 revoke all on function public.finish_song_chart_import(uuid,integer,integer) from public;
 revoke all on function public.record_song_chart_import_error(uuid,text,text,uuid) from public;
+grant execute on function public.save_song_library_entry(uuid,text,text,text,text,integer,text,text,text[],text[],text,text,text,jsonb,text) to authenticated;
 grant execute on function public.bulk_import_songs(jsonb,text,text) to authenticated;
 grant execute on function public.start_song_chart_import(text,integer) to authenticated;
 grant execute on function public.register_song_chart(uuid,uuid,text,text,text,text,boolean,text,text,text,bigint,text,jsonb) to authenticated;

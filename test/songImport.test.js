@@ -7,17 +7,19 @@ import {
 } from '../src/lib/songImport.js'
 
 test('CSV parsing preserves quoted multiline Arabic lyrics', () => {
-  const rows = parseDelimitedText('title,lyrics\nأنت صالح,"[مقطع 1]\nأنت صالح، في كل حين"')
+  const rows = parseDelimitedText('title,lyrics,pro_chords\nأنت صالح,"[مقطع 1]\nأنت صالح، في كل حين","[Verse]\nG       C/E\nأنت صالح"')
   const songs = rowsToSongImports(rows)
   assert.equal(songs[0].title, 'أنت صالح')
   assert.equal(songs[0].lyrics, '[مقطع 1]\nأنت صالح، في كل حين')
+  assert.equal(songs[0].proChords, '[Verse]\nG       C/E\nأنت صالح')
   assert.equal(songs[0].language, 'ar')
 })
 
 test('pasted song blocks preserve formatting and detect languages', () => {
-  const songs = parsePastedSongs('TITLE: Worthy\nLANGUAGE: English\n\nLYRICS:\n[Verse 1]\nYou are worthy\n---\nTITLE: إلهي صالح\nLYRICS:\n[قرار]\nأنت أمين')
+  const songs = parsePastedSongs('TITLE: Worthy\nLANGUAGE: English\n\nLYRICS:\n[Verse 1]\nYou are worthy\n\nPRO CHORDS:\n[Verse 1]\nG       C/E\nYou are worthy\n---\nTITLE: إلهي صالح\nLYRICS:\n[قرار]\nأنت أمين')
   assert.equal(songs.length, 2)
   assert.equal(songs[0].lyrics, '[Verse 1]\nYou are worthy')
+  assert.equal(songs[0].proChords, '[Verse 1]\nG       C/E\nYou are worthy')
   assert.equal(songs[1].language, 'ar')
 })
 
@@ -60,5 +62,6 @@ test('chart matching uses normalized filenames and detects musical key', () => {
 test('Arabic paths are stable and template includes UTF-8 Arabic sample', () => {
   assert.match(slugifySongPath('أنت صالح'), /^song-/)
   assert.match(buildSongTemplateCsv(), /أنت صالح/)
+  assert.match(buildSongTemplateCsv(), /pro_chords/)
   assert.equal(detectSongLanguage('Hello يسوع'), 'both')
 })

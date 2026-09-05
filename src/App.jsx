@@ -10,6 +10,7 @@ const MemberHome = lazy(() => import('./pages/MemberHome'))
 const Services = lazy(() => import('./pages/Services'))
 const ServiceDetail = lazy(() => import('./pages/ServiceDetail'))
 const Songs = lazy(() => import('./pages/Songs'))
+const SongDetail = lazy(() => import('./pages/SongDetail'))
 const People = lazy(() => import('./pages/People'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const Reports = lazy(() => import('./pages/Reports'))
@@ -88,6 +89,7 @@ function AuthGate() {
           <Route path="/services"      element={<Services/>}/>
           <Route path="/services/:id"  element={<ServiceDetail/>}/>
           <Route path="/songs"         element={<Songs/>}/>
+          <Route path="/songs/:id"     element={<SongDetail/>}/>
           <Route path="/people"        element={<PermissionOnly permission="users.view"><People/></PermissionOnly>}/>
           <Route path="/schedule"      element={<Schedule/>}/>
           <Route path="/reports"       element={<PermissionOnly permission="reports.view"><Reports/></PermissionOnly>}/>

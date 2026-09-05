@@ -107,7 +107,7 @@ function ImportSongsPane({ songs, isAr, onImport }) {
       <span className="mt-1 text-xs text-slate-500">{isAr?'العنوان هو الحقل الوحيد المطلوب':'Title is the only required field'}</span>
       <input type="file" accept=".xlsx,.csv,text/csv" className="sr-only" onChange={chooseFile}/>
     </label>:<div className="space-y-2">
-      <Textarea rows={9} dir="auto" value={paste} onChange={event=>setPaste(event.target.value)} placeholder={'Title: Worthy of It All\nArtist: David Brymer\nLyrics:\n[Verse 1]\nAll the saints...\n\n---\n\nTitle: أنت صالح\nArabic Title: أنت صالح\nLyrics:\n[مقطع 1]\nأنت صالح...'}/>
+      <Textarea rows={12} dir="auto" value={paste} onChange={event=>setPaste(event.target.value)} placeholder={'Title: Worthy of It All\nArtist: David Brymer\nLyrics:\n[Verse 1]\nAll the saints...\n\nPro Chords:\n[Verse 1]\nG       C/E\nAll the saints...\n\n---\n\nTitle: أنت صالح\nArabic Title: أنت صالح\nLyrics:\n[مقطع 1]\nأنت صالح...'}/>
       <Btn onClick={parsePaste}>{isAr?'تحليل النص':'Preview pasted songs'}</Btn>
     </div>}
     {error&&<p className="rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}
@@ -117,7 +117,7 @@ function ImportSongsPane({ songs, isAr, onImport }) {
       <div className="max-h-[44vh] space-y-3 overflow-y-auto pe-1">
         {rows.map((row,index)=><div key={row.previewId||index} className={`rounded-xl border p-3 ${row.errors?.length?'border-red-200 bg-red-50/40':row.status==='existing'?'border-amber-200 bg-amber-50/30':'border-slate-200'}`}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2"><strong className="text-sm text-slate-800">#{row.sourceRow||index+1}</strong><Badge color={row.errors?.length?'red':row.status==='existing'?'yellow':'green'}>{row.errors?.length?(isAr?'يحتاج تصحيح':'Needs fixing'):row.status==='existing'?(isAr?'تطابق موجود':'Duplicate found'):(isAr?'جاهزة':'Ready')}</Badge></div>
+            <div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-slate-800">#{row.sourceRow||index+1}</strong><Badge color={row.errors?.length?'red':row.status==='existing'?'yellow':'green'}>{row.errors?.length?(isAr?'يحتاج تصحيح':'Needs fixing'):row.status==='existing'?(isAr?'تطابق موجود':'Duplicate found'):(isAr?'جاهزة':'Ready')}</Badge>{row.lyrics&&<Badge color="blue">{isAr?'كلمات':'Lyrics'}</Badge>}{row.proChords&&<Badge color="purple">Pro Chords</Badge>}</div>
             <Select aria-label={isAr?'إجراء الاستيراد':'Import action'} value={row.action} onChange={event=>changeAction(index,event.target.value)} className="w-44" disabled={row.errors?.length}>
               <option value="create">{isAr?'إنشاء':'Create'}</option><option value="update">{isAr?'تحديث المطابقة':'Update match'}</option><option value="create_new">{isAr?'إنشاء كنسخة جديدة':'Create as new'}</option><option value="skip">{isAr?'تخطي':'Skip'}</option>
             </Select>

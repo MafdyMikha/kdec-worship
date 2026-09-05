@@ -2,7 +2,7 @@ import { MUSICAL_KEYS } from './musicKeys.js'
 
 export const SONG_IMPORT_HEADERS = [
   'title','arabic_title','artist','default_key','bpm','time_signature',
-  'language','ccli_number','lyrics','tags','notes',
+  'language','ccli_number','lyrics','pro_chords','tags','notes',
 ]
 
 const HEADER_ALIASES = {
@@ -15,6 +15,7 @@ const HEADER_ALIASES = {
   language:['language','lang','اللغة'],
   ccliNumber:['ccli','ccli number','ccli_number'],
   lyrics:['lyrics','words','كلمات','الكلمات'],
+  proChords:['pro chords','pro_chords','chords','chord sheet','chord_sheet','الكوردات','الأكوردات'],
   tags:['tags','themes','keywords','تصنيفات'],
   notes:['notes','note','ملاحظات'],
 }
@@ -157,6 +158,7 @@ export function normalizeImportedSong(input = {}) {
   const title = cleanText(input.title)
   const arabicTitle = cleanText(input.arabicTitle ?? input.arabic_title)
   const lyrics = String(input.lyrics ?? '').replace(/\r\n?/g, '\n').trim()
+  const proChords = String(input.proChords ?? input.pro_chords ?? '').replace(/\r\n?/g, '\n').trim()
   const rawBpm = input.bpm === '' || input.bpm == null ? null : Number(input.bpm)
   const keyInput = cleanText(input.key ?? input.defaultKey ?? input.default_key)
   const key = keyInput ? [...VALID_KEYS].find(valid => valid.toLowerCase() === keyInput.toLowerCase()) || keyInput : 'G'
@@ -171,6 +173,7 @@ export function normalizeImportedSong(input = {}) {
     language:normalizeLanguage(input.language, `${title}\n${arabicTitle}\n${lyrics}`),
     ccliNumber:cleanText(input.ccliNumber ?? input.ccli_number),
     lyrics,
+    proChords,
     tags:parseTags(input.tags ?? input.themes),
     notes:cleanText(input.notes),
   }
@@ -223,16 +226,21 @@ export function parsePastedSongs(text) {
   return String(text ?? '').replace(/\r\n?/g, '\n').split(/^\s*---+\s*$/m).map((block, blockIndex) => {
     const lines = block.trim().split('\n')
     const song = { sourceRow:blockIndex + 1 }
-    let lyricsStart = -1
-    lines.forEach((line, index) => {
-      if (lyricsStart >= 0) return
+    let multilineField = null
+    const multiline = { lyrics:[], proChords:[] }
+    lines.forEach(line => {
       const match = line.match(/^\s*([\p{L}_ /]+)\s*:\s*(.*)$/u)
-      if (!match) return
-      const field = fieldForHeader(match[1])
-      if (field === 'lyrics') { lyricsStart = index + 1; if (match[2]) song.lyrics = match[2] }
-      else if (field) song[field] = match[2]
+      const field = match ? fieldForHeader(match[1]) : null
+      if (field === 'lyrics' || field === 'proChords') {
+        multilineField=field
+        if(match[2])multiline[field].push(match[2])
+      } else if (field) {
+        multilineField=null
+        song[field]=match[2]
+      } else if (multilineField) multiline[multilineField].push(line)
     })
-    if (lyricsStart >= 0) song.lyrics = [song.lyrics, ...lines.slice(lyricsStart)].filter(Boolean).join('\n').trim()
+    if(multiline.lyrics.length)song.lyrics=multiline.lyrics.join('\n').trim()
+    if(multiline.proChords.length)song.proChords=multiline.proChords.join('\n').trim()
     return normalizeImportedSong(song)
   }).filter(song => song.title || song.lyrics || song.artist)
 }
@@ -352,8 +360,8 @@ export function csvEscape(value) {
 export function buildSongTemplateCsv() {
   const rows = [
     SONG_IMPORT_HEADERS,
-    ['Worthy of It All','','David Brymer','G','72','4/4','English','7126736','[Verse 1]\nAll the saints and angels...','worship, adoration','Original arrangement'],
-    ['أنت صالح','أنت صالح','فريق التسبيح','G','76','4/4','Arabic','','[مقطع 1]\nأنت صالح في كل حين\n\n[قرار]\nأنت أمين','تسبيح، صلاح الله','مثال عربي UTF-8'],
+    ['Worthy of It All','','David Brymer','G','72','4/4','English','7126736','[Verse 1]\nAll the saints and angels...','[Verse 1]\nG\nAll the saints and angels...','worship, adoration','Original arrangement'],
+    ['أنت صالح','أنت صالح','فريق التسبيح','G','76','4/4','Arabic','','[مقطع 1]\nأنت صالح في كل حين\n\n[قرار]\nأنت أمين','[مقطع 1]\nG        C\nأنت صالح في كل حين','تسبيح، صلاح الله','مثال عربي UTF-8'],
   ]
   return `\uFEFF${rows.map(row => row.map(csvEscape).join(',')).join('\r\n')}`
 }

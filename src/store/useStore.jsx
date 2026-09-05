@@ -7,6 +7,7 @@ import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
 import { ACCESS_LEVELS, SYSTEM_PERMISSIONS, hasPermission, isAdminUser, isSuperAdminUser } from '../lib/permissions.js'
 import { parseLyricsSections, slugifySongPath } from '../lib/songImport.js'
+import { createDemoSongContent, prepareSongForm } from '../lib/songLibrary.js'
 import { isBlankText, isValidEmail, normalizeEmail, normalizeRequiredText } from '../lib/validation.js'
 
 // ─────────────────────────────────────────────────────────
@@ -122,6 +123,7 @@ const normalizeSong = (song) => ({
     arrangementName:chart.arrangement_name,
     chartKey:chart.chart_key,
     chartType:chart.chart_type,
+    isInline:chart.is_inline??chart.isInline??false,
     isPrimary:chart.is_primary,
     createdBy:chart.created_by,
     versions:(chart.versions || []).map(version => ({
@@ -1026,27 +1028,45 @@ export function AppProvider({ children }) {
   // ── SONGS ───────────────────────────────────────────────
   const addSong = async (data) => {
     if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
-    const title=normalizeRequiredText(data.title)
-    const titleEn=normalizeRequiredText(data.titleEn)
-    if(isBlankText(title)&&isBlankText(titleEn)){const message='Song title is required.';toast(message,'error');return {error:message}}
-    const cleanData={...data,title,titleEn}
-    const song = { ...cleanData, id:'s'+Date.now(), usageCount:0, status:'active', titleAr:title, arrangements:data.arrangements||[], themes:data.themes||[], sequence:data.sequence||[] }
+    const prepared=prepareSongForm(data)
+    if(prepared.errors.length){toast(prepared.errors[0],'error');return {error:prepared.errors[0]}}
+    const cleanData=prepared.value
+    const id='s'+Date.now()
+    const content=createDemoSongContent(cleanData,id)
+    const song = { ...cleanData,...content,id,usageCount:0,status:'active',titleAr:cleanData.title,arrangements:data.arrangements||[] }
     if (isDemoMode) { setSongs(prev => [...prev, song]); toast('Song added'); return { success:true } }
-    const { data:s, error } = await supabase.from('songs').insert({ title:titleEn||title, title_ar:title, author:data.author||'', key:data.key, bpm:data.bpm||null, time_signature:data.timeSignature||'4/4', language:data.language||'ar', sequence:data.sequence||[], themes:data.themes||[], notes:data.notes||'', ccli_number:data.ccliNumber||'', usage_count:0, status:'active', created_by:currentUser.id }).select().single()
+    const databaseTitle=cleanData.language==='en'?(cleanData.title||cleanData.titleEn):(cleanData.titleEn||cleanData.title)
+    const databaseTitleAr=cleanData.language==='en'?'':cleanData.title
+    const { data:s, error } = await supabase.rpc('save_song_library_entry',{
+      p_song_id:null,p_title:databaseTitle,p_title_ar:databaseTitleAr,p_author:cleanData.author,p_key:cleanData.key,p_bpm:cleanData.bpm,
+      p_time_signature:cleanData.timeSignature,p_language:cleanData.language,p_themes:cleanData.themes,p_sequence:cleanData.sequence,p_notes:cleanData.notes,
+      p_ccli_number:cleanData.ccliNumber,p_lyrics:cleanData.lyrics,p_lyrics_sections:cleanData.lyricSections,p_pro_chords:cleanData.proChords,
+    })
     if (error) { toast(error.message,'error'); return { error:error.message } }
-    setSongs(prev => [...prev, normalizeSong(s)]); toast('Song added'); return { success:true }
+    await loadAll(true);toast('Song added');return {success:true,id:s}
   }
   const updateSong = async (id, data) => {
     if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
-    const title=normalizeRequiredText(data.title)
-    const titleEn=normalizeRequiredText(data.titleEn)
-    if(isBlankText(title)&&isBlankText(titleEn)){const message='Song title is required.';toast(message,'error');return {error:message}}
-    const cleanData={...data,title,titleEn}
-    if (isDemoMode) { setSongs(prev => prev.map(s => s.id===id?{...s,...cleanData,titleAr:title}:s)); toast('Song updated'); return { success:true } }
-    const { error } = await supabase.from('songs').update({ title:titleEn||title, title_ar:title, author:data.author, key:data.key, bpm:data.bpm||null, time_signature:data.timeSignature, language:data.language, sequence:data.sequence||[], themes:data.themes||[], notes:data.notes||'', ccli_number:data.ccliNumber||'' }).eq('id',id).select('id').single()
+    const prepared=prepareSongForm(data)
+    if(prepared.errors.length){toast(prepared.errors[0],'error');return {error:prepared.errors[0]}}
+    const cleanData=prepared.value
+    if (isDemoMode) {
+      setSongs(prev => prev.map(existing=>{
+        if(existing.id!==id)return existing
+        const content=createDemoSongContent(cleanData,id)
+        return {...existing,...cleanData,...content,titleAr:cleanData.title,charts:[...(existing.charts||[]).filter(chart=>!chart.isInline),...content.charts]}
+      }))
+      toast('Song updated');return {success:true}
+    }
+    const databaseTitle=cleanData.language==='en'?(cleanData.title||cleanData.titleEn):(cleanData.titleEn||cleanData.title)
+    const databaseTitleAr=cleanData.language==='en'?'':cleanData.title
+    const { error } = await supabase.rpc('save_song_library_entry',{
+      p_song_id:id,p_title:databaseTitle,p_title_ar:databaseTitleAr,p_author:cleanData.author,p_key:cleanData.key,p_bpm:cleanData.bpm,
+      p_time_signature:cleanData.timeSignature,p_language:cleanData.language,p_themes:cleanData.themes,p_sequence:cleanData.sequence,p_notes:cleanData.notes,
+      p_ccli_number:cleanData.ccliNumber,p_lyrics:cleanData.lyrics,p_lyrics_sections:cleanData.lyricSections,p_pro_chords:cleanData.proChords,
+    })
     if (error) { toast(error.message,'error'); return { error:error.message } }
-    setSongs(prev => prev.map(s => s.id===id?{...s,...cleanData}:s)); toast('Song updated')
-    return { success:true }
+    await loadAll(true);toast('Song updated');return {success:true}
   }
   const deleteSong = async (id) => {
     if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
@@ -1070,7 +1090,6 @@ export function AppProvider({ children }) {
       items.forEach((item,index) => {
         if (item.errors?.length) { errors += 1; importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title||'', status:'error', action:item.action, error_message:item.errors.join('; ') }); return }
         if (item.action === 'skip') { skipped += 1; importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title||'', status:'skipped', action:'skip' }); return }
-        const primaryLyrics = item.lyrics ? { id:`lyrics-${Date.now()}-${index}`, language:item.language, content:item.lyrics, sections:item.lyricSections, is_primary:true, isPrimary:true, version:1 } : null
         const data = {
           title:item.language==='ar' ? (item.arabicTitle||item.title) : item.title,
           titleEn:item.title,
@@ -1078,17 +1097,19 @@ export function AppProvider({ children }) {
           author:item.artist, key:item.key, bpm:item.bpm, timeSignature:item.timeSignature,
           language:item.language, themes:item.tags||[], tags:item.tags||[], notes:item.notes,
           ccliNumber:item.ccliNumber, sequence:item.lyricSections.map(section=>section.label).filter(Boolean),
-          primaryLyrics, lyricVersions:primaryLyrics?[primaryLyrics]:[],
         }
         if (item.action === 'update') {
           const songIndex = nextSongs.findIndex(song=>song.id===item.matchedSongId)
           if (songIndex < 0) { errors += 1; importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title, status:'error', action:'update', error_message:'The selected song no longer exists' }); return }
-          nextSongs[songIndex] = { ...nextSongs[songIndex], ...data, id:nextSongs[songIndex].id }
+          const id=nextSongs[songIndex].id
+          const content=createDemoSongContent({...data,lyrics:item.lyrics||'',proChords:item.proChords||'',lyricSections:item.lyricSections},id)
+          nextSongs[songIndex] = { ...nextSongs[songIndex], ...data,...content,id,charts:[...(nextSongs[songIndex].charts||[]).filter(chart=>!chart.isInline),...content.charts] }
           updated += 1
           importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title, status:'updated', action:'update', song_id:item.matchedSongId })
         } else {
           const id=`song-${createSecureToken(8).toLowerCase()}`
-          nextSongs.push({ ...data, id, usageCount:0, status:'active', charts:[] })
+          const content=createDemoSongContent({...data,lyrics:item.lyrics||'',proChords:item.proChords||'',lyricSections:item.lyricSections},id)
+          nextSongs.push({ ...data,...content,id,usageCount:0,status:'active' })
           created += 1
           importItems.push({ id:`demo-item-${Date.now()}-${index}`, source_name:item.title, status:'created', action:item.action, song_id:id })
         }

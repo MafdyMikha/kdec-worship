@@ -10,7 +10,7 @@ Do not put the service-role key in this application. Vite exposes every `VITE_*`
 
 ## 2. Apply the database schema
 
-For a new project, open **SQL Editor**, paste the complete contents of `supabase-schema-FULL.sql`, and run it once. Then run `MIGRATION_dynamic_roles_admin.sql` to install the normalized role catalogue, explicit access levels, permission matrix, audit log, and protected administration functions. Finally run `MIGRATION_qa_hardening.sql` to restrict private profile fields, install the safe member directory, enforce input integrity, and protect attendance expiry. Run the files in that order.
+For a new project, open **SQL Editor**, paste the complete contents of `supabase-schema-FULL.sql`, and run it once. Then run `MIGRATION_dynamic_roles_admin.sql` to install the normalized role catalogue, explicit access levels, permission matrix, audit log, and protected administration functions. Next run `MIGRATION_qa_hardening.sql` to restrict private profile fields, install the safe member directory, enforce input integrity, and protect attendance expiry. Finally run `MIGRATION_song_bulk_management.sql` to install multilingual lyrics, inline Pro Chords, private chart files, import history, and the transactional song-save functions. Run the files in that order.
 
 For an existing project:
 
@@ -21,6 +21,7 @@ For an existing project:
 5. Validate any constraints left `NOT VALID` after legacy cleanup, for example with `alter table public.excuses validate constraint excuse_exactly_one_target_check;`.
 6. Run `MIGRATION_dynamic_roles_admin.sql`. It imports every legacy role name, creates role-ID relationships, preserves the legacy text columns as synchronized compatibility snapshots, and promotes the oldest active legacy administrator to the first Super Admin. Review the resulting access levels before inviting additional administrators.
 7. Run `MIGRATION_qa_hardening.sql`. It is rerunnable and must be applied before deploying the matching client because the client loads team names through its safe directory function.
+8. Run `MIGRATION_song_bulk_management.sql`. It preserves existing song IDs and rows, adds the song-content relationships expected by the client, and reloads the PostgREST schema cache when it completes.
 
 If `MIGRATION_security_data_integrity.sql` was already applied before explicit attendance dates and end times were introduced, run `MIGRATION_attendance_session_timing.sql` once. New upgrades do not need the smaller migration because the main migration already includes the same columns and RPC behavior.
 
@@ -88,6 +89,10 @@ Before inviting the team, verify all of the following:
 - the last active administrator cannot be demoted, deactivated, or stripped of administrator status, including by concurrent updates;
 - an inactive member cannot continue into the application;
 - permitted users can create a song and service and see both after reload;
+- a permitted user can add or edit complete lyrics and a manually entered Pro Chords sheet, reopen the song detail route after reload, and see the original line breaks and chord spacing unchanged;
+- the song detail route is read-only for an ordinary active member, while song create/edit/archive, chart upload/delete, and bulk import remain unavailable both in the UI and through RLS/RPC authorization;
+- CSV, XLSX, and pasted-song imports report created, updated, skipped, and failed rows; a mixed Arabic/English sample with multiline lyrics and Pro Chords survives import and reload;
+- uploaded song-chart files are private, open through short-lived signed URLs for active members, and cannot be uploaded or deleted by an ordinary member;
 - an ordinary member cannot perform manager-only database mutations;
 - an ordinary member cannot list attendance QR tokens or insert/edit an attendance record directly;
 - a valid attendance QR resolves only while active and unexpired, a non-repeatable QR works only on its explicit organization-local session date, repeated scans are idempotent, capacity is enforced, the configured local-time grace period determines early/on-time/late arrival, scheduled end time determines early/normal checkout, and checkout affects only the signed-in member;
@@ -130,5 +135,6 @@ Publish `dist/` and configure the two Supabase variables in the hosting environm
 - **Old database lacks roles:** run `MIGRATION_security_data_integrity.sql`; it includes the legacy roles backfill and the current policy/trigger hardening.
 - **Admin Control reports missing tables/functions:** run `MIGRATION_dynamic_roles_admin.sql`, then sign out and back in so the new access level and role assignments reload.
 - **The app reports `get_member_directory` is missing:** run `MIGRATION_qa_hardening.sql`, then reload the application.
+- **The app reports a missing `songs` → `song_lyrics` or `song_charts` relationship, or `save_song_library_entry` is missing:** run `MIGRATION_song_bulk_management.sql`, wait a few seconds for the schema cache reload, then reload the application.
 - **Security migration prints a skipped-index warning:** query the duplicate key named in the warning, reconcile the historical rows without discarding audit evidence, then rerun the migration.
 - **A legacy constraint remains `NOT VALID`:** new writes are already protected. Audit/fix older violating rows, then run `alter table ... validate constraint ...` during a maintenance window.

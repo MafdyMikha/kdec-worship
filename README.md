@@ -54,7 +54,7 @@ Supabase mode currently loads and writes:
 - profiles and multi-role membership;
 - centrally managed worship roles, role categories, primary-role assignments, explicit system access levels, and admin audit history;
 - invitations;
-- songs;
+- songs, multilingual lyrics, manual Pro Chords, private chart versions, and bulk-import history;
 - services and recurrence metadata;
 - setlist song rows;
 - service-team assignments and response status;
@@ -85,6 +85,7 @@ MIGRATION_dynamic_roles_admin.sql dynamic role/access/admin-control upgrade for 
 MIGRATION_qa_hardening.sql  private member directory, validation, and attendance-expiry hardening
 MIGRATION_security_data_integrity.sql current rerunnable upgrade migration
 MIGRATION_attendance_session_timing.sql small upgrade for already-migrated live databases
+MIGRATION_song_bulk_management.sql lyrics, Pro Chords, private chart storage, and audited bulk imports
 MIGRATION_multi_role.sql    superseded legacy migration; do not combine
 scripts/check-browser-env.mjs blocks server secrets before bundling
 test/                       Node unit tests
