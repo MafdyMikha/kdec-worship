@@ -280,7 +280,7 @@ export function Tabs({ tabs, active, onChange }) {
     <div className="max-w-full overflow-x-auto">
       <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-max min-w-full sm:min-w-0" role="tablist" onKeyDown={onKeyDown}>
         {tabs.map(tab => (
-          <button key={tab.value} role="tab" aria-selected={active === tab.value} tabIndex={active === tab.value ? 0 : -1} onClick={() => onChange(tab.value)}
+          <button key={tab.value} type="button" role="tab" aria-selected={active === tab.value} tabIndex={active === tab.value ? 0 : -1} onClick={() => onChange(tab.value)}
             className={`flex-shrink-0 px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-all ${active === tab.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             {tab.label}
             {tab.count !== undefined && <span className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs ${active === tab.value ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>{tab.count}</span>}

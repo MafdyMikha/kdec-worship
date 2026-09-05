@@ -5,6 +5,7 @@ import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } fro
 import { attendanceOccurrenceDate, attendanceTiming, validateAttendanceSessionSchedule } from '../lib/attendance.js'
 import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
+import { shouldReloadAuthProfile } from '../lib/authEvents.js'
 import { ACCESS_LEVELS, SYSTEM_PERMISSIONS, hasPermission, isAdminUser, isSuperAdminUser } from '../lib/permissions.js'
 import { parseLyricsSections, slugifySongPath } from '../lib/songImport.js'
 import { createDemoSongContent, prepareSongForm } from '../lib/songLibrary.js'
@@ -750,7 +751,7 @@ export function AppProvider({ children }) {
         return
       }
       if (session) {
-        const shouldReload = activeUserIdRef.current !== session.user.id || ['INITIAL_SESSION','SIGNED_IN'].includes(event)
+        const shouldReload = shouldReloadAuthProfile(event,activeUserIdRef.current,session.user.id)
         if (shouldReload) void loadCurrentUser(session.user)
         else setAuthLoading(false)
       }
