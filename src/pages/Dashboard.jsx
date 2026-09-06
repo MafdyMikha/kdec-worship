@@ -31,6 +31,7 @@ export default function Dashboard() {
     <div className="space-y-6 max-w-7xl animate-fade-in">
       <div className="worship-page-heading">
         <div><h1>{isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0] || ''}` : `Welcome, ${currentUser?.name?.split(' ')[0] || ''}`}</h1>
+          <p className="worship-mantra"><bdi lang="en" dir="ltr">Intimacy, Sacrifice, Heart Posture</bdi></p>
           <p>{isAr ? 'أسبوع جديد وقلب واحد. لنستعد معًا.' : 'A new week. One heart. Let’s prepare together.'}</p></div>
         {hasPermission(currentUser,'services.create') && <Btn onClick={()=>navigate('/services')} icon={<Calendar size={16}/>}>{isAr ? 'تخطيط خدمة' : 'Plan a service'}</Btn>}
       </div>

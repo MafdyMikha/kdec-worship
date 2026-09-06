@@ -111,6 +111,7 @@ export default function MemberHome() {
 
       <div className="worship-page-heading">
         <div><h1>{isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0] || ''}` : `Welcome, ${currentUser?.name?.split(' ')[0] || ''}`}</h1>
+          <p className="worship-mantra"><bdi lang="en" dir="ltr">Intimacy, Sacrifice, Heart Posture</bdi></p>
           <p>{isAr ? 'قلب واحد. لنستعد ونخدم معًا.' : 'One heart. Let’s prepare and serve together.'}</p>
         </div><Badge color="indigo">{((Array.isArray(currentUser?.roles) && currentUser.roles.length>0) ? currentUser.roles : (currentUser?.role?[currentUser.role]:[])).join(' · ')}</Badge>
       </div>

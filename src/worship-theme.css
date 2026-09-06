@@ -17,6 +17,7 @@
 .worship-page-heading h1{font-size:clamp(26px,2.6vw,36px);font-weight:500;line-height:1.3;letter-spacing:-.7px;color:var(--text-p)}
 [dir=rtl] .worship-page-heading h1{letter-spacing:0;}
 .worship-page-heading p{margin-top:8px;color:var(--text-s);font-size:14px;}
+.worship-page-heading .worship-mantra{color:var(--accent);font-weight:600;}
 .worship-eyebrow{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:15px;}
 [dir=rtl] .worship-eyebrow{letter-spacing:0;}
 .worship-next-service{background:var(--bg-muted);padding:28px;border-radius:20px;}
