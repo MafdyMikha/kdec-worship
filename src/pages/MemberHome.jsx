@@ -6,7 +6,7 @@ import { ar } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Badge, Btn, Modal, Textarea } from '../components/ui'
-import InstrumentDisplay, { INSTRUMENT_COLORS } from '../components/instruments/InstrumentDisplay.jsx'
+import RehearsalReminder from '../components/RehearsalReminder'
 import { hasPermission } from '../lib/permissions.js'
 
 function TimeUntil({ dateStr, timeStr, isAr }) {
@@ -97,7 +97,6 @@ export default function MemberHome() {
     .sort((a,b)=>parseISO(a.date)-parseISO(b.date))
 
   const nextSvc   = myServices[0]
-  const colors    = INSTRUMENT_COLORS[currentUser?.role] || INSTRUMENT_COLORS['Vocalist']
 
   // Top songs
   const topSongs  = songs.filter(s => s.status !== 'inactive').sort((a,b)=>(b.usageCount||0)-(a.usageCount||0)).slice(0,5)
@@ -110,26 +109,17 @@ export default function MemberHome() {
   return (
     <div className="space-y-6 max-w-5xl animate-fade-in">
 
-      {/* Hero card */}
-      <div className={`rounded-2xl p-4 md:p-6 text-white bg-gradient-to-br ${colors?.bg||'from-indigo-500 to-violet-600'} relative overflow-hidden`}>
-        <div className="absolute inset-0 opacity-10">
-          <InstrumentDisplay role={currentUser?.role} animated size="lg"/>
-        </div>
-        <div className="relative">
-          <div className="text-white/70 text-sm mb-1">
-            {isAr ? format(today,'EEEE، d MMMM',{locale:ar}) : format(today,'EEEE, MMMM d')}
-          </div>
-          <h2 className="font-display text-2xl font-bold mb-1">
-            {isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0]}! 🎵` : `Welcome, ${currentUser?.name?.split(' ')[0]}! 🎵`}
-          </h2>
-          <p className="text-white/80 text-sm">{((Array.isArray(currentUser?.roles) && currentUser.roles.length>0) ? currentUser.roles : (currentUser?.role?[currentUser.role]:[])).join(' · ')}</p>
-          {nextSvc && (
-            <div className="mt-4 flex items-center gap-2">
-              <TimeUntil dateStr={nextSvc.date} timeStr={nextSvc.time} isAr={isAr}/>
-            </div>
-          )}
-        </div>
+      <div className="worship-page-heading">
+        <div><h1>{isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0] || ''}` : `Welcome, ${currentUser?.name?.split(' ')[0] || ''}`}</h1>
+          <p>{isAr ? 'قلب واحد. لنستعد ونخدم معًا.' : 'One heart. Let’s prepare and serve together.'}</p>
+        </div><Badge color="indigo">{((Array.isArray(currentUser?.roles) && currentUser.roles.length>0) ? currentUser.roles : (currentUser?.role?[currentUser.role]:[])).join(' · ')}</Badge>
       </div>
+      {nextSvc && <section className="worship-next-service">
+        <p className="worship-eyebrow">{isAr?'خدمتك القادمة':'Your next service'}</p>
+        <h2 dir="auto">{nextSvc.title}</h2>
+        <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{nextSvc.time}</bdi></p>
+        <div className="flex items-center justify-between flex-wrap gap-4 mt-5"><TimeUntil dateStr={nextSvc.date} timeStr={nextSvc.time} isAr={isAr}/><Btn onClick={()=>navigate(`/services/${nextSvc.id}`)}>{isAr?'عرض الخدمة':'Open service'}</Btn></div>
+      </section>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* My upcoming services */}
@@ -207,8 +197,9 @@ export default function MemberHome() {
           })}
         </div>
 
-        {/* Sidebar: top songs + quick links */}
+        {/* Sidebar: rehearsals, top songs and quick links */}
         <div className="space-y-4">
+          <RehearsalReminder services={myServices}/>
           <div>
             <h3 className="font-display font-semibold text-slate-800 mb-3">{isAr?'أكثر الترانيم':'Top Songs'}</h3>
             <Card className="divide-y divide-slate-100">

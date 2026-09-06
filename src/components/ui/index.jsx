@@ -5,7 +5,7 @@ import { useLang } from '../../lib/i18n.jsx'
 
 // Button
 export function Btn({ children, onClick, variant = 'primary', size = 'md', className = '', disabled, type = 'button', icon, ...props }) {
-  const base = 'inline-flex items-center gap-2 font-medium rounded-lg cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95'
+  const base = 'worship-button inline-flex items-center gap-2 font-medium rounded-lg cursor-pointer transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95'
   const variants = {
     primary:   'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm',
     secondary: 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm',
@@ -17,7 +17,7 @@ export function Btn({ children, onClick, variant = 'primary', size = 'md', class
   const sizes = {
     xs: 'px-2.5 py-1.5 text-xs min-h-[32px]',
     sm: 'px-3 py-2 text-sm min-h-[36px]',
-    md: 'px-4 py-2.5 text-sm min-h-[40px]',
+    md: 'px-4 py-2.5 text-sm min-h-[44px]',
     lg: 'px-5 py-3 text-base min-h-[48px]',
   }
   return (
@@ -50,7 +50,7 @@ export function Badge({ children, color = 'slate', size = 'sm', className='' }) 
 export function Avatar({ name, size = 'md', color }) {
   const initials = name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
   // Darker avatar fills keep white initials above WCAG contrast targets.
-  const colors = ['bg-indigo-600', 'bg-violet-600', 'bg-blue-600', 'bg-emerald-700', 'bg-amber-700', 'bg-rose-600', 'bg-pink-600', 'bg-cyan-700']
+  const colors = ['bg-indigo-600', 'bg-slate-600', 'bg-slate-700']
   const bg = color || colors[name?.charCodeAt(0) % colors.length] || colors[0]
   const sizes = { xs: 'w-6 h-6 text-xs', sm: 'w-8 h-8 text-xs', md: 'w-9 h-9 text-sm', lg: 'w-11 h-11 text-base', xl: 'w-14 h-14 text-lg' }
   return <div className={`${bg} ${sizes[size]} rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0`}>{initials}</div>
@@ -209,7 +209,7 @@ export function Card({ children, className = '', onClick, hover = false, ...prop
     : undefined
   return (
     <div onClick={onClick} onKeyDown={handleKeyDown} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined} {...props}
-      className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer' : ''} transition-all ${className}`}>
+      className={`worship-card ${hover || onClick ? 'hover:shadow-card-hover hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer' : ''} transition-all ${className}`}>
       {children}
     </div>
   )

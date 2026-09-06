@@ -62,7 +62,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside className={`${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 bg-slate-900 flex-col transition-all duration-300 relative hidden md:flex`}>
+    <aside className={`worship-sidebar ${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 flex-col transition-all duration-300 relative hidden md:flex`}>
       {/* Logo */}
       <div className={`flex items-center gap-3 px-4 py-4 border-b border-slate-800 ${collapsed ? 'justify-center' : ''}`}>
         <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-1 shadow-lg">
@@ -70,9 +70,9 @@ export default function Sidebar() {
         </div>
         {!collapsed && (
           <div>
-            <div className="text-white font-display font-bold text-sm leading-tight">KDEC Worship</div>
-            <div className="text-slate-400 text-xs">
-              {isAdmin ? t('adminPlatform') : t('teamPlatform')}
+            <div className="font-display font-medium text-lg leading-tight">KDEC Worship</div>
+            <div className="text-slate-500 text-xs mt-1">
+              {isAr ? 'معًا في الخدمة' : 'Together in service'}
             </div>
           </div>
         )}
@@ -114,6 +114,10 @@ export default function Sidebar() {
 
       {/* Settings */}
       <div className="px-2 py-3 border-t border-slate-800">
+        <NavLink to="/profile" aria-label={t('profile')} className="worship-sidebar-profile flex items-center gap-3 px-3 py-3 rounded-lg">
+          <span className="worship-initials">{currentUser?.name?.slice(0,1) || 'K'}</span>
+          {!collapsed && <span className="min-w-0"><span className="block text-sm font-medium truncate" dir="auto">{currentUser?.name}</span><span className="text-xs text-slate-500">{t('profile')}</span></span>}
+        </NavLink>
         <NavLink to="/settings"
           aria-label={t('settings')}
           className={({ isActive }) =>

@@ -42,11 +42,9 @@ export default function Header({ title }) {
     : format(new Date(), 'EEE, MMM d')
 
   return (
-    <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-3 md:px-6 flex-shrink-0 gap-2 z-20">
+    <header className="worship-header min-h-16 flex items-center justify-between px-4 md:px-8 flex-shrink-0 gap-2 z-20">
       {/* Page title */}
-      <h1 className="font-display font-semibold text-slate-800 text-base md:text-lg truncate flex-1">
-        {title}
-      </h1>
+      <div className="text-sm text-slate-500 truncate flex-1"><span className="hidden lg:inline">KDEC Worship <span className="mx-3" aria-hidden="true">/</span></span>{title}</div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
 
@@ -101,7 +99,7 @@ export default function Header({ title }) {
             className="flex items-center gap-1.5 px-1.5 py-1.5 hover:bg-slate-100 rounded-xl cursor-pointer">
             <Avatar name={currentUser?.name || currentUser?.email} size="sm"/>
             {/* Name — hidden on small screens */}
-            <div className="text-left hidden sm:block">
+            <div className="text-start hidden sm:block">
               <div className="text-xs font-semibold text-slate-700 leading-tight max-w-[90px] truncate">
                 {currentUser?.name || (isAr ? 'مستخدم' : 'User')}
               </div>

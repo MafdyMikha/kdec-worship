@@ -36,9 +36,16 @@ export default function Layout({ children }) {
   const base  = Object.keys(PAGE_KEYS).find(k => pathname === k || (k !== '/' && k !== '/home' && pathname.startsWith(k)))
   const key   = PAGE_KEYS[base] || 'dashboard'
   const title = t(key)
+  const introductions = {
+    '/services': isAr ? 'مساحة للاستعداد والتخطيط والخدمة معًا.' : 'A space to prepare, plan, and serve together.',
+    '/songs': isAr ? 'ترانيم نحملها معنا في العبادة.' : 'The songs we carry into worship.',
+    '/people': isAr ? 'مواهب متعددة. فريق واحد.' : 'Many gifts. One team.',
+    '/schedule': isAr ? 'خطط الفريق القادمة، في مكان واحد.' : 'Your team’s plans, together in one place.',
+    '/profile': isAr ? 'نبذة عنك وعن خدمتك.' : 'A little about you, and how you serve.',
+  }
 
   return (
-    <div className="flex h-screen h-dvh overflow-hidden bg-slate-50" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="worship-app flex h-screen h-dvh overflow-hidden bg-slate-50" dir={isAr ? 'rtl' : 'ltr'}>
       {/* Sidebar — desktop only */}
       <Sidebar/>
 
@@ -47,7 +54,8 @@ export default function Layout({ children }) {
 
         {/* Page content — extra bottom padding on mobile for bottom nav */}
         <main className="flex-1 overflow-y-auto">
-          <div className="p-3 md:p-6 pb-24 md:pb-6 animate-fade-in">
+          <div className="worship-content p-4 md:p-8 pb-24 md:pb-8 animate-fade-in">
+            {introductions[pathname] && <div className="worship-page-heading"><div><h1>{title}</h1><p>{introductions[pathname]}</p></div></div>}
             {children}
           </div>
         </main>

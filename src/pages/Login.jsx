@@ -120,18 +120,12 @@ export default function Login({ inviteCode }) {
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
-      {/* Background blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl"/>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl"/>
-      </div>
-
+    <div className="worship-login min-h-screen min-h-[100dvh] flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
-        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden">
+        <div className="worship-login-card rounded-3xl overflow-hidden">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-4 sm:px-8 py-7 text-center">
+          <div className="worship-login-heading px-4 sm:px-8 py-7 text-center">
             <div className="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg p-1.5">
               <img src={KDEC_LOGO} alt="KDEC Worship" className="w-full h-full object-contain"/>
             </div>
@@ -214,7 +208,7 @@ export default function Login({ inviteCode }) {
                 </div>
 
                 <button type="submit" disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold rounded-xl hover:from-indigo-700 hover:to-violet-700 transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
+                  className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
                   {loading
                     ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                     : <LogIn size={17}/>}
@@ -291,7 +285,7 @@ export default function Login({ inviteCode }) {
                     className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 hover:border-slate-300"/>
                 </div>
                 <button type="submit" disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
+                  className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
                   {loading
                     ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                     : <CheckCircle size={17}/>}
@@ -337,7 +331,7 @@ export default function Login({ inviteCode }) {
                   </div>
                 </div>
                 <button type="submit" disabled={loading}
-                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold rounded-xl hover:from-indigo-700 transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
+                  className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
                   {loading
                     ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                     : <Mail size={17}/>}
@@ -369,7 +363,7 @@ export default function Login({ inviteCode }) {
                   </p>
                 </div>
                 <button type="button" onClick={() => { setMode('login'); setError(''); setSuccess('') }}
-                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold rounded-xl cursor-pointer hover:from-indigo-700 transition-all">
+                  className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl cursor-pointer hover:bg-indigo-700 transition-all">
                   {isAr ? 'العودة لتسجيل الدخول' : 'Back to Sign In'}
                 </button>
               </div>

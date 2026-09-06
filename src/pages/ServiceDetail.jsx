@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Users, Edit2, Check, X, Save, Repeat, RefreshCw, AlertCircle } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
+import { ar } from 'date-fns/locale'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { canManageWorship } from '../lib/permissions.js'
@@ -9,6 +10,7 @@ import { Btn, Badge, Avatar, Modal, Select, Textarea, Card, StatusDot, ConfirmDi
 import WhatsAppNotify from '../components/WhatsAppNotify'
 import PracticeTab from '../components/PracticeTab'
 import SetlistTab from '../components/SetlistTab'
+import RehearsalReminder from '../components/RehearsalReminder'
 
 export default function ServiceDetail() {
   const { id } = useParams()
@@ -86,11 +88,11 @@ export default function ServiceDetail() {
       ]
 
   return (
-    <div className="max-w-5xl space-y-5 animate-fade-in">
+    <div className="max-w-7xl space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-start gap-3">
+      <div className="worship-service-header flex items-start gap-3">
         <button onClick={() => navigate('/services')} aria-label={isAr?'العودة للخدمات':'Back to services'} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer mt-1">
-          <ArrowLeft size={18}/>
+          <ArrowLeft size={18} className={isAr?'rotate-180':''}/>
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
@@ -98,7 +100,7 @@ export default function ServiceDetail() {
             <Badge color={SVC_STATUS_COLOR[service.status]||'slate'} size="xs">{SVC_STATUS[service.status]||service.status}</Badge>
           </div>
           <h2 className="font-display font-bold text-xl text-slate-800">{service.title}</h2>
-          <p className="text-sm text-slate-500">{format(parseISO(service.date),'EEEE, d MMMM yyyy')} · {service.time}</p>
+          <p className="text-sm text-slate-500">{format(parseISO(service.date),'EEEE, d MMMM yyyy',{locale:isAr?ar:undefined})} · <bdi>{service.time}</bdi></p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
           {canEdit && (
@@ -155,7 +157,22 @@ export default function ServiceDetail() {
       </div>
 
       {/* Setlist */}
-      {tab==='setlist' && <SetlistTab key={service.id} service={service} canEdit={canEdit}/>}
+      {tab==='setlist' && <div className="worship-service-layout">
+        <div><SetlistTab key={service.id} service={service} canEdit={canEdit}/></div>
+        <aside className="space-y-5" aria-label={isAr?'الفريق والبروفة':'Team and rehearsal'}>
+          <Card className="p-5 md:p-6">
+            <div className="flex items-center justify-between gap-2 mb-4"><h3 className="font-display text-lg font-medium">{isAr?'المشاركون':'Team assignments'}</h3><Badge color="green">{confirmed}/{service.team.length}</Badge></div>
+            {teamMembers.length===0 && <p className="text-sm text-slate-500">{isAr?'لم يتم تعيين أعضاء بعد.':'No team members assigned yet.'}</p>}
+            {teamMembers.slice(0,5).map(tm=><div key={tm.personId} className="flex gap-3 items-center py-3 border-b border-slate-100 last:border-0">
+              <Avatar name={tm.person?.name} size="sm"/>
+              <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate" dir="auto">{tm.person?.name || (isAr?'عضو غير متاح':'Unavailable member')}</p><p className="text-xs text-slate-500">{tm.role}</p></div>
+              <Badge color={STATUS_COLOR[tm.status] || 'slate'} size="xs">{STATUS_LABEL[tm.status] || tm.status}</Badge>
+            </div>)}
+            <Btn variant="secondary" className="w-full mt-4" onClick={()=>setTab('team')}>{canEdit?(isAr?'إدارة المشاركين':'Manage assignments'):(isAr?'عرض الفريق':'View team')}</Btn>
+          </Card>
+          <RehearsalReminder services={[service]} upcomingOnly={false}/>
+        </aside>
+      </div>}
 
       {/* Team */}
       {tab==='team' && (

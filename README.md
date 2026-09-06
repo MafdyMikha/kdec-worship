@@ -93,6 +93,12 @@ test/                       Node unit tests
 
 The UI uses camelCase objects while Supabase columns use snake_case. Normalize at the data boundary and surface backend errors before showing success.
 
+### Visual design
+
+The warm light theme uses ivory, sand, dusty rose, and espresso, with DM Sans / Outfit for English and Cairo for Arabic. Shared palette values live in `tailwind.config.js` and `src/index.css`; layout and component treatments live in `src/worship-theme.css`. Existing dark-mode preferences and RTL navigation remain supported.
+
+Dashboard and member-home summaries use the current service and assignment data. Rehearsal reminders are derived from saved service practice details; they do not send notifications. Service planning keeps the existing editable setlist and team workflows, with a desktop team summary beside the setlist and stacked sections on mobile. The redesign does not change database permissions or add a backend dependency.
+
 ## Deployment
 
 Use `npm run build` and publish `dist/`. Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the hosting provider, then add the deployed origin and password-recovery URL to Supabase Auth redirect settings.

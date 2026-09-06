@@ -2,20 +2,21 @@ import { Calendar, Music2, Users, CheckCircle, Clock, AlertCircle, ArrowRight, S
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, StatCard, Badge, Avatar, Btn, StatusDot } from '../components/ui'
-import { format, parseISO, isAfter, addDays } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
-import { KDEC_LOGO } from '../assets/kdecLogo.js'
+import RehearsalReminder from '../components/RehearsalReminder'
+import { hasPermission } from '../lib/permissions.js'
 
 export default function Dashboard() {
-  const { services, songs, people, announcements } = useStore()
+  const { services, songs, people, announcements, currentUser } = useStore()
   const { t, isAr } = useLang()
   const navigate  = useNavigate()
   const today     = new Date()
   const locale    = isAr ? arLocale : undefined
 
   const upcoming = services
-    .filter(s => !['completed','cancelled'].includes(s.status) && isAfter(parseISO(s.date), addDays(today,-1)))
+    .filter(s => !['completed','cancelled'].includes(s.status) && s.date >= format(today,'yyyy-MM-dd'))
     .sort((a,b) => parseISO(a.date) - parseISO(b.date)).slice(0, 3)
 
   const nextSvc       = upcoming[0]
@@ -28,26 +29,27 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 max-w-7xl animate-fade-in">
-      {/* Hero */}
-      <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 rounded-2xl p-6 text-white relative overflow-hidden">
-        {/* Keep the watermark opposite the reading edge so it never competes with the welcome copy. */}
-        <img
-          src={KDEC_LOGO}
-          alt=""
-          className={`absolute ${isAr ? 'left-6' : 'right-6'} top-1/2 -translate-y-1/2 w-24 h-24 object-contain opacity-10 pointer-events-none select-none`}
-          style={{zIndex:0}}
-        />
-        <div className="relative" style={{zIndex:1}}>
-          <div className="text-indigo-200 text-sm mb-1">
-            {isAr ? format(today,'EEEE، d MMMM yyyy',{locale:arLocale}) : format(today,'EEEE, MMMM d, yyyy')}
-          </div>
-          <h2 className="font-display text-2xl font-bold mb-1">{t('welcomeBack')}</h2>
-          <p className="text-indigo-200 text-sm">
-            {nextSvc
-              ? `${t('nextService')}: ${nextSvc.title} · ${format(parseISO(nextSvc.date),'d MMM',{locale})} ${t('at')} ${nextSvc.time}`
-              : (isAr?t('noUpcoming'):t('noUpcoming'))}
-          </p>
-        </div>
+      <div className="worship-page-heading">
+        <div><h1>{isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0] || ''}` : `Welcome, ${currentUser?.name?.split(' ')[0] || ''}`}</h1>
+          <p>{isAr ? 'أسبوع جديد وقلب واحد. لنستعد معًا.' : 'A new week. One heart. Let’s prepare together.'}</p></div>
+        {hasPermission(currentUser,'services.create') && <Btn onClick={()=>navigate('/services')} icon={<Calendar size={16}/>}>{isAr ? 'تخطيط خدمة' : 'Plan a service'}</Btn>}
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section className="worship-next-service xl:col-span-2">
+          <p className="worship-eyebrow">{isAr ? 'الخدمة القادمة' : 'Your next service'}</p>
+          {nextSvc ? <>
+            <h2 dir="auto">{nextSvc.title}</h2>
+            <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{nextSvc.time}</bdi></p>
+            <hr/>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div><div className="flex gap-1 mb-2">{nextSvc.team.slice(0,5).map(tm=><Avatar key={tm.personId} name={(tm.person || people.find(p=>p.id===tm.personId))?.name} size="sm"/>)}</div>
+                <p className="text-sm text-slate-500">{nextSvc.team.filter(tm=>tm.status==='confirmed').length} {t('confirmed')} · {nextSvc.team.filter(tm=>tm.status==='pending').length} {t('pending')}</p>
+              </div>
+              <Btn onClick={()=>navigate(`/services/${nextSvc.id}`)}>{isAr?'عرض الخدمة':'Open service'}<ArrowRight size={16} className={isAr?'rotate-180':''}/></Btn>
+            </div>
+          </> : <><h2>{t('noUpcoming')}</h2><p className="text-slate-500 mt-3">{isAr?'ستظهر خطط الفريق هنا عند إضافة خدمة.':'Your team’s plans will appear here when a service is added.'}</p></>}
+        </section>
+        <RehearsalReminder services={services}/>
       </div>
 
       {/* Stats */}

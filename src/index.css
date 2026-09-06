@@ -4,23 +4,27 @@
 @tailwind utilities;
 
 :root {
-  --bg-page:    #f8fafc;
-  --bg-card:    #ffffff;
-  --bg-elevated:#ffffff;
-  --bg-sidebar: #0f172a;
-  --bg-input:   #ffffff;
-  --bg-muted:   #f1f5f9;
-  --border:     #e2e8f0;
-  --border-h:   #cbd5e1;
-  --text-p:     #1e293b;
-  --text-s:     #64748b;
-  --text-m:     #94a3b8;
-  --shadow-c:   0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
-  --shadow-h:   0 4px 16px rgba(0,0,0,.09),0 2px 6px rgba(0,0,0,.05);
-  --shadow-mo:  0 20px 60px rgba(0,0,0,.14),0 8px 24px rgba(0,0,0,.08);
+  --bg-page:#faf7f2;
+  --bg-card:#fffdfa;
+  --bg-elevated:#fffdfa;
+  --bg-sidebar:#fffdfa;
+  --bg-input:#fffdfa;
+  --bg-muted:#f0e8df;
+  --border:#ddd2c7;
+  --border-h:#c4b4a6;
+  --text-p:#302722;
+  --text-s:#716157;
+  --text-m:#716157;
+  --accent:#8b4f5c;
+  --accent-soft:#f3e3e5;
+  --shadow-c:0 4px 16px rgba(48,39,34,.025);
+  --shadow-h:0 6px 20px rgba(48,39,34,.06);
+  --shadow-mo:0 20px 60px rgba(48,39,34,.16);
   color-scheme:light;
 }
 .dark {
+  --accent:#d3a5af;
+  --accent-soft:#493039;
   --bg-page:    #0b1220;
   --bg-card:    #111c2e;
   --bg-elevated:#18243a;
@@ -63,12 +67,12 @@ select {
 }
 
 select:hover:not(:disabled) {
-  border-color:#a5b4fc !important;
+  border-color:var(--accent) !important;
   box-shadow:0 2px 8px rgba(79,70,229,.08);
 }
 
 select:focus {
-  border-color:#6366f1 !important;
+  border-color:var(--accent) !important;
   outline:none;
 }
 
@@ -99,7 +103,7 @@ select option {
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--border-h)}
-:focus-visible{outline:2px solid #6366f1;outline-offset:2px;border-radius:4px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
 /* ── Dark mode override rules ─────────────────────────── */
 /* Backgrounds */
