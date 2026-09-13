@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- translations and the language provider intentionally share one public module */
 import { createContext, useContext, useState, useEffect } from 'react'
+import { resolveLanguage } from './language.js'
 
 export const T = {
   // ── Navigation ───────────────────────────────────────────
@@ -304,7 +305,7 @@ export const T = {
 const LangContext = createContext(null)
 
 export function LangProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem('kdec_lang') || 'ar')
+  const [lang, setLang] = useState(() => resolveLanguage(localStorage.getItem('kdec_lang')))
 
   useEffect(() => {
     localStorage.setItem('kdec_lang', lang)
@@ -315,7 +316,7 @@ export function LangProvider({ children }) {
   // t(key) → always returns the correct language string
   const t = (key) => {
     if (!T[key]) return key
-    return T[key][lang] ?? T[key].ar ?? key
+    return T[key][lang] ?? T[key].en ?? T[key].ar ?? key
   }
 
   return (
