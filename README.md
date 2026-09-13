@@ -113,3 +113,22 @@ Use `npm run build` and publish `dist/`. Configure `VITE_SUPABASE_URL` and `VITE
 - The predev/prebuild guard rejects Supabase secret/service-role keys before Vite can bundle them.
 - Deactivate access at both the application and policy layers.
 - Review `npm audit` before releases; the checked-in dependency tree currently audits clean.
+
+### Fixed weekly meetings
+
+For existing databases, apply `MIGRATION_fixed_weekly_services.sql` after the
+existing dynamic-role and QA-hardening migrations, before using this app version.
+Fresh installs include this SQL in `supabase-schema-FULL.sql`.
+The four templates are Friday youth at 18:00, Tuesday prayer at 19:00,
+Friday morning at 11:00, and Friday house meeting at 14:00 (Cairo time).
+On authenticated data load, `ensure_weekly_services` transactionally fills the next
+84 days. Its active-member check and server-defined templates permit ordinary
+members to load the schedule without granting them general service-write access.
+A unique template/date index makes reloads and concurrent requests idempotent;
+cancelled occurrences remain stored and are not recreated. No background scheduler
+is required; opening/reloading the app advances the planning window.
+Team assignments, soundcheck time and optional rehearsal belong to each service
+row. Fixed dates/times cannot be edited through an occurrence. Add Service still
+creates independent extra meetings. Demo mode uses the same schedule and stores
+occurrence preparation locally. Live persistence requires the migration above;
+failures are reported and never cause a fallback to demo data.

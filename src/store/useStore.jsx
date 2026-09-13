@@ -3,6 +3,7 @@ import { useState, useEffect, createContext, useContext, useCallback, useRef } f
 import { format, parseISO } from 'date-fns'
 import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } from '../lib/supabase.js'
 import { attendanceOccurrenceDate, attendanceTiming, validateAttendanceSessionSchedule } from '../lib/attendance.js'
+import { ensureDemoWeeklyServices } from '../lib/weeklyServices.js'
 import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
 import { shouldReloadAuthProfile } from '../lib/authEvents.js'
@@ -144,6 +145,8 @@ const normalizeSong = (song) => ({
 
 const normalizeService = (service) => ({
   ...service,
+  weeklyTemplateKey: service.weekly_template_key,
+  soundcheckTime: service.soundcheck_time,
   recurrenceGroupId: service.recurrence_group_id,
   recurrenceIndex: service.recurrence_index,
   recurrenceFrequency: service.recurrence_frequency,
@@ -542,7 +545,7 @@ export function AppProvider({ children }) {
     setSongs(s)
     setSongImportHistory(songImports)
     setAnnouncements(a)
-    setServices(hydrateDemoServices(rawSvcs, s, normalizedPeople))
+    setServices(hydrateDemoServices(ensureDemoWeeklyServices(rawSvcs), s, normalizedPeople))
     setEvents(evts)
     setEventResponses(responses)
     setAttendanceSessions(sessions.map(session => ({
@@ -613,6 +616,8 @@ export function AppProvider({ children }) {
     void includeAdminData
     setLoading(true)
     try {
+      const weeklyResult = await supabase.rpc('ensure_weekly_services')
+      if (weeklyResult.error) toast(`Weekly schedule could not be loaded: ${weeklyResult.error.message}`, 'error')
       const queries = [
         ['profiles', supabase.from('profiles').select('*, roleAssignments:profile_worship_roles!profile_worship_roles_profile_id_fkey(*, worshipRole:worship_roles(*, category:role_categories(*)))').order('name')],
         ['memberDirectory',supabase.rpc('get_member_directory')],
@@ -1263,10 +1268,14 @@ export function AppProvider({ children }) {
 
   const updateService = async (id, data) => {
     if(!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to edit services.'}
+    const target = services.find(service => service.id === id)
+    if (target?.weeklyTemplateKey && ['title','date','time','weeklyTemplateKey','recurrenceGroupId'].some(key => data[key] !== undefined && data[key] !== target[key])) return { error:'The weekly schedule is fixed.' }
+    if (data.soundcheckTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.soundcheckTime)) return { error:'Invalid soundcheck time.' }
     if(data.title!==undefined){const title=normalizeRequiredText(data.title);if(isBlankText(title)){const message='Service title is required.';toast(message,'error');return {error:message}};data={...data,title}}
     if (isDemoMode) { setServices(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Service updated'); return { success:true } }
     const u = {}
     ;['title','date','time','type','status','notes','practice'].forEach(k => { if (data[k]!==undefined) u[k]=data[k] })
+    if (data.soundcheckTime !== undefined) u.soundcheck_time = data.soundcheckTime || null
     const { error } = await supabase.from('services').update(u).eq('id',id).select('id').single()
     if (error) { toast(error.message,'error'); return { error:error.message } }
     setServices(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Service updated')

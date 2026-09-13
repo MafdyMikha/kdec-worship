@@ -1,3 +1,4 @@
+import { WEEKLY_SERVICES, weeklyServiceTitle } from '../lib/weeklyServices.js'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar, Music2, Users, CheckCircle, Clock, ChevronRight, Repeat } from 'lucide-react'
@@ -91,7 +92,7 @@ function ServiceRow({ svc, services, navigate, isAr }) {
         <div className="w-px bg-slate-100 self-stretch"/>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <Badge color="blue" size="xs">{svc.type}</Badge>
+            <Badge color="blue" size="xs">{svc.weeklyTemplateKey ? (isAr ? 'أسبوعي ثابت' : 'Fixed weekly') : svc.type}</Badge>
             <Badge color={statusColors[svc.status]||'slate'} size="xs">{statusLabels[svc.status]||svc.status}</Badge>
             {groupSize>1 && (
               <span className="flex items-center gap-1 text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200 font-medium">
@@ -99,7 +100,7 @@ function ServiceRow({ svc, services, navigate, isAr }) {
               </span>
             )}
           </div>
-          <h3 className="font-display font-semibold text-slate-800">{svc.title}</h3>
+          <h3 className="font-display font-semibold text-slate-800">{weeklyServiceTitle(svc, isAr)}</h3>
           <div className="flex items-center gap-4 text-sm text-slate-500 mt-1 flex-wrap">
             <span className="flex items-center gap-1"><Clock size={12}/>{svc.time}</span>
             <span className="flex items-center gap-1"><Music2 size={12}/>{svc.setlist.length} {isAr?'ترنيمة':'songs'}</span>
@@ -178,11 +179,11 @@ export default function Services() {
 
   const filtered = services.filter(s => {
     const q = search.toLowerCase()
-    const matchQ = s.title.toLowerCase().includes(q) || s.type.toLowerCase().includes(q)
+    const matchQ = weeklyServiceTitle(s, isAr).toLowerCase().includes(q) || s.type.toLowerCase().includes(q)
     if (tab==='upcoming') return matchQ && s.date>=todayKey && s.status!=='completed' && s.status!=='cancelled'
     if (tab==='past')     return matchQ && (s.date<todayKey||s.status==='completed'||s.status==='cancelled')
     return matchQ
-  }).sort((a,b)=>tab==='past'?parseISO(b.date)-parseISO(a.date):parseISO(a.date)-parseISO(b.date))
+  }).sort((a,b)=>tab==='past'?b.date.localeCompare(a.date)||b.time.localeCompare(a.time):a.date.localeCompare(b.date)||a.time.localeCompare(b.time))
 
   const upcomingCount  = services.filter(s=>s.date>=todayKey&&s.status!=='completed'&&s.status!=='cancelled').length
   const recurringCount = [...new Set(services.filter(s=>s.recurrenceGroupId).map(s=>s.recurrenceGroupId))]
@@ -223,9 +224,17 @@ export default function Services() {
             className={`p-2.5 rounded-lg border cursor-pointer transition-all ${grouped?'bg-violet-50 border-violet-300 text-violet-600':'border-slate-200 text-slate-400 hover:border-slate-300'}`}>
             <Repeat size={16}/>
           </button>
-          {canCreate&&<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>}
+          {canCreate&&<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{isAr?'إضافة خدمة':'Add Service'}</Btn>}
         </div>
       </div>
+
+      <Card className="p-4 space-y-2">
+        <h2 className="font-semibold">{isAr ? 'الاجتماعات الأسبوعية الثابتة' : 'Fixed weekly meetings'}</h2>
+        <p className="text-sm text-slate-500">{isAr ? 'تظهر تلقائياً لمدة ١٢ أسبوعاً قادمة. اختر موعداً لتعيين الفريق وتجهيز الاجتماع.' : 'Automatically scheduled for the next 12 weeks. Open an occurrence to assign the team and prepare the meeting.'}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+          {WEEKLY_SERVICES.map(item => <div key={item.key} className="rounded-lg bg-slate-50 p-2">{isAr ? item.titleAr : item.title} · {item.day === 2 ? (isAr ? 'الثلاثاء' : 'Tuesday') : (isAr ? 'الجمعة' : 'Friday')} · <bdi>{item.time}</bdi></div>)}
+        </div>
+      </Card>
 
       {recurringCount>0 && tab!=='past' && (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-violet-50 border border-violet-200 rounded-xl text-sm text-violet-700">
@@ -237,7 +246,7 @@ export default function Services() {
         ? <EmptyState icon={<Calendar size={28}/>}
             title={isAr?'لا توجد خدمات':'No services found'}
             description={tab==='upcoming'?(isAr?'لا توجد خدمات قادمة.':'No upcoming services.'):(isAr?'لا توجد نتائج.':'No results.')}
-            action={canCreate?<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{t('newService')}</Btn>:null}/>
+            action={canCreate?<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{isAr?'إضافة خدمة':'Add Service'}</Btn>:null}/>
         : <div className="space-y-3">{renderList()}</div>
       }
 

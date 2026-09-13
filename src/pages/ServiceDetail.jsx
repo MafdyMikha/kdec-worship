@@ -1,3 +1,5 @@
+import ServicePreparation from '../components/ServicePreparation'
+import { weeklyServiceTitle } from '../lib/weeklyServices.js'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Users, Edit2, Check, X, Save, Repeat, RefreshCw, AlertCircle } from 'lucide-react'
@@ -18,7 +20,7 @@ export default function ServiceDetail() {
   const {services,people,currentUser,updateService,deleteService,deleteRecurringService,generateMoreOccurrences,addTeamMember,updateTeamMemberStatus,removeTeamMember,requestSubstitute,ROLES,worshipRoles}=useStore()
   const { t, isAr } = useLang()
 
-  const [tab,             setTab]            = useState('setlist')
+  const [tab,             setTab]            = useState('team')
   const [showAddPerson,   setShowAddPerson]  = useState(false)
   const [selectedPerson,  setSelectedPerson] = useState('')
   const [selectedRole,    setSelectedRole]   = useState(ROLES[0])
@@ -99,7 +101,7 @@ export default function ServiceDetail() {
             <Badge color="blue" size="xs">{service.type}</Badge>
             <Badge color={SVC_STATUS_COLOR[service.status]||'slate'} size="xs">{SVC_STATUS[service.status]||service.status}</Badge>
           </div>
-          <h2 className="font-display font-bold text-xl text-slate-800">{service.title}</h2>
+          <h2 className="font-display font-bold text-xl text-slate-800">{weeklyServiceTitle(service, isAr)}</h2>
           <p className="text-sm text-slate-500">{format(parseISO(service.date),'EEEE, d MMMM yyyy',{locale:isAr?ar:undefined})} · <bdi>{service.time}</bdi></p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
@@ -138,6 +140,8 @@ export default function ServiceDetail() {
       })()}
 
       {/* Notes banner */}
+      <ServicePreparation key={`${service.id}:${service.soundcheckTime}:${JSON.stringify(service.practice)}`} service={service} canEdit={canEdit}/>
+
       {service.notes && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
           <span>📌</span> {service.notes}
