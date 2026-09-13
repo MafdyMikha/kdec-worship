@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Input, Btn } from './ui'
 
-export default function ServicePreparation({ service, canEdit }) {
+export default function ServicePreparation({ service, canEdit, onSaved }) {
   const { updateService } = useStore()
   const { isAr } = useLang()
   const [soundcheck, setSoundcheck] = useState(service.soundcheckTime || '')
@@ -21,6 +21,7 @@ export default function ServicePreparation({ service, canEdit }) {
         practice:enabled ? { ...service.practice, enabled:true, date, time } : { enabled:false },
       })
       if (result?.error) setError(result.error)
+      else if (result?.success) onSaved?.()
     } catch {
       setError(isAr ? 'تعذر الحفظ. حاول مرة أخرى.' : 'Could not save. Please try again.')
     } finally { setSaving(false) }
@@ -37,6 +38,6 @@ export default function ServicePreparation({ service, canEdit }) {
       <Input label={isAr ? 'وقت البروفة' : 'Rehearsal time'} type="time" required value={time} disabled={!canEdit || saving} onChange={event => setTime(event.target.value)}/>
     </div>}
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    {canEdit && <Btn onClick={save} disabled={saving || (enabled && (!date || !time))}>{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ التجهيزات' : 'Save preparation')}</Btn>}
+    {canEdit && <Btn onClick={save} disabled={saving || (enabled && (!date || !time))}>{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ وعرض تفاصيل الخدمة' : 'Save & View Details')}</Btn>}
   </Card>
 }

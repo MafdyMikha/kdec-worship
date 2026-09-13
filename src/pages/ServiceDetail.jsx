@@ -1,7 +1,7 @@
 import ServicePreparation from '../components/ServicePreparation'
 import { weeklyServiceTitle } from '../lib/weeklyServices.js'
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Plus, Trash2, Users, Edit2, Check, X, Save, Repeat, RefreshCw, AlertCircle } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ar } from 'date-fns/locale'
@@ -16,6 +16,8 @@ import RehearsalReminder from '../components/RehearsalReminder'
 
 export default function ServiceDetail() {
   const { id } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const viewingDetails = searchParams.get('view') === 'details'
   const navigate = useNavigate()
   const {services,people,currentUser,updateService,deleteService,deleteRecurringService,generateMoreOccurrences,addTeamMember,updateTeamMemberStatus,removeTeamMember,requestSubstitute,ROLES,worshipRoles}=useStore()
   const { t, isAr } = useLang()
@@ -93,7 +95,7 @@ export default function ServiceDetail() {
     <div className="max-w-7xl space-y-6 animate-fade-in">
       {/* Header */}
       <div className="worship-service-header flex items-start gap-3">
-        <button onClick={() => navigate('/services')} aria-label={isAr?'العودة للخدمات':'Back to services'} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer mt-1">
+        <button onClick={() => navigate(service.weeklyTemplateKey === 'youth' ? '/services/youth' : '/services')} aria-label={isAr?'العودة للخدمات':'Back to services'} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer mt-1">
           <ArrowLeft size={18} className={isAr?'rotate-180':''}/>
         </button>
         <div className="flex-1">
@@ -140,7 +142,15 @@ export default function ServiceDetail() {
       })()}
 
       {/* Notes banner */}
-      <ServicePreparation key={`${service.id}:${service.soundcheckTime}:${JSON.stringify(service.practice)}`} service={service} canEdit={canEdit}/>
+      {viewingDetails ? <Card className="p-5 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="font-semibold">{isAr ? 'تفاصيل الخدمة' : 'Service details'}</h3>
+          {canEdit && <Btn variant="secondary" onClick={() => setSearchParams({})}>{isAr ? 'تعديل التجهيزات' : 'Edit preparation'}</Btn>}
+        </div>
+        <p>{isAr ? 'الساوند تشيك: ' : 'Soundcheck: '}<bdi>{service.soundcheckTime || (isAr ? 'غير محدد' : 'Not set')}</bdi></p>
+        <p>{isAr ? 'البروفة: ' : 'Rehearsal: '}{service.practice?.enabled ? <bdi>{service.practice.date} · {service.practice.time}</bdi> : (isAr ? 'لا توجد بروفة' : 'No rehearsal')}</p>
+        <p>{isAr ? 'عدد أعضاء الفريق: ' : 'Team members: '}{service.team.length}</p>
+      </Card> : <ServicePreparation key={`${service.id}:${service.soundcheckTime}:${JSON.stringify(service.practice)}`} service={service} canEdit={canEdit} onSaved={() => setSearchParams({ view:'details' })}/> }
 
       {service.notes && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">

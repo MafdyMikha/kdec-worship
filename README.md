@@ -116,9 +116,11 @@ Use `npm run build` and publish `dist/`. Configure `VITE_SUPABASE_URL` and `VITE
 
 ### Youth Meeting calendar
 
-Services now opens with a calendar for Youth Meeting, every Friday at 18:00
-(Cairo time). Select a Friday and open its details to assign the team and save
-soundcheck, optional rehearsal, songs and notes for that occurrence only.
+Services opens with a Youth Meeting card. Open it to reach the calendar, then
+select a Friday at 18:00 (Cairo time) and open the meeting setup. Assign the team
+and enter soundcheck, optional rehearsal, songs and notes for that occurrence.
+Save & View Details saves preparation before showing the service summary; Edit
+preparation returns to the form. The details view can be bookmarked and reloaded.
 Add Service remains available for extra meetings; existing services are retained
 under “View all services and extra meetings”.
 

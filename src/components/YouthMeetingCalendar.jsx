@@ -33,7 +33,8 @@ export default function YouthMeetingCalendar() {
     } catch { setError(isAr ? 'تعذر فتح الاجتماع. حاول مرة أخرى.' : 'Could not open the meeting. Please try again.') }
     finally { setBusy(false) }
   }
-  return <Card className="p-4 sm:p-6 space-y-5">
+  return <Card className="max-w-5xl p-4 sm:p-6 space-y-5">
+    <Btn variant="ghost" onClick={() => navigate('/services')}>{isAr ? 'العودة للخدمات' : 'Back to services'}</Btn>
     <div>
       <h2 className="text-xl font-semibold">{isAr ? 'اجتماع الشباب' : 'Youth Meeting'}</h2>
       <p className="mt-1 text-sm text-slate-500">{isAr ? 'كل جمعة الساعة ٦ مساءً. اختر التاريخ ثم أضف الفريق والساوند تشيك والبروفة وباقي التفاصيل.' : 'Every Friday at 6:00 PM. Choose a date, then add the team, soundcheck, rehearsal and other details.'}</p>

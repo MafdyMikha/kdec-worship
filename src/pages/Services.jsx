@@ -1,4 +1,3 @@
-import YouthMeetingCalendar from '../components/YouthMeetingCalendar.jsx'
 import { weeklyServiceTitle } from '../lib/weeklyServices.js'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -213,10 +212,20 @@ export default function Services() {
   return (
     <div className="max-w-5xl space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold">{isAr ? 'اختر موعد اجتماع الشباب' : 'Choose a Youth Meeting date'}</h1>
+        <h1 className="text-xl font-semibold">{isAr ? 'الخدمات' : 'Services'}</h1>
         {canCreate && <Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{isAr ? 'إضافة خدمة' : 'Add Service'}</Btn>}
       </div>
-      <YouthMeetingCalendar/>
+      <button type="button" onClick={() => navigate('/services/youth')} className="w-full rounded-2xl border border-slate-200 bg-white p-6 text-start shadow-sm hover:border-indigo-300 focus-visible:outline-indigo-600">
+        <div className="flex items-center gap-4">
+          <Calendar size={28} className="text-indigo-600 shrink-0"/>
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold">{isAr ? 'اجتماع الشباب' : 'Youth Meeting'}</h2>
+            <p className="mt-1 text-sm text-slate-500">{isAr ? 'كل جمعة الساعة ٦ مساءً' : 'Every Friday at 6:00 PM'}</p>
+            <p className="mt-2 text-sm text-indigo-600">{isAr ? 'فتح التقويم واختيار التاريخ' : 'Open calendar and choose a date'}</p>
+          </div>
+          <ChevronRight size={20} className="rtl:rotate-180 shrink-0"/>
+        </div>
+      </button>
       <details className="space-y-4">
         <summary className="cursor-pointer text-sm font-medium text-slate-600">{isAr ? 'عرض كل الخدمات والاجتماعات الإضافية' : 'View all services and extra meetings'}</summary>
       <div className="flex items-center justify-between flex-wrap gap-3">

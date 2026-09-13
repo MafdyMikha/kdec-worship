@@ -7,6 +7,7 @@ import { Notifications } from './components/ui'
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const MemberHome = lazy(() => import('./pages/MemberHome'))
+const YouthMeetingCalendar = lazy(() => import('./components/YouthMeetingCalendar'))
 const Services = lazy(() => import('./pages/Services'))
 const ServiceDetail = lazy(() => import('./pages/ServiceDetail'))
 const Songs = lazy(() => import('./pages/Songs'))
@@ -87,6 +88,7 @@ function AuthGate() {
           <Route path="/dashboard"     element={<AdminOnly><Dashboard/></AdminOnly>}/>
           <Route path="/home"          element={<MemberHome/>}/>
           <Route path="/services"      element={<Services/>}/>
+          <Route path="/services/youth" element={<YouthMeetingCalendar/>}/>
           <Route path="/services/:id"  element={<ServiceDetail/>}/>
           <Route path="/songs"         element={<Songs/>}/>
           <Route path="/songs/:id"     element={<SongDetail/>}/>
