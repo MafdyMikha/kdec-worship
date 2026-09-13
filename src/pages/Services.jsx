@@ -1,4 +1,5 @@
-import { WEEKLY_SERVICES, weeklyServiceTitle } from '../lib/weeklyServices.js'
+import YouthMeetingCalendar from '../components/YouthMeetingCalendar.jsx'
+import { weeklyServiceTitle } from '../lib/weeklyServices.js'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar, Music2, Users, CheckCircle, Clock, ChevronRight, Repeat } from 'lucide-react'
@@ -211,6 +212,13 @@ export default function Services() {
 
   return (
     <div className="max-w-5xl space-y-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-xl font-semibold">{isAr ? 'اختر موعد اجتماع الشباب' : 'Choose a Youth Meeting date'}</h1>
+        {canCreate && <Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{isAr ? 'إضافة خدمة' : 'Add Service'}</Btn>}
+      </div>
+      <YouthMeetingCalendar/>
+      <details className="space-y-4">
+        <summary className="cursor-pointer text-sm font-medium text-slate-600">{isAr ? 'عرض كل الخدمات والاجتماعات الإضافية' : 'View all services and extra meetings'}</summary>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Tabs tabs={[
           { label:t('upcoming'), value:'upcoming', count:upcomingCount },
@@ -228,14 +236,6 @@ export default function Services() {
         </div>
       </div>
 
-      <Card className="p-4 space-y-2">
-        <h2 className="font-semibold">{isAr ? 'الاجتماعات الأسبوعية الثابتة' : 'Fixed weekly meetings'}</h2>
-        <p className="text-sm text-slate-500">{isAr ? 'تظهر تلقائياً لمدة ١٢ أسبوعاً قادمة. اختر موعداً لتعيين الفريق وتجهيز الاجتماع.' : 'Automatically scheduled for the next 12 weeks. Open an occurrence to assign the team and prepare the meeting.'}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-          {WEEKLY_SERVICES.map(item => <div key={item.key} className="rounded-lg bg-slate-50 p-2">{isAr ? item.titleAr : item.title} · {item.day === 2 ? (isAr ? 'الثلاثاء' : 'Tuesday') : (isAr ? 'الجمعة' : 'Friday')} · <bdi>{item.time}</bdi></div>)}
-        </div>
-      </Card>
-
       {recurringCount>0 && tab!=='past' && (
         <div className="flex items-center gap-2 px-4 py-2.5 bg-violet-50 border border-violet-200 rounded-xl text-sm text-violet-700">
           <Repeat size={14}/> {recurringCount} {isAr?'سلسلة متكررة — استخدم':'recurring series — use'} <Repeat size={12} className="inline"/> {isAr?'للتجميع':'to group'}
@@ -249,6 +249,8 @@ export default function Services() {
             action={canCreate?<Btn onClick={()=>setShowAdd(true)} icon={<Plus size={16}/>}>{isAr?'إضافة خدمة':'Add Service'}</Btn>:null}/>
         : <div className="space-y-3">{renderList()}</div>
       }
+
+      </details>
 
       <Modal open={canCreate&&showAdd} onClose={()=>setShowAdd(false)} title={isAr?'إنشاء خدمة جديدة':'Create New Service'} size="lg"
         footer={<>

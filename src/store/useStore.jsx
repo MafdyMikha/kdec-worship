@@ -3,7 +3,7 @@ import { useState, useEffect, createContext, useContext, useCallback, useRef } f
 import { format, parseISO } from 'date-fns'
 import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } from '../lib/supabase.js'
 import { attendanceOccurrenceDate, attendanceTiming, validateAttendanceSessionSchedule } from '../lib/attendance.js'
-import { ensureDemoWeeklyServices } from '../lib/weeklyServices.js'
+import { ensureDemoWeeklyServices, isYouthMeetingDate } from '../lib/weeklyServices.js'
 import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
 import { shouldReloadAuthProfile } from '../lib/authEvents.js'
@@ -1213,6 +1213,22 @@ export function AppProvider({ children }) {
   }
 
   // ── SERVICES ────────────────────────────────────────────
+  const openYouthMeeting = async (date) => {
+    if (!isYouthMeetingDate(date)) return { error:'Choose a Friday for Youth Meeting.' }
+    const existing = services.find(service => service.weeklyTemplateKey === 'youth' && service.date === date)
+    if (existing) return { id:existing.id }
+    if (!hasPermission(currentUser,'services.create')) return { error:'You do not have permission to create services.' }
+    if (isDemoMode) {
+      const occurrence = ensureDemoWeeklyServices([], date)[0]
+      setServices(previous => previous.some(service => service.id === occurrence.id) ? previous : [...previous, occurrence])
+      return { id:occurrence.id }
+    }
+    const { data, error } = await supabase.rpc('open_youth_meeting', { p_date:date })
+    if (error) return { error:error.message }
+    await loadAll(Boolean(currentUser?.isAdmin || currentUser?.is_admin))
+    return { id:data }
+  }
+
   const addService = async (data) => {
     if(!hasPermission(currentUser,'services.create'))return {error:'You do not have permission to create services.'}
     const title=normalizeRequiredText(data.title)
@@ -1773,7 +1789,7 @@ export function AppProvider({ children }) {
     saveRoleCategory,saveWorshipRole,setWorshipRoleStatus,reorderWorshipRoles,updateAccessPermissions,
     addSong, updateSong, deleteSong,
     bulkImportSongs, uploadSongCharts, getSongChartUrl, deleteSongChart,
-    addService, updateService, updateRecurringService,
+    openYouthMeeting, addService, updateService, updateRecurringService,
     deleteService, deleteRecurringService, generateMoreOccurrences,
     addToSetlist, removeFromSetlist, reorderSetlist, updateSetlistBlocks,
     addTeamMember, updateTeamMemberStatus, removeTeamMember,

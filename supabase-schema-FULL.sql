@@ -2448,10 +2448,36 @@ begin
   insert into public.services(title,date,time,type,weekly_template_key)
     select t.title, v_today + offset_day, t.time, 'Weekly Meeting', t.key
     from public.weekly_service_templates t cross join generate_series(0,83) offset_day
-    where extract(dow from (v_today + offset_day)) = t.weekday
+    where t.key = 'youth' and extract(dow from (v_today + offset_day)) = t.weekday
     on conflict (weekly_template_key,date) where weekly_template_key is not null do nothing;
 end;
 $$;
 revoke all on function public.ensure_weekly_services() from public, anon;
 grant execute on function public.ensure_weekly_services() to authenticated;
+
+-- Open a selected Friday without duplicating it or resetting its preparation.
+create or replace function public.open_youth_meeting(p_date date)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  if not public.is_active_member() then
+    raise exception 'Active membership required' using errcode = '42501';
+  end if;
+  if p_date is null or extract(dow from p_date) <> 5 then
+    raise exception 'Choose a Friday for Youth Meeting';
+  end if;
+  select id into v_id from public.services where weekly_template_key = 'youth' and date = p_date;
+  if v_id is not null then return v_id; end if;
+  if not public.has_permission('services.create') then
+    raise exception 'Service creation permission required' using errcode = '42501';
+  end if;
+  insert into public.services(title,date,time,type,weekly_template_key,created_by)
+    values ('Youth Meeting',p_date,'18:00','Weekly Meeting','youth',auth.uid())
+    on conflict (weekly_template_key,date) where weekly_template_key is not null do nothing;
+  select id into v_id from public.services where weekly_template_key = 'youth' and date = p_date;
+  return v_id;
+end;
+$$;
+revoke all on function public.open_youth_meeting(date) from public, anon;
+grant execute on function public.open_youth_meeting(date) to authenticated;
 commit;

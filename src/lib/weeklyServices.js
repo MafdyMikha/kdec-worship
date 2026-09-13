@@ -17,7 +17,7 @@ export function ensureDemoWeeklyServices(services, today = format(new Date(), 'y
   const existing = new Set(services.map(service => `${service.weeklyTemplateKey}:${service.date}`))
   for (let offset = 0; offset < 84; offset++) {
     const date = addDays(parseISO(today), offset)
-    for (const template of WEEKLY_SERVICES.filter(item => item.day === date.getDay())) {
+    for (const template of WEEKLY_SERVICES.filter(item => item.key === 'youth' && item.day === date.getDay())) {
       const dateKey = format(date, 'yyyy-MM-dd')
       if (existing.has(`${template.key}:${dateKey}`)) continue
       result.push({ id:`weekly-${template.key}-${dateKey}`, weeklyTemplateKey:template.key,
@@ -27,4 +27,9 @@ export function ensureDemoWeeklyServices(services, today = format(new Date(), 'y
     }
   }
   return result
+}
+
+export function isYouthMeetingDate(date) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(parseISO(date).getTime())
+    && format(parseISO(date), 'yyyy-MM-dd') === date && parseISO(date).getDay() === 5
 }

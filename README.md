@@ -114,21 +114,25 @@ Use `npm run build` and publish `dist/`. Configure `VITE_SUPABASE_URL` and `VITE
 - Deactivate access at both the application and policy layers.
 - Review `npm audit` before releases; the checked-in dependency tree currently audits clean.
 
-### Fixed weekly meetings
+### Youth Meeting calendar
 
-For existing databases, apply `MIGRATION_fixed_weekly_services.sql` after the
-existing dynamic-role and QA-hardening migrations, before using this app version.
-Fresh installs include this SQL in `supabase-schema-FULL.sql`.
-The four templates are Friday youth at 18:00, Tuesday prayer at 19:00,
-Friday morning at 11:00, and Friday house meeting at 14:00 (Cairo time).
-On authenticated data load, `ensure_weekly_services` transactionally fills the next
-84 days. Its active-member check and server-defined templates permit ordinary
-members to load the schedule without granting them general service-write access.
-A unique template/date index makes reloads and concurrent requests idempotent;
-cancelled occurrences remain stored and are not recreated. No background scheduler
-is required; opening/reloading the app advances the planning window.
-Team assignments, soundcheck time and optional rehearsal belong to each service
-row. Fixed dates/times cannot be edited through an occurrence. Add Service still
-creates independent extra meetings. Demo mode uses the same schedule and stores
-occurrence preparation locally. Live persistence requires the migration above;
-failures are reported and never cause a fallback to demo data.
+Services now opens with a calendar for Youth Meeting, every Friday at 18:00
+(Cairo time). Select a Friday and open its details to assign the team and save
+soundcheck, optional rehearsal, songs and notes for that occurrence only.
+Add Service remains available for extra meetings; existing services are retained
+under “View all services and extra meetings”.
+
+Apply `MIGRATION_youth_meeting_calendar.sql` in Supabase SQL Editor after the
+existing dynamic-role and QA-hardening migrations. This migration is self-contained
+and works whether or not the earlier fixed-weekly migration was applied. Use this
+new migration for the youth-only workflow. Fresh installations include it in the
+full schema.
+
+Only Youth Meetings are now generated for the next 84 days on data load.
+Other previously generated meetings remain stored; they are not deleted or cancelled.
+Selecting a Friday outside that window opens or creates one occurrence through
+`open_youth_meeting`; creation requires `services.create`, and inactive or anonymous
+users are denied. Existing dates are reused, including cancelled occurrences.
+Unique template/date constraints prevent duplicates on reload and concurrent calls.
+Team/preparation writes still use the existing service-level authorization.
+Demo mode mirrors the youth calendar using browser-local persistence.
