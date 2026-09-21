@@ -146,3 +146,6 @@ These fields use the existing `services.practice` JSON column (`location` and `l
 # Time display
 
 Clock times use 12-hour display with AM/PM. Shared time fields provide hour, minute, and AM/PM choices independent of device settings. Scheduling values remain in 24-hour `HH:mm` format in storage, so no database migration is needed and attendance calculations are unchanged.
+# Rehearsal scheduling rule
+
+An enabled rehearsal must start strictly before its service. Same-day rehearsals are allowed only at an earlier time. Apply `MIGRATION_rehearsal_before_service.sql` in Supabase SQL Editor, then deploy the frontend. The migration leaves existing records untouched; invalid rehearsal schedules must be corrected when their rehearsal/date/time fields are next saved. The fresh-project schema includes the same trigger. No authorization policies are changed.

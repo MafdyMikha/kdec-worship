@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Input, Btn, Textarea } from './ui'
-import { prepareRehearsal, rehearsalLocationUrl } from '../lib/rehearsal.js'
+import { prepareRehearsal, rehearsalLocationUrl, rehearsalBeforeService } from '../lib/rehearsal.js'
 
 export default function ServicePreparation({ service, canEdit, onSaved }) {
   const { updateService } = useStore()
@@ -16,8 +16,11 @@ export default function ServicePreparation({ service, canEdit, onSaved }) {
   const [notes, setNotes] = useState(service.practice?.notes || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const validSchedule = rehearsalBeforeService({ enabled, date, time }, service)
+  const scheduleError = isAr ? 'يجب أن تبدأ البروفة قبل موعد الخدمة. في نفس اليوم، اختر وقتاً أسبق من وقت الخدمة.' : 'Rehearsal must start before the service. On the same day, choose an earlier time.'
   const save = async () => {
     if (!canEdit || saving) return
+    if (!validSchedule) { setError(scheduleError); return }
     if (enabled && locationUrl.trim() && !rehearsalLocationUrl(locationUrl)) {
       setError(isAr ? 'أدخل رابط موقع صحيح يبدأ بـ https:// أو http://' : 'Enter a valid location link starting with https:// or http://.')
       return
@@ -43,13 +46,13 @@ export default function ServicePreparation({ service, canEdit, onSaved }) {
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={enabled} disabled={!canEdit || saving} onChange={event => setEnabled(event.target.checked)}/>{isAr ? 'توجد بروفة' : 'Has rehearsal'}</label>
     </div>
     {enabled && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <Input label={isAr ? 'تاريخ البروفة' : 'Rehearsal date'} type="date" required value={date} disabled={!canEdit || saving} onChange={event => setDate(event.target.value)}/>
+      <Input label={isAr ? 'تاريخ البروفة' : 'Rehearsal date'} type="date" max={service.date} required value={date} disabled={!canEdit || saving} onChange={event => setDate(event.target.value)}/>
       <Input label={isAr ? 'وقت البروفة' : 'Rehearsal time'} type="time" required value={time} disabled={!canEdit || saving} onChange={event => setTime(event.target.value)}/>
       <Input label={isAr ? 'مكان البروفة' : 'Rehearsal location'} value={location} dir="auto" placeholder={isAr ? 'اكتب المكان' : 'Type the location'} disabled={!canEdit || saving} onChange={event => setLocation(event.target.value)}/>
       <Input label={isAr ? 'رابط الموقع' : 'Location link'} type="url" dir="ltr" value={locationUrl} placeholder="https://maps.google.com/..." disabled={!canEdit || saving} onChange={event => setLocationUrl(event.target.value)}/>
       <div className="sm:col-span-2"><Textarea label={isAr ? 'ملاحظات البروفة' : 'Rehearsal notes'} dir="auto" value={notes} disabled={!canEdit || saving} onChange={event => setNotes(event.target.value)}/></div>
     </div>}
-    {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    {canEdit && <Btn onClick={save} disabled={saving || (enabled && (!date || !time))}>{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ وعرض تفاصيل الخدمة' : 'Save & View Details')}</Btn>}
+    {(!validSchedule || error) && <p role="alert" className="text-sm text-red-600">{!validSchedule ? scheduleError : error}</p>}
+    {canEdit && <Btn onClick={save} disabled={saving || !validSchedule}>{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ وعرض تفاصيل الخدمة' : 'Save & View Details')}</Btn>}
   </Card>
 }

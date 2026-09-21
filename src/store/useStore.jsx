@@ -1,4 +1,5 @@
 import { formatClock } from '../lib/time.js'
+import { rehearsalBeforeService } from '../lib/rehearsal.js'
 /* eslint-disable react-refresh/only-export-components -- this module intentionally co-locates the provider with its public store helpers */
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
@@ -1286,6 +1287,7 @@ export function AppProvider({ children }) {
   const updateService = async (id, data) => {
     if(!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to edit services.'}
     const target = services.find(service => service.id === id)
+    if (['practice','date','time'].some(key => data[key] !== undefined) && !rehearsalBeforeService(data.practice === undefined ? target?.practice : data.practice, { ...target, ...data })) return { error:'Rehearsal must start before the service.' }
     if (target?.weeklyTemplateKey && ['title','date','time','weeklyTemplateKey','recurrenceGroupId'].some(key => data[key] !== undefined && data[key] !== target[key])) return { error:'The weekly schedule is fixed.' }
     if (data.soundcheckTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.soundcheckTime)) return { error:'Invalid soundcheck time.' }
     if(data.title!==undefined){const title=normalizeRequiredText(data.title);if(isBlankText(title)){const message='Service title is required.';toast(message,'error');return {error:message}};data={...data,title}}
@@ -1302,6 +1304,8 @@ export function AppProvider({ children }) {
   const updateRecurringService = async (id, data, scope) => {
     const svc = services.find(s => s.id===id)
     if (!svc?.recurrenceGroupId || scope==='this') return updateService(id, data)
+    const affected = services.filter(s => s.recurrenceGroupId === svc.recurrenceGroupId && (scope !== 'this_and_future' || s.date >= svc.date))
+    if (affected.some(s => !rehearsalBeforeService(s.practice, { ...s, time:data.time ?? s.time }))) return { error:'Rehearsal must start before the service for every affected occurrence.' }
     if (isDemoMode) {
       setServices(prev => prev.map(s => {
         if (s.recurrenceGroupId !== svc.recurrenceGroupId) return s
@@ -1474,6 +1478,7 @@ export function AppProvider({ children }) {
 
   // ── PRACTICE ────────────────────────────────────────────
   const setPractice = async (serviceId, practice) => {
+    if (!rehearsalBeforeService(practice, services.find(service => service.id === serviceId))) return { error:'Rehearsal must start before the service.' }
     if (isDemoMode) { setServices(prev => prev.map(s => s.id===serviceId?{...s,practice}:s)); toast(practice?.enabled?'Practice saved':'Practice removed'); return }
     const { error } = await supabase.from('services').update({ practice }).eq('id',serviceId).select('id').single()
     if (error) { toast(error.message,'error'); return { error:error.message } }
