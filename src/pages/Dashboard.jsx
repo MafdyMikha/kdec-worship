@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 import { Calendar, Music2, Users, CheckCircle, Clock, AlertCircle, ArrowRight, Star, QrCode, Megaphone } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
@@ -40,7 +41,7 @@ export default function Dashboard() {
           <p className="worship-eyebrow">{isAr ? 'الخدمة القادمة' : 'Your next service'}</p>
           {nextSvc ? <>
             <h2 dir="auto">{nextSvc.title}</h2>
-            <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{nextSvc.time}</bdi></p>
+            <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{formatClock(nextSvc.time)}</bdi></p>
             <hr/>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div><div className="flex gap-1 mb-2">{nextSvc.team.slice(0,5).map(tm=><Avatar key={tm.personId} name={(tm.person || people.find(p=>p.id===tm.personId))?.name} size="sm"/>)}</div>
@@ -97,7 +98,7 @@ export default function Dashboard() {
                     </div>
                     <h4 className="font-display font-semibold text-slate-800">{svc.title}</h4>
                     <div className="flex items-center gap-3 text-sm text-slate-500 mt-1 flex-wrap">
-                      <span className="flex items-center gap-1"><Clock size={12}/>{svc.time}</span>
+                      <span className="flex items-center gap-1"><Clock size={12}/>{formatClock(svc.time)}</span>
                       <span className="flex items-center gap-1"><Music2 size={12}/>{svc.setlist.length} {isAr?'ترنيمة':'songs'}</span>
                       {conf>0&&<span className="text-emerald-600 flex items-center gap-1"><CheckCircle size={12}/>{conf}</span>}
                       {pend>0&&<span className="text-amber-500">{pend} {isAr?'انتظار':'pending'}</span>}

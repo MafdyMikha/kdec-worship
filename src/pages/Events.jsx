@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 import { useState } from 'react'
 import { Plus, MapPin, Calendar, Clock, ChevronRight, Megaphone } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
@@ -143,7 +144,7 @@ export default function Events() {
                       <Calendar size={11}/>
                       {formatDate(evt.date)}{evt.endDate && ` — ${formatDate(evt.endDate)}`}
                     </span>
-                    {evt.time && <span className="flex items-center gap-1"><Clock size={11}/>{evt.time}</span>}
+                    {evt.time && <span className="flex items-center gap-1"><Clock size={11}/>{formatClock(evt.time)}</span>}
                     {evt.location && <span className="flex items-center gap-1"><MapPin size={11}/>{evt.location}</span>}
                   </div>
 
@@ -238,7 +239,7 @@ export default function Events() {
             {!isAr && showDetail.title && <p className="text-slate-400 italic" dir="rtl">{showDetail.title}</p>}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2 text-slate-600"><Calendar size={14}/>{formatDate(showDetail.date)}</div>
-              {showDetail.time && <div className="flex items-center gap-2 text-slate-600"><Clock size={14}/>{showDetail.time}</div>}
+              {showDetail.time && <div className="flex items-center gap-2 text-slate-600"><Clock size={14}/>{formatClock(showDetail.time)}</div>}
               {showDetail.location && <div className="flex items-center gap-2 text-slate-600 col-span-2"><MapPin size={14}/>{showDetail.location}</div>}
             </div>
             {(isAr ? showDetail.description : (showDetail.descriptionEn || showDetail.description)) && (

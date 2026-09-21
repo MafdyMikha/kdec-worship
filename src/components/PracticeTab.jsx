@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 import { useState } from 'react'
 import { Dumbbell, Plus, Check, X, Clock, MapPin, Edit2, Save, AlertCircle, Trash2, CheckCircle, HelpCircle } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
@@ -109,7 +110,7 @@ export default function PracticeTab({ service, canEdit=false }) {
                   <div className="flex items-center gap-4 text-sm text-slate-600 flex-wrap">
                     <span className="flex items-center gap-1.5 font-medium">
                       <Clock size={13} className="text-slate-400"/>
-                      {practice.date ? format(parseISO(practice.date), isAr ? 'EEEE، d MMMM' : 'EEE, MMM d', {locale}) : '—'} {isAr ? 'الساعة' : 'at'} {practice.time}
+                      {practice.date ? format(parseISO(practice.date), isAr ? 'EEEE، d MMMM' : 'EEE, MMM d', {locale}) : '—'} {isAr ? 'الساعة' : 'at'} {formatClock(practice.time)}
                     </span>
                     {practice.location && (
                       <span className="flex items-center gap-1.5">

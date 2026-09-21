@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, Clock, Music2, Users } from 'lucide-react'
 import {
@@ -148,9 +149,9 @@ export default function Schedule() {
                         {dayServices.map(svc => (
                           <button key={svc.id} type="button"
                             onClick={() => navigate(`/services/${svc.id}`)}
-                            title={`${svc.time} ${svc.title}`}
+                            title={`${formatClock(svc.time)} ${svc.title}`}
                             className={`block w-full text-start text-xs px-1.5 py-0.5 rounded border cursor-pointer truncate font-medium hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all ${TYPE_COLOR[svc.type] || DEFAULT_COLOR}`}>
-                            {svc.time} {svc.title}
+                            {formatClock(svc.time)} {svc.title}
                           </button>
                         ))}
                       </div>
@@ -213,7 +214,7 @@ export default function Schedule() {
                     <h3 className="font-semibold text-slate-800">{svc.title}</h3>
                     <div className="flex items-center gap-4 text-xs text-slate-500 mt-0.5 flex-wrap">
                       <span className="flex items-center gap-1">
-                        <Clock size={11}/>{svc.time}
+                        <Clock size={11}/>{formatClock(svc.time)}
                       </span>
                       <span className="flex items-center gap-1">
                         <Music2 size={11}/>{svc.setlist.length} {isAr ? 'ترنيمة' : 'songs'}

@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, Calendar, CheckCircle, AlertCircle, ChevronRight, Music2, Users, X } from 'lucide-react'
@@ -118,7 +119,7 @@ export default function MemberHome() {
       {nextSvc && <section className="worship-next-service">
         <p className="worship-eyebrow">{isAr?'خدمتك القادمة':'Your next service'}</p>
         <h2 dir="auto">{nextSvc.title}</h2>
-        <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{nextSvc.time}</bdi></p>
+        <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{formatClock(nextSvc.time)}</bdi></p>
         <div className="flex items-center justify-between flex-wrap gap-4 mt-5"><TimeUntil dateStr={nextSvc.date} timeStr={nextSvc.time} isAr={isAr}/><Btn onClick={()=>navigate(`/services/${nextSvc.id}`)}>{isAr?'عرض الخدمة':'Open service'}</Btn></div>
       </section>}
 
@@ -162,7 +163,7 @@ export default function MemberHome() {
                       </button>
                     </h4>
                     <div className="flex items-center gap-3 text-sm text-slate-500 mt-1 flex-wrap">
-                      <span className="flex items-center gap-1"><Clock size={12}/>{svc.time}</span>
+                      <span className="flex items-center gap-1"><Clock size={12}/>{formatClock(svc.time)}</span>
                       <span className="flex items-center gap-1"><Music2 size={12}/>{svc.setlist.length} {isAr?'ترنيمة':'songs'}</span>
                       {entry && <Badge color={STATUS_COLORS[entry.status]||'slate'} size="xs">{STATUS_LABEL[entry.status]||entry.status}</Badge>}
                     </div>

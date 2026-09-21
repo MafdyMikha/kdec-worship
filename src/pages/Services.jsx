@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 import { weeklyServiceTitle } from '../lib/weeklyServices.js'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -102,7 +103,7 @@ function ServiceRow({ svc, services, navigate, isAr }) {
           </div>
           <h3 className="font-display font-semibold text-slate-800">{weeklyServiceTitle(svc, isAr)}</h3>
           <div className="flex items-center gap-4 text-sm text-slate-500 mt-1 flex-wrap">
-            <span className="flex items-center gap-1"><Clock size={12}/>{svc.time}</span>
+            <span className="flex items-center gap-1"><Clock size={12}/>{formatClock(svc.time)}</span>
             <span className="flex items-center gap-1"><Music2 size={12}/>{svc.setlist.length} {isAr?'ترنيمة':'songs'}</span>
             <span className="flex items-center gap-1"><Users size={12}/>{svc.team.length} {isAr?'عضو':'members'}</span>
             {confirmed>0&&<span className="text-emerald-600 flex items-center gap-1"><CheckCircle size={12}/>{confirmed}</span>}
@@ -135,7 +136,7 @@ function RecurringGroup({ members, navigate, isAr }) {
             <Badge color="purple" size="xs">{members.length} {isAr?'تكرار':'occurrences'}</Badge>
           </div>
           <div className="text-xs text-slate-500">
-            {format(parseISO(first.date),'MMM d')} → {format(parseISO(last.date),'MMM d, yyyy')} · {first.time} · <span className="text-violet-600 font-medium">{freq}</span>
+            {format(parseISO(first.date),'MMM d')} → {format(parseISO(last.date),'MMM d, yyyy')} · {formatClock(first.time)} · <span className="text-violet-600 font-medium">{freq}</span>
           </div>
         </div>
         <ChevronRight size={16} className={`text-slate-400 transition-transform flex-shrink-0 ${open?'rotate-90':''}`}/>

@@ -1,3 +1,5 @@
+import { formatClock } from '../lib/time.js'
+import TimeInput from '../components/TimeInput'
 import { useState, useEffect } from 'react'
 import { Save, Eye, EyeOff, Check, Calendar, Shield, Lock, Clock, Plus, X } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
@@ -273,10 +275,10 @@ export default function Profile() {
                 <div key={s.id} className="flex items-center gap-2 flex-wrap px-3 py-2 bg-indigo-50 rounded-lg border border-indigo-100">
                   <Clock size={12} className="text-indigo-500 flex-shrink-0"/>
                   <span className="text-sm text-indigo-700 font-medium">{t(s.day)}</span>
-                  <span className="text-sm text-indigo-500" dir="ltr">{s.from} – {s.to}</span>
+                  <span className="text-sm text-indigo-500" dir="ltr">{formatClock(s.from)} – {formatClock(s.to)}</span>
                   {s.label && <span className="text-xs text-indigo-400 italic">{s.label}</span>}
                   <button type="button" onClick={() => setForm(f=>({...f,timeSlots:(f.timeSlots||[]).filter(ts=>ts.id!==s.id)}))}
-                    aria-label={isAr ? `حذف الفترة ${t(s.day)} ${s.from} إلى ${s.to}` : `Remove ${t(s.day)} ${s.from} to ${s.to} time slot`}
+                    aria-label={isAr ? `حذف الفترة ${t(s.day)} ${formatClock(s.from)} إلى ${formatClock(s.to)}` : `Remove ${t(s.day)} ${formatClock(s.from)} to ${formatClock(s.to)} time slot`}
                     className="ms-auto w-8 h-8 inline-flex items-center justify-center text-indigo-500 hover:text-red-600 cursor-pointer rounded-lg hover:bg-white"><X size={14} aria-hidden="true"/></button>
                 </div>
               ))}
@@ -293,12 +295,12 @@ export default function Profile() {
                   </div>
                   <div>
                     <label htmlFor="slot-from" className="block text-xs text-slate-500 mb-1">{isAr?'من':'From'}</label>
-                    <input id="slot-from" type="time" value={slotForm.from} onChange={e=>setSlotForm(f=>({...f,from:e.target.value}))}
+                    <TimeInput id="slot-from" aria-label={isAr?'من':'From'} value={slotForm.from} onChange={e=>setSlotForm(f=>({...f,from:e.target.value}))}
                       className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
                   </div>
                   <div>
                     <label htmlFor="slot-to" className="block text-xs text-slate-500 mb-1">{isAr?'إلى':'To'}</label>
-                    <input id="slot-to" type="time" value={slotForm.to} onChange={e=>setSlotForm(f=>({...f,to:e.target.value}))}
+                    <TimeInput id="slot-to" aria-label={isAr?'إلى':'To'} value={slotForm.to} onChange={e=>setSlotForm(f=>({...f,to:e.target.value}))}
                       className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
                   </div>
                 </div>
@@ -375,11 +377,11 @@ export default function Profile() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-slate-800 text-sm">{svc.title}</h3>
-                    <p className="text-xs text-slate-500">{svc.date} · {svc.time} · <strong>{me?.role}</strong></p>
+                    <p className="text-xs text-slate-500">{svc.date} · {formatClock(svc.time)} · <strong>{me?.role}</strong></p>
                     {svc.practice?.enabled && (
                       <div className="flex items-center gap-1.5 mt-1 text-xs text-emerald-600">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>
-                        {isAr?'بروفة':'Practice'}: {svc.practice.date} {isAr?'الساعة':'at'} {svc.practice.time}
+                        {isAr?'بروفة':'Practice'}: {svc.practice.date} {isAr?'الساعة':'at'} {formatClock(svc.practice.time)}
                       </div>
                     )}
                   </div>

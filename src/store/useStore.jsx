@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 /* eslint-disable react-refresh/only-export-components -- this module intentionally co-locates the provider with its public store helpers */
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
@@ -21,7 +22,7 @@ export function buildWhatsAppUrl(phone, message) {
   return `https://wa.me/${num}?text=${encodeURIComponent(message)}`
 }
 export function buildServiceNotificationMsg(service, person, role) {
-  return `🎵 *KDEC Worship – Service Assignment*\n\nHi ${person.name}!\n\nYou've been assigned to serve:\n\n📅 *${service.title}*\n🗓 ${service.date} at ${service.time}\n🎸 Your role: *${role}*\n\nPlease confirm your attendance.\n\n— KDEC Worship Team`
+  return `🎵 *KDEC Worship – Service Assignment*\n\nHi ${person.name}!\n\nYou've been assigned to serve:\n\n📅 *${service.title}*\n🗓 ${service.date} at ${formatClock(service.time)}\n🎸 Your role: *${role}*\n\nPlease confirm your attendance.\n\n— KDEC Worship Team`
 }
 export function buildInvitationMsg(inviteCode, inviterName) {
   const url = `${window.location.origin}?invite=${inviteCode}`

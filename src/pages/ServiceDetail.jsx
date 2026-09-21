@@ -1,3 +1,4 @@
+import { formatClock } from '../lib/time.js'
 import ServicePreparation from '../components/ServicePreparation'
 import { weeklyServiceTitle } from '../lib/weeklyServices.js'
 import { useState } from 'react'
@@ -103,7 +104,7 @@ export default function ServiceDetail() {
             <Badge color={SVC_STATUS_COLOR[service.status]||'slate'} size="xs">{SVC_STATUS[service.status]||service.status}</Badge>
           </div>
           <h2 className="font-display font-bold text-xl text-slate-800">{weeklyServiceTitle(service, isAr)}</h2>
-          <p className="text-sm text-slate-500">{format(parseISO(service.date),'EEEE, d MMMM yyyy',{locale:isAr?ar:undefined})} · <bdi>{service.time}</bdi></p>
+          <p className="text-sm text-slate-500">{format(parseISO(service.date),'EEEE, d MMMM yyyy',{locale:isAr?ar:undefined})} · <bdi>{formatClock(service.time)}</bdi></p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
           {canEdit && (
@@ -146,8 +147,8 @@ export default function ServiceDetail() {
           <h3 className="font-semibold">{isAr ? 'تفاصيل الخدمة' : 'Service details'}</h3>
           {canEdit && <Btn variant="secondary" onClick={() => setSearchParams({})}>{isAr ? 'تعديل التجهيزات' : 'Edit preparation'}</Btn>}
         </div>
-        <p>{isAr ? 'الساوند تشيك: ' : 'Soundcheck: '}<bdi>{service.soundcheckTime || (isAr ? 'غير محدد' : 'Not set')}</bdi></p>
-        <p>{isAr ? 'البروفة: ' : 'Rehearsal: '}{service.practice?.enabled ? <bdi>{service.practice.date} · {service.practice.time}</bdi> : (isAr ? 'لا توجد بروفة' : 'No rehearsal')}</p>
+        <p>{isAr ? 'الساوند تشيك: ' : 'Soundcheck: '}<bdi>{service.soundcheckTime ? formatClock(service.soundcheckTime) : (isAr ? 'غير محدد' : 'Not set')}</bdi></p>
+        <p>{isAr ? 'البروفة: ' : 'Rehearsal: '}{service.practice?.enabled ? <bdi>{service.practice.date} · {formatClock(service.practice.time)}</bdi> : (isAr ? 'لا توجد بروفة' : 'No rehearsal')}</p>
         {service.practice?.enabled && <>
           {service.practice.location && <p>{isAr ? 'مكان البروفة: ' : 'Rehearsal location: '}<bdi>{service.practice.location}</bdi></p>}
           {rehearsalLocationUrl(service.practice.locationUrl) && <a className="inline-block text-indigo-600 underline" href={rehearsalLocationUrl(service.practice.locationUrl)} target="_blank" rel="noopener noreferrer">{isAr ? 'فتح الموقع' : 'Open location'}</a>}

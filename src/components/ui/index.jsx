@@ -1,6 +1,7 @@
 import { X, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import TimeInput from '../TimeInput'
 import { useLang } from '../../lib/i18n.jsx'
 
 // Button
@@ -160,6 +161,11 @@ export function Input({ label, required, error, className = '', ...props }) {
   const generatedId = useId()
   const id = props.id || generatedId
   const errorId = `${id}-error`
+  if (props.type === 'time') return <div className={className}>
+    {label && <Label htmlFor={id} required={required}>{label}</Label>}
+    <TimeInput {...props} id={id} required={required} aria-label={label || props['aria-label']} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : props['aria-describedby']}/>
+    {error && <p id={errorId} role="alert" className="mt-1 text-xs text-red-600">{error}</p>}
+  </div>
   return (
     <div className={className}>
       {label && <Label htmlFor={id} required={required}>{label}</Label>}

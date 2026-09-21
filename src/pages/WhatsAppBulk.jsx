@@ -23,7 +23,7 @@ const buildUrl = (phone, msg) => {
 // ── Fill template placeholders ──────────────────────────────
 const fillTemplate = (template, person, service) => {
   const date = service?.date || ''
-  const time = service?.time || ''
+  const time = service?.time ? formatClock(service.time) : ''
   const assignmentRole = service?.team?.find(member => member.personId === person?.id)?.role
   const personRole = Array.isArray(person?.roles) ? person.roles[0] : person?.role
   return template
@@ -500,3 +500,4 @@ export default function WhatsAppBulk() {
     </div>
   )
 }
+import { formatClock } from '../lib/time.js'

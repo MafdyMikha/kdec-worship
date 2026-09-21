@@ -187,7 +187,7 @@ function HistoryPane({ history,isAr }) {
   }
   if(!batches.length)return <div className="py-14 text-center text-slate-500"><History className="mx-auto mb-3 text-slate-300" size={34}/>{isAr?'لا يوجد سجل استيراد بعد':'No import history yet'}</div>
   return <div className="space-y-3">{batches.map(batch=><div key={batch.id} className="rounded-xl border border-slate-200 p-4">
-    <div className="flex flex-wrap items-start justify-between gap-2"><div><strong className="text-sm text-slate-800">{batch.source_name||batch.import_type}</strong><p className="text-xs text-slate-500">{new Date(batch.created_at).toLocaleString(isAr?'ar-EG':'en-GB')}</p></div><Badge color={batch.error_count?'yellow':'green'}>{batch.status}</Badge></div>
+    <div className="flex flex-wrap items-start justify-between gap-2"><div><strong className="text-sm text-slate-800">{batch.source_name||batch.import_type}</strong><p className="text-xs text-slate-500">{new Date(batch.created_at).toLocaleString(isAr?'ar-EG':'en-GB', { hour12:true })}</p></div><Badge color={batch.error_count?'yellow':'green'}>{batch.status}</Badge></div>
     <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-600"><span>{isAr?'الإجمالي':'Total'}: {batch.total_items}</span><span>{isAr?'جديدة':'Created'}: {batch.created_count}</span><span>{isAr?'محدثة':'Updated'}: {batch.updated_count}</span><span>{isAr?'ملفات':'Charts'}: {batch.chart_count}</span><span>{isAr?'أخطاء':'Errors'}: {batch.error_count}</span></div>
     {batch.error_count>0&&<Btn className="mt-3" variant="secondary" size="xs" icon={<Download size={13}/>} onClick={()=>downloadErrors(batch)}>{isAr?'تنزيل الأخطاء':'Download failures'}</Btn>}
   </div>)}</div>
