@@ -10,7 +10,7 @@ import { useLang } from '../lib/i18n.jsx'
 import { canManageWorship } from '../lib/permissions.js'
 import { Btn, Badge, Avatar, Modal, Select, Textarea, Card, StatusDot, ConfirmDialog } from '../components/ui'
 import WhatsAppNotify from '../components/WhatsAppNotify'
-import PracticeTab from '../components/PracticeTab'
+import { rehearsalLocationUrl } from '../lib/rehearsal.js'
 import SetlistTab from '../components/SetlistTab'
 import RehearsalReminder from '../components/RehearsalReminder'
 
@@ -75,7 +75,6 @@ export default function ServiceDetail() {
   const TABS = [
     { key:'setlist',  label: isAr?'قائمة الترانيم':'Setlist', count: service.setlist.length },
     { key:'team',     label: isAr?'الفريق':'Team',            count: service.team.length },
-    { key:'practice', label: isAr?'البروفة':'Practice',       highlight: service.practice?.enabled },
     { key:'notes',    label: isAr?'ملاحظات':'Notes' },
   ]
 
@@ -149,6 +148,11 @@ export default function ServiceDetail() {
         </div>
         <p>{isAr ? 'الساوند تشيك: ' : 'Soundcheck: '}<bdi>{service.soundcheckTime || (isAr ? 'غير محدد' : 'Not set')}</bdi></p>
         <p>{isAr ? 'البروفة: ' : 'Rehearsal: '}{service.practice?.enabled ? <bdi>{service.practice.date} · {service.practice.time}</bdi> : (isAr ? 'لا توجد بروفة' : 'No rehearsal')}</p>
+        {service.practice?.enabled && <>
+          {service.practice.location && <p>{isAr ? 'مكان البروفة: ' : 'Rehearsal location: '}<bdi>{service.practice.location}</bdi></p>}
+          {rehearsalLocationUrl(service.practice.locationUrl) && <a className="inline-block text-indigo-600 underline" href={rehearsalLocationUrl(service.practice.locationUrl)} target="_blank" rel="noopener noreferrer">{isAr ? 'فتح الموقع' : 'Open location'}</a>}
+          {service.practice.notes && <p className="whitespace-pre-wrap" dir="auto">{service.practice.notes}</p>}
+        </>}
         <p>{isAr ? 'عدد أعضاء الفريق: ' : 'Team members: '}{service.team.length}</p>
       </Card> : <ServicePreparation key={`${service.id}:${service.soundcheckTime}:${JSON.stringify(service.practice)}`} service={service} canEdit={canEdit} onSaved={() => setSearchParams({ view:'details' })}/> }
 
@@ -253,9 +257,6 @@ export default function ServiceDetail() {
           )}
         </div>
       )}
-
-      {/* Practice */}
-      {tab==='practice' && <PracticeTab key={service.id} service={service} canEdit={canEdit}/>}
 
       {/* Notes */}
       {tab==='notes' && (

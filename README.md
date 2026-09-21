@@ -138,3 +138,8 @@ users are denied. Existing dates are reused, including cancelled occurrences.
 Unique template/date constraints prevent duplicates on reload and concurrent calls.
 Team/preparation writes still use the existing service-level authorization.
 Demo mode mirrors the youth calendar using browser-local persistence.
+# Rehearsal preparation
+
+Service rehearsal scheduling is managed through **Prepare this meeting → Has rehearsal**, not a separate Practice tab. Managers can enter the date, time, location, optional HTTP/HTTPS location link, and notes, then save. Details and rehearsal reminders show an **Open location** link. Existing rehearsal attendance metadata is retained when editing or disabling a rehearsal.
+
+These fields use the existing `services.practice` JSON column (`location` and `locationUrl`); no database migration is required. Existing service-update authorization remains unchanged. Deploy the updated frontend, then verify saving and reloading a rehearsal in English and Arabic on desktop and mobile.
