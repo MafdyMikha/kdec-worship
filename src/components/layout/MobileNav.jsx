@@ -148,7 +148,7 @@ export default function MobileNav() {
                 <X size={16}/>
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 min-[400px]:grid-cols-4 gap-2">
               {more.map(item => (
                 <NavLink
                   key={item.to}
@@ -175,7 +175,7 @@ export default function MobileNav() {
       )}
 
       {/* Bottom nav bar — mobile only */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-bottom">
+      <nav className="worship-mobile-nav md:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 safe-bottom">
         <div className="flex items-center">
           {primary.map(item => (
             <NavLink

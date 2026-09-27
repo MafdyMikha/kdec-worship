@@ -28,16 +28,11 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl"/>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl"/>
-      </div>
-
+    <div className="worship-login min-h-screen flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
-        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden">
+        <div className="worship-login-card rounded-3xl overflow-hidden">
 
-          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-8 py-7 text-center">
+          <div className="worship-login-heading px-8 py-7 text-center">
             <div className="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg p-1.5">
               <img src={KDEC_LOGO} alt="KDEC" className="w-full h-full object-contain"/>
             </div>
@@ -95,7 +90,7 @@ export default function ResetPassword() {
                   </div>
 
                   <button type="submit" disabled={loading}
-                    className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold rounded-xl hover:from-indigo-700 transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
+                    className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
                     {loading
                       ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
                       : <CheckCircle size={17}/>}
@@ -117,7 +112,7 @@ export default function ResetPassword() {
                   </p>
                 </div>
                 <button onClick={() => { finishPasswordRecovery(); window.location.assign('/') }}
-                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold rounded-xl cursor-pointer hover:from-indigo-700 transition-all">
+                  className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl cursor-pointer hover:bg-indigo-700 transition-all">
                   {isAr ? 'الذهاب للتطبيق' : 'Go to App'}
                 </button>
               </div>

@@ -46,6 +46,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="worship-app flex h-screen h-dvh overflow-hidden bg-slate-50" dir={isAr ? 'rtl' : 'ltr'}>
+      <a href="#main-content" className="worship-skip-link">{isAr ? 'انتقل إلى المحتوى' : 'Skip to content'}</a>
       {/* Sidebar — desktop only */}
       <Sidebar/>
 
@@ -53,7 +54,7 @@ export default function Layout({ children }) {
         <Header title={title}/>
 
         {/* Page content — extra bottom padding on mobile for bottom nav */}
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
           <div className="worship-content p-4 md:p-8 pb-24 md:pb-8 animate-fade-in">
             {introductions[pathname] && <div className="worship-page-heading"><div><h1>{title}</h1><p>{introductions[pathname]}</p></div></div>}
             {children}

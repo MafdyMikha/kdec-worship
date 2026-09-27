@@ -5,11 +5,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: { 50:'#fbf4f4', 100:'#f3e3e5', 200:'#e4c7cc', 300:'#d3a5af', 400:'#b97989', 500:'#a36173', 600:'#8b4f5c', 700:'#733e4b', 800:'#603540', 900:'#4b2c34', 950:'#302026' },
-        // Keep existing utility consumers connected to the shared warm palette.
-        indigo: { 50:'#fbf4f4', 100:'#f3e3e5', 200:'#e4c7cc', 300:'#d3a5af', 400:'#b97989', 500:'#a36173', 600:'#8b4f5c', 700:'#733e4b', 800:'#603540', 900:'#4b2c34', 950:'#302026' },
-        slate: { 50:'#faf7f2', 100:'#f0e8df', 200:'#ddd2c7', 300:'#c4b4a6', 400:'#7b695e', 500:'#716157', 600:'#605149', 700:'#493d35', 800:'#302722', 900:'#241e1a', 950:'#191512' },
-        white: '#fffdfa',
+        brand: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a', 950:'#172554' },
+        // Existing indigo utilities share the KDEC blue brand palette.
+        indigo: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a', 950:'#172554' },
+        slate: { 50:'#f5f8fc', 100:'#edf3fa', 200:'#dce5f0', 300:'#b6c7dc', 400:'#60758f', 500:'#536981', 600:'#405671', 700:'#2c4360', 800:'#182f4d', 900:'#102139', 950:'#091527' },
+        white: '#ffffff',
       },
       fontFamily: {
         display: ['"Outfit"', 'sans-serif'],

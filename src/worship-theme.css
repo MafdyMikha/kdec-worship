@@ -1,4 +1,4 @@
-/* Calm & Connected: shared presentation tokens, without changing workflow state. */
+/* Shared presentation styles; workflow state remains in the existing store. */
 .worship-sidebar{background:var(--bg-sidebar);border-inline-end:1px solid var(--border);color:var(--text-p)}
 .worship-sidebar>div{border-color:var(--border)}
 .worship-sidebar nav{padding:20px 12px;}
@@ -40,3 +40,91 @@
 @media(max-width:1100px){.worship-service-layout{grid-template-columns:minmax(0,1fr)}.worship-service-layout>aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}}
 @media(max-width:640px){.worship-service-layout>aside{display:block}.worship-next-service{padding:20px;}.worship-service-header{padding:16px;}.worship-service-header>div:last-child{flex-wrap:wrap;}.worship-service-header h2{font-size:24px;}.worship-app button,.worship-app a{touch-action:manipulation;}.worship-app .worship-button{min-height:44px;}}
 @media(prefers-reduced-motion:reduce){.worship-app *,.worship-login *{animation:none!important;transition:none!important;}}
+
+/* KDEC blue & white: shared surfaces and interaction treatments. */
+.worship-header {
+  background: var(--bg-card);
+  min-height: 76px;
+}
+.worship-sidebar nav a[aria-current=page] {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 var(--accent);
+  font-weight: 700;
+}
+[dir=rtl] .worship-sidebar nav a[aria-current=page] {
+  box-shadow: inset -3px 0 var(--accent);
+}
+.worship-sidebar-profile { border: 1px solid var(--border); }
+.worship-initials { background: var(--accent-soft); color: var(--accent); }
+.worship-card { border-radius: 16px; box-shadow: 0 3px 12px rgb(24 47 77 / 3%); }
+.worship-page-heading { padding-block: 6px; margin-bottom: 30px; }
+.worship-page-heading h1 { font-weight: 600; letter-spacing: -1px; }
+.worship-page-heading p { line-height: 1.8; }
+.worship-next-service {
+  background: var(--accent-soft);
+  border: 1px solid var(--border-h);
+  border-inline-start: 4px solid var(--accent);
+  padding: 32px;
+  border-radius: 18px;
+}
+.worship-next-service h2 { font-size: clamp(24px, 2.5vw, 34px); font-weight: 600; }
+.worship-next-service hr { border-color: var(--border-h); }
+.worship-next-service .worship-eyebrow { display: flex; align-items: center; gap: 8px; }
+.worship-next-service .worship-eyebrow::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+}
+.worship-stat { position: relative; overflow: hidden; }
+.worship-stat > div:first-child { margin-bottom: 20px; }
+.worship-stat > div:nth-child(2) { font-size: 32px; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.worship-reminder { border: 1px solid var(--border); }
+.worship-button { transition: background-color .15s, border-color .15s, box-shadow .15s; }
+.worship-button:active { transform: translateY(1px); }
+.worship-button:disabled { transform: none; }
+.worship-button.bg-indigo-600 { box-shadow: 0 3px 8px rgb(37 99 235 / 18%); }
+.worship-app input:not([type=checkbox]):not([type=radio]),
+.worship-app select, .worship-app textarea,
+.worship-modal input:not([type=checkbox]):not([type=radio]),
+.worship-modal select, .worship-modal textarea { border-radius: 10px; }
+.worship-app table { border-collapse: separate; border-spacing: 0; }
+.worship-app thead { background: var(--bg-muted); }
+.worship-app th { color: var(--text-s); font-weight: 600; padding-block: 14px; }
+.worship-app td { padding-block: 16px; }
+.worship-app tbody tr:hover { background: var(--bg-muted); }
+.worship-app [role=tablist] { border: 1px solid var(--border); padding: 5px; border-radius: 12px; }
+.worship-app [role=tab][aria-selected=true] { color: var(--accent); border-radius: 8px; }
+.worship-empty > div:first-child { background: var(--accent-soft); color: var(--accent); border-radius: 50%; }
+.worship-modal { border-color: var(--border); }
+.worship-modal > div:last-child:has(.worship-button) { background: var(--bg-page); border-radius: 0 0 16px 16px; }
+.worship-login { background: var(--bg-muted); }
+.worship-login-card { border-radius: 24px; border-top: 4px solid var(--accent); }
+.worship-login-heading { background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.worship-login-heading h1 { font-weight: 600; }
+.worship-mobile-nav { box-shadow: 0 -4px 20px rgb(24 47 77 / 5%); }
+.worship-mobile-nav a { position: relative; padding-block: 12px; }
+.worship-mobile-nav a[aria-current=page] { background: var(--accent-soft); color: var(--accent); }
+.worship-mobile-nav a[aria-current=page]::before {
+  content: ''; position: absolute; top: 0; inset-inline: 30%; height: 3px;
+  background: var(--accent); border-radius: 0 0 4px 4px;
+}
+#mobile-more-dialog { max-height: calc(100dvh - 100px); overflow-y: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+.worship-skip-link { position: fixed; top: -100px; inset-inline-start: 16px; z-index: 100; padding: 12px 20px; background: var(--bg-card); color: var(--accent); border-radius: 10px; }
+.worship-skip-link:focus { top: 12px; }
+[dir=rtl] .font-display { font-family: 'Cairo', sans-serif; }
+[dir=rtl] .worship-stat > div:nth-child(2) { letter-spacing: 0; }
+@media (min-width: 1280px) {
+  .worship-content { padding: 36px 40px; }
+  .worship-sidebar.w-60 { width: 256px; }
+}
+@media (max-width: 767px) {
+  .worship-header { min-height: 68px; }
+  .worship-header button { min-height: 44px; min-width: 36px; }
+  .worship-content { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+  .worship-page-heading { margin-bottom: 22px; gap: 16px; }
+  .worship-page-heading h1 { font-size: 28px; }
+  .worship-next-service { padding: 22px; }
+  .worship-app button, .worship-modal button { min-height: 44px; }
+  .worship-card { border-radius: 14px; }
+}
+
+.worship-sidebar.w-16 > div:first-child { padding-inline: 8px; }
+.worship-sidebar.w-16 nav { padding-inline: 6px; }

@@ -4,27 +4,27 @@
 @tailwind utilities;
 
 :root {
-  --bg-page:#faf7f2;
-  --bg-card:#fffdfa;
-  --bg-elevated:#fffdfa;
-  --bg-sidebar:#fffdfa;
-  --bg-input:#fffdfa;
-  --bg-muted:#f0e8df;
-  --border:#ddd2c7;
-  --border-h:#c4b4a6;
-  --text-p:#302722;
-  --text-s:#716157;
-  --text-m:#716157;
-  --accent:#8b4f5c;
-  --accent-soft:#f3e3e5;
-  --shadow-c:0 4px 16px rgba(48,39,34,.025);
-  --shadow-h:0 6px 20px rgba(48,39,34,.06);
-  --shadow-mo:0 20px 60px rgba(48,39,34,.16);
+  --bg-page:#f5f8fc;
+  --bg-card:#ffffff;
+  --bg-elevated:#ffffff;
+  --bg-sidebar:#ffffff;
+  --bg-input:#ffffff;
+  --bg-muted:#edf3fa;
+  --border:#dce5f0;
+  --border-h:#b6c7dc;
+  --text-p:#182f4d;
+  --text-s:#536981;
+  --text-m:#536981;
+  --accent:#2563eb;
+  --accent-soft:#dbeafe;
+  --shadow-c:0 4px 16px rgba(24,47,77,.025);
+  --shadow-h:0 6px 20px rgba(24,47,77,.06);
+  --shadow-mo:0 20px 60px rgba(24,47,77,.16);
   color-scheme:light;
 }
 .dark {
-  --accent:#d3a5af;
-  --accent-soft:#493039;
+  --accent:#93c5fd;
+  --accent-soft:#18365b;
   --bg-page:    #0b1220;
   --bg-card:    #111c2e;
   --bg-elevated:#18243a;
@@ -90,8 +90,8 @@ select option {
 
 [dir="rtl"] select {
   background-position:left .75rem center;
-  padding-inline-start:2.6rem !important;
-  padding-inline-end:.875rem !important;
+  padding-inline-start:.875rem !important;
+  padding-inline-end:2.6rem !important;
 }
 
 .dark select {
@@ -134,8 +134,8 @@ select option {
 .dark .text-slate-700                        {color:var(--text-p) !important}
 .dark .text-slate-600,.dark .text-slate-500  {color:var(--text-s) !important}
 .dark .text-slate-400,.dark .text-slate-300  {color:var(--text-m) !important}
-.dark .text-indigo-600 {color:#818cf8 !important}
-.dark .text-indigo-700,.dark .text-indigo-800 {color:#a5b4fc !important}
+.dark .text-indigo-600 {color:#60a5fa !important}
+.dark .text-indigo-700,.dark .text-indigo-800 {color:#93c5fd !important}
 .dark .text-blue-600 {color:#60a5fa !important}
 .dark .text-violet-600 {color:#a78bfa !important}
 .dark .text-purple-600 {color:#c084fc !important}
@@ -165,7 +165,7 @@ select option {
   color:#718096 !important;
   opacity:1;
 }
-.dark input[type="checkbox"],.dark input[type="radio"]{accent-color:#6366f1}
+.dark input[type="checkbox"],.dark input[type="radio"]{accent-color:#3b82f6}
 .dark input[type="date"],.dark input[type="time"]{color-scheme:dark}
 .dark input:-webkit-autofill,
 .dark input:-webkit-autofill:hover,
@@ -181,7 +181,7 @@ select option {
 .dark .hover\:bg-white:hover,.dark .hover\:bg-white\/90:hover,.dark .hover\:bg-white\/60:hover{background-color:var(--bg-elevated) !important}
 
 /* Badge/chip tints */
-.dark .bg-indigo-100  {background-color:rgba(99,102,241,.2) !important}
+.dark .bg-indigo-100  {background-color:rgba(59,130,246,.2) !important}
 .dark .bg-emerald-100 {background-color:rgba(16,185,129,.2) !important}
 .dark .bg-amber-100   {background-color:rgba(245,158,11,.2) !important}
 .dark .bg-red-100     {background-color:rgba(239,68,68,.2) !important}
@@ -196,7 +196,7 @@ select option {
 .dark .bg-slate-100   {background-color:rgba(148,163,184,.14) !important}
 
 /* Subtle tint backgrounds */
-.dark .bg-indigo-50  {background-color:rgba(99,102,241,.12) !important}
+.dark .bg-indigo-50  {background-color:rgba(59,130,246,.12) !important}
 .dark .bg-violet-50  {background-color:rgba(139,92,246,.12) !important}
 .dark .bg-purple-50  {background-color:rgba(168,85,247,.12) !important}
 .dark .bg-blue-50    {background-color:rgba(59,130,246,.12) !important}
@@ -212,7 +212,7 @@ select option {
 .dark .bg-orange-50  {background-color:rgba(249,115,22,.12) !important}
 .dark .bg-pink-50    {background-color:rgba(236,72,153,.12) !important}
 .dark .bg-cyan-50    {background-color:rgba(6,182,212,.12) !important}
-.dark .bg-indigo-50\/40,.dark .bg-indigo-600\/10 {background-color:rgba(99,102,241,.12) !important}
+.dark .bg-indigo-50\/40,.dark .bg-indigo-600\/10 {background-color:rgba(59,130,246,.12) !important}
 .dark .bg-violet-50\/40,.dark .bg-violet-100\/60,.dark .bg-violet-600\/10 {background-color:rgba(139,92,246,.12) !important}
 .dark .bg-emerald-50\/30 {background-color:rgba(16,185,129,.1) !important}
 .dark .bg-amber-50\/30 {background-color:rgba(245,158,11,.1) !important}
@@ -231,11 +231,11 @@ select option {
 .dark table{color:var(--text-s)}
 .dark thead{background-color:var(--bg-muted);color:var(--text-s)}
 .dark tbody tr{border-color:var(--border)}
-.dark tbody tr:hover{background-color:rgba(99,102,241,.065)}
+.dark tbody tr:hover{background-color:rgba(59,130,246,.065)}
 .dark th[scope="row"]{background-color:var(--bg-card)}
 
 /* Native controls and selection */
-.dark ::selection{background:#4338ca;color:#fff}
+.dark ::selection{background:#1d4ed8;color:#fff}
 .dark .ring-offset-2{--tw-ring-offset-color:var(--bg-card)}
 .dark [aria-selected="true"],.dark [aria-current="page"]{scroll-margin:4px}
 

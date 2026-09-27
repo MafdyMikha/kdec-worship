@@ -133,7 +133,7 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative w-full ${sizes[size]} bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700 sm:rounded-2xl rounded-t-2xl shadow-modal animate-slide-up sm:animate-scale-in max-h-[92vh] flex flex-col`}>
+        className={`worship-modal relative w-full ${sizes[size]} bg-white dark:bg-slate-800 border border-transparent dark:border-slate-700 sm:rounded-2xl rounded-t-2xl shadow-modal animate-slide-up sm:animate-scale-in max-h-[92vh] flex flex-col`}>
         {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
           <div className="w-10 h-1 bg-slate-200 dark:bg-slate-600 rounded-full"/>
@@ -224,7 +224,7 @@ export function Card({ children, className = '', onClick, hover = false, ...prop
 // Empty state
 export function EmptyState({ icon, title, description, action }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
+    <div className="worship-empty flex flex-col items-center justify-center py-16 px-4 text-center">
       <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-4">{icon}</div>
       <h3 className="font-display font-semibold text-slate-700 mb-1">{title}</h3>
       <p className="text-sm text-slate-500 max-w-xs mb-5">{description}</p>
@@ -237,10 +237,10 @@ export function EmptyState({ icon, title, description, action }) {
 export function SearchInput({ value, onChange, placeholder = 'Search...', className = '' }) {
   return (
     <div className={`relative ${className}`}>
-      <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
         aria-label={placeholder}
-        className="w-full pl-9 pr-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-900/60 placeholder:text-slate-400 dark:placeholder:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600 transition-all" />
+        className="w-full ps-9 pe-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-900/60 placeholder:text-slate-400 dark:placeholder:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600 transition-all" />
     </div>
   )
 }
@@ -255,7 +255,7 @@ export function StatusDot({ status }) {
 export function Notifications({ items }) {
   const icons = { success: <CheckCircle size={16} className="text-emerald-500" />, error: <AlertCircle size={16} className="text-red-500" />, info: <Info size={16} className="text-blue-500" />, warning: <AlertTriangle size={16} className="text-amber-500" /> }
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-live="polite" aria-atomic="true">
+    <div className="fixed top-4 end-4 max-w-[calc(100vw-2rem)] z-[100] flex flex-col gap-2 pointer-events-none" aria-live="polite" aria-atomic="true">
       {items.map(n => (
         <div key={n.id} className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-xl px-4 py-3 shadow-modal border border-slate-100 dark:border-slate-700 animate-slide-up min-w-64">
           {icons[n.type] || icons.success}
@@ -307,7 +307,7 @@ export function StatCard({ label, value, icon, trend, color = 'indigo' }) {
     purple: 'bg-purple-50 text-purple-600',
   }
   return (
-    <Card className="p-5">
+    <Card className="worship-stat p-5">
       <div className="flex items-start justify-between mb-3">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors[color]}`}>{icon}</div>
         {trend && <span className={`text-xs font-medium px-2 py-1 rounded-full ${trend > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{trend > 0 ? '+' : ''}{trend}%</span>}
