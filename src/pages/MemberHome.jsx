@@ -183,7 +183,8 @@ export default function MemberHome() {
                             <X size={12}/> {isAr?'اعتذار':'Excuse'}
                           </Btn>
                         )}
-                        {!committedSubstitute && <Btn variant="outline" size="xs" onClick={()=>setSubModal(svc)}>
+                        {svc.publishedSchedule&&<Btn variant="outline" size="xs" onClick={()=>navigate('/schedule')}>{isAr?'البدلاء والموافقات':'Replacements & approvals'}</Btn>}
+                        {!svc.publishedSchedule&&!committedSubstitute && <Btn variant="outline" size="xs" onClick={()=>setSubModal(svc)}>
                           <Users size={12}/> {isAr?'بديل':'Sub'}
                         </Btn>}
                         {committedSubstitute && <span className="text-xs font-medium text-indigo-600">

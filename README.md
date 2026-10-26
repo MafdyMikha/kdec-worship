@@ -65,6 +65,7 @@ Supabase mode currently loads and writes:
 - organization settings;
 - setlist note/prayer/reading/break blocks;
 - excuse and substitute request creation, review, cancellation, and resolution.
+- quarterly publication, persistent in-app schedule notifications, member responses, private replacement proposals/approvals, and decision history (requires `MIGRATION_quarterly_scheduling.sql`).
 
 Explicit local demo mode persists its browser-only datasets in `localStorage`. Clearing site data resets that isolated evaluation state; production builds cannot enable it.
 
@@ -86,6 +87,7 @@ MIGRATION_qa_hardening.sql  private member directory, validation, and attendance
 MIGRATION_security_data_integrity.sql current rerunnable upgrade migration
 MIGRATION_attendance_session_timing.sql small upgrade for already-migrated live databases
 MIGRATION_song_bulk_management.sql lyrics, Pro Chords, private chart storage, and audited bulk imports
+MIGRATION_quarterly_scheduling.sql quarterly schedule publication, replacement approval, notifications and RLS
 MIGRATION_multi_role.sql    superseded legacy migration; do not combine
 scripts/check-browser-env.mjs blocks server secrets before bundling
 test/                       Node unit tests
@@ -114,30 +116,25 @@ Use `npm run build` and publish `dist/`. Configure `VITE_SUPABASE_URL` and `VITE
 - Deactivate access at both the application and policy layers.
 - Review `npm audit` before releases; the checked-in dependency tree currently audits clean.
 
-### Youth Meeting calendar
+### Manual services and quarterly schedules
 
-Services opens with a Youth Meeting card. Open it to reach the calendar, then
-select a Friday at 18:00 (Cairo time) and open the meeting setup. Assign the team
-and enter soundcheck, optional rehearsal, songs and notes for that occurrence.
-Save & View Details saves preparation before showing the service summary; Edit
-preparation returns to the form. The details view can be bookmarked and reloaded.
-Add Service remains available for extra meetings; existing services are retained
-under “View all services and extra meetings”.
+Create meetings under **Services → Add Service**, assign their teams and rehearsals,
+then use **Schedule → Quarter → Publish quarter**. The old youth-calendar route now
+opens the Services list. No weekly services are generated on data load; the quarterly
+migration disables the legacy generator and removes the fixed-template edit lock.
+Previously generated services and their data remain stored. Optional recurrence is
+still an explicit manager action.
 
-Apply `MIGRATION_youth_meeting_calendar.sql` in Supabase SQL Editor after the
-existing dynamic-role and QA-hardening migrations. This migration is self-contained
-and works whether or not the earlier fixed-weekly migration was applied. Use this
-new migration for the youth-only workflow. Fresh installations include it in the
-full schema.
+After publication, members respond in Schedule or their service details. Ordinary
+vacancies produce a private weighted-random proposal for the confirmed service
+Worship Leader. The candidate receives an in-app assignment notification only after
+approval. Only a Super Admin selects a replacement Worship Leader. Every active
+member can view and print/save the quarter as a branded PDF in English or Arabic.
+Published dates, rehearsals and original team assignments are locked; setlists and
+notes remain editable. Cancel a changed meeting and create a corrected service.
 
-Only Youth Meetings are now generated for the next 84 days on data load.
-Other previously generated meetings remain stored; they are not deleted or cancelled.
-Selecting a Friday outside that window opens or creates one occurrence through
-`open_youth_meeting`; creation requires `services.create`, and inactive or anonymous
-users are denied. Existing dates are reused, including cancelled occurrences.
-Unique template/date constraints prevent duplicates on reload and concurrent calls.
-Team/preparation writes still use the existing service-level authorization.
-Demo mode mirrors the youth calendar using browser-local persistence.
+See [QUARTERLY-SCHEDULING.md](./QUARTERLY-SCHEDULING.md) for migration order,
+fairness/availability rules, isolated test commands, deployment, and live verification.
 # Rehearsal preparation
 
 Service rehearsal scheduling is managed through **Prepare this meeting → Has rehearsal**, not a separate Practice tab. Managers can enter the date, time, location, optional HTTP/HTTPS location link, and notes, then save. Details and rehearsal reminders show an **Open location** link. Existing rehearsal attendance metadata is retained when editing or disabling a rehearsal.

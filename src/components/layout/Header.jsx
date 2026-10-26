@@ -20,7 +20,8 @@ function useDarkMode() {
 }
 
 export default function Header({ title }) {
-  const { currentUser, logout, announcements } = useStore()
+  const { currentUser, logout, announcements, quarterly } = useStore()
+  const unreadSchedule = quarterly.inbox.filter(item=>!item.readAt).length
   const { lang, setLang, t } = useLang()
   const navigate     = useNavigate()
   const [open, setOpen]   = useState(false)
@@ -79,13 +80,13 @@ export default function Header({ title }) {
 
         {/* Bell — shows badge count */}
         <button
-          onClick={() => navigate('/announcements')}
-          aria-label={`${t('announcements')}${announcements.length > 0 ? ` (${announcements.length})` : ''}`}
+          onClick={() => navigate(unreadSchedule ? '/schedule' : '/announcements')}
+          aria-label={unreadSchedule ? `${isAr?'إشعارات الجدول':'Schedule notifications'} (${unreadSchedule})` : t('announcements')}
           className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer">
           <Bell size={17}/>
-          {announcements.length > 0 && (
+          {(unreadSchedule || announcements.length) > 0 && (
             <span className="absolute top-1 right-1 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center text-white text-[9px] font-bold">
-              {announcements.length > 9 ? '9+' : announcements.length}
+              {(unreadSchedule || announcements.length) > 9 ? '9+' : (unreadSchedule || announcements.length)}
             </span>
           )}
         </button>

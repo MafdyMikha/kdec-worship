@@ -1,4 +1,5 @@
 import { formatClock } from '../lib/time.js'
+import QuarterlySchedule from '../components/QuarterlySchedule'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Calendar, Clock, Music2, Users } from 'lucide-react'
 import {
@@ -34,7 +35,7 @@ export default function Schedule() {
   const { services, currentUser } = useStore()
   const navigate  = useNavigate()
   const [current, setCurrent] = useState(new Date())
-  const [view,    setView]    = useState('month')
+  const [view,    setView]    = useState('quarter')
 
   const locale     = isAr ? arLocale : undefined
   const monthStart = startOfMonth(current)
@@ -78,7 +79,7 @@ export default function Schedule() {
 
       {/* ── Header row ─────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-1 sm:gap-2 min-w-0 w-full sm:w-auto">
+        {view!=='quarter'&&<div className="flex items-center gap-1 sm:gap-2 min-w-0 w-full sm:w-auto">
           <button onClick={() => setCurrent(subMonths(current, 1))}
             aria-label={isAr ? 'الشهر السابق' : 'Previous month'}
             className="p-3 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer touch-manipulation transition-colors flex-shrink-0">
@@ -96,10 +97,11 @@ export default function Schedule() {
             className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 cursor-pointer transition-colors">
             {isAr ? 'اليوم' : 'Today'}
           </button>
-        </div>
+        </div>}
 
         <Tabs
           tabs={[
+            { label: isAr ? 'ربع سنوي' : 'Quarter', value: 'quarter' },
             { label: isAr ? 'شهري' : 'Month', value: 'month' },
             { label: isAr ? 'قائمة' : 'List',  value: 'list'  },
           ]}
@@ -107,6 +109,8 @@ export default function Schedule() {
           onChange={setView}
         />
       </div>
+
+      {view==='quarter'&&<QuarterlySchedule/>}
 
       {/* ── Month / Calendar view ───────────────────────── */}
       {view === 'month' && (

@@ -429,10 +429,24 @@ export function AppProvider({ children }) {
   const [substituteRequests, setSubstituteRequests] = useState([])
   const [organizationSettings, setOrganizationSettings] = useState(DEFAULT_ORGANIZATION_SETTINGS)
   const [notifications,  setNotifications]  = useState([])
+  const [quarterly, setQuarterly] = useState({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
   const [loading,        setLoading]        = useState(false)
   const [demoReady,      setDemoReady]      = useState(false)
   const authGenerationRef = useRef(0)
   const activeUserIdRef = useRef(null)
+
+  // Refresh only the inbox, without reloading pages or resetting unsaved forms.
+  useEffect(() => {
+    if (isDemoMode || !supabase || !quarterly.ready || !currentUser?.id) return
+    let cancelled = false
+    const userId = currentUser.id
+    const timer = setInterval(async () => {
+      if (document.visibilityState !== 'visible') return
+      const { data, error } = await supabase.from('schedule_notifications').select('*').order('created_at', { ascending:false }).limit(100)
+      if (!cancelled && !error && activeUserIdRef.current === userId) setQuarterly(previous => ({ ...previous, inbox:data || [] }))
+    }, 30000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [isDemoMode, quarterly.ready, currentUser?.id])
 
   const toast = useCallback((msg, type='success') => {
     const id = Date.now()
@@ -465,6 +479,7 @@ export function AppProvider({ children }) {
     setAttendanceRecords({})
     setExcuseRequests([])
     setSubstituteRequests([])
+    setQuarterly({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
     setOrganizationSettings(DEFAULT_ORGANIZATION_SETTINGS)
     setLoading(false)
   }, [])
@@ -547,7 +562,7 @@ export function AppProvider({ children }) {
     setSongs(s)
     setSongImportHistory(songImports)
     setAnnouncements(a)
-    setServices(hydrateDemoServices(ensureDemoWeeklyServices(rawSvcs), s, normalizedPeople))
+    setServices(hydrateDemoServices(rawSvcs, s, normalizedPeople))
     setEvents(evts)
     setEventResponses(responses)
     setAttendanceSessions(sessions.map(session => ({
@@ -618,9 +633,12 @@ export function AppProvider({ children }) {
     void includeAdminData
     setLoading(true)
     try {
-      const weeklyResult = await supabase.rpc('ensure_weekly_services')
-      if (weeklyResult.error) toast(`Weekly schedule could not be loaded: ${weeklyResult.error.message}`, 'error')
       const queries = [
+        ['scheduleQuarters',supabase.from('schedule_quarters').select('*')],
+        ['scheduleSlots',supabase.from('schedule_slots').select('*')],
+        ['scheduleAttempts',supabase.from('schedule_attempts').select('*')],
+        ['scheduleInbox',supabase.from('schedule_notifications').select('*').order('created_at',{ascending:false}).limit(100)],
+        ['scheduleAudit',supabase.from('schedule_audit').select('*').order('created_at',{ascending:false}).limit(100)],
         ['profiles', supabase.from('profiles').select('*, roleAssignments:profile_worship_roles!profile_worship_roles_profile_id_fkey(*, worshipRole:worship_roles(*, category:role_categories(*)))').order('name')],
         ['memberDirectory',supabase.rpc('get_member_directory')],
         ['roleCategories',supabase.from('role_categories').select('*').order('display_order').order('name')],
@@ -646,6 +664,8 @@ export function AppProvider({ children }) {
       const resolved = await Promise.all(queries.map(async ([key, query]) => [key, await query]))
       if (expectedGeneration !== authGenerationRef.current) return
       const resultByKey = Object.fromEntries(resolved)
+      const scheduleKeys = ['scheduleQuarters','scheduleSlots','scheduleAttempts','scheduleInbox','scheduleAudit']
+      setQuarterly({ quarters:resultByKey.scheduleQuarters.data||[], slots:resultByKey.scheduleSlots.data||[], attempts:resultByKey.scheduleAttempts.data||[], inbox:resultByKey.scheduleInbox.data||[], audit:resultByKey.scheduleAudit.data||[], ready:scheduleKeys.every(key=>!resultByKey[key].error) })
       const firstError = resolved.find(([, result]) => result.error)?.[1].error
       if (firstError) toast(`Some data could not be loaded: ${firstError.message}`, 'error')
 
@@ -673,7 +693,10 @@ export function AppProvider({ children }) {
       if (resultByKey.songImportHistory?.data) setSongImportHistory(resultByKey.songImportHistory.data)
       if (servicesResult.data) setServices(servicesResult.data.map(normalizeService).map(service=>({
         ...service,
-        team:service.team.map(member=>({...member,person:profileById.get(member.personId)||null})),
+        team:(resultByKey.scheduleSlots.data?.some(slot=>slot.service_id===service.id)
+          ? resultByKey.scheduleSlots.data.filter(slot=>slot.service_id===service.id && slot.person_id).map(slot=>({personId:slot.person_id,roleId:slot.role_id,role:slot.role,status:slot.state,slotId:slot.id,version:slot.version}))
+          : service.team).map(member=>({...member,person:profileById.get(member.personId)||null})),
+        publishedSchedule:resultByKey.scheduleSlots.data?.some(slot=>slot.service_id===service.id)||false,
       })))
       if (announcementsResult.data) {
         setAnnouncements(announcementsResult.data.map(announcement => ({
@@ -1288,7 +1311,6 @@ export function AppProvider({ children }) {
     if(!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to edit services.'}
     const target = services.find(service => service.id === id)
     if (['practice','date','time'].some(key => data[key] !== undefined) && !rehearsalBeforeService(data.practice === undefined ? target?.practice : data.practice, { ...target, ...data })) return { error:'Rehearsal must start before the service.' }
-    if (target?.weeklyTemplateKey && ['title','date','time','weeklyTemplateKey','recurrenceGroupId'].some(key => data[key] !== undefined && data[key] !== target[key])) return { error:'The weekly schedule is fixed.' }
     if (data.soundcheckTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.soundcheckTime)) return { error:'Invalid soundcheck time.' }
     if(data.title!==undefined){const title=normalizeRequiredText(data.title);if(isBlankText(title)){const message='Service title is required.';toast(message,'error');return {error:message}};data={...data,title}}
     if (isDemoMode) { setServices(prev => prev.map(s => s.id===id?{...s,...data}:s)); toast('Service updated'); return { success:true } }
@@ -1435,6 +1457,8 @@ export function AppProvider({ children }) {
   }
 
   const updateTeamMemberStatus = async (serviceId, personId, status) => {
+    const slot = quarterly.slots.find(item=>item.service_id===serviceId && item.person_id===personId)
+    if (slot) return scheduleAction('respond_schedule_assignment', {p_slot:slot.id,p_version:slot.version,p_status:status})
     if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:s.team.map(t=>t.personId===personId?{...t,status}:t)})); return { success:true } }
     const { error } = personId===currentUser?.id
       ? await supabase.rpc('respond_to_service_assignment', { p_service_id:serviceId, p_status:status })
@@ -1765,6 +1789,16 @@ export function AppProvider({ children }) {
   }
 
   // ── ORGANIZATION SETTINGS ───────────────────────────────
+  const scheduleAction = async (action, args) => {
+    if (isDemoMode) return {error:'Quarterly publishing and replacement approvals require the isolated Supabase test environment; demo mode does not send notifications.'}
+    const allowed = ['publish_schedule_quarter','respond_schedule_assignment','decide_schedule_replacement','retry_schedule_replacement','read_schedule_notification']
+    if (!allowed.includes(action) || !quarterly.ready) return {error:'Apply the quarterly scheduling migration before using this workflow.'}
+    const { error } = await supabase.rpc(action,args)
+    if (error) return {error:error.message}
+    await loadAll()
+    return {success:true}
+  }
+
   const updateOrganizationSettings = async (settings) => {
     const next = { ...organizationSettings, ...settings, id:true }
     if (isDemoMode) { setOrganizationSettings(next); toast('Settings saved'); return { success:true } }
@@ -1786,6 +1820,7 @@ export function AppProvider({ children }) {
     isDemoMode, configurationError, currentUser, authLoading, loading, isPasswordRecovery,
     people, songs, services, announcements, invitations, events, eventResponses,
     attendanceSessions, attendanceRecords, excuseRequests, substituteRequests,
+    quarterly, scheduleAction,
     songImportHistory,roleCategories,worshipRoles,roleUsage,permissionDefinitions,permissionMatrix,auditLogs,
     organizationSettings, notifications,
     ROLES, POSITIONS,

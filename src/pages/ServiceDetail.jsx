@@ -36,6 +36,7 @@ export default function ServiceDetail() {
 
   const canEdit  = canManageWorship(currentUser)
   const service  = services.find(s => s.id === id)
+  const canEditTeam = canEdit && !service?.publishedSchedule
 
   if (!service) return (
     <div className="text-center py-16">
@@ -142,10 +143,10 @@ export default function ServiceDetail() {
       })()}
 
       {/* Notes banner */}
-      {viewingDetails ? <Card className="p-5 space-y-3">
+      {viewingDetails || service.publishedSchedule ? <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h3 className="font-semibold">{isAr ? 'تفاصيل الخدمة' : 'Service details'}</h3>
-          {canEdit && <Btn variant="secondary" onClick={() => setSearchParams({})}>{isAr ? 'تعديل التجهيزات' : 'Edit preparation'}</Btn>}
+          {canEditTeam && <Btn variant="secondary" onClick={() => setSearchParams({})}>{isAr ? 'تعديل التجهيزات' : 'Edit preparation'}</Btn>}
         </div>
         <p>{isAr ? 'الساوند تشيك: ' : 'Soundcheck: '}<bdi>{service.soundcheckTime ? formatClock(service.soundcheckTime) : (isAr ? 'غير محدد' : 'Not set')}</bdi></p>
         <p>{isAr ? 'البروفة: ' : 'Rehearsal: '}{service.practice?.enabled ? <bdi>{service.practice.date} · {formatClock(service.practice.time)}</bdi> : (isAr ? 'لا توجد بروفة' : 'No rehearsal')}</p>
@@ -164,6 +165,7 @@ export default function ServiceDetail() {
       )}
 
       {/* Tabs */}
+      {service.publishedSchedule&&<Btn variant="secondary" onClick={()=>navigate('/schedule')}>{isAr?'الردود والبدلاء في الجدول ربع السنوي':'Manage responses and replacements in Quarterly Schedule'}</Btn>}
       <div className="flex border-b border-slate-200 gap-1 overflow-x-auto" role="tablist" aria-label={isAr?'تفاصيل الخدمة':'Service details'}>
         {TABS.map(tabItem => (
           <button key={tabItem.key} role="tab" aria-selected={tab===tabItem.key} onClick={() => setTab(tabItem.key)}
@@ -201,7 +203,7 @@ export default function ServiceDetail() {
               <span className="text-emerald-600 font-medium">{confirmed} {isAr?'مؤكد':'confirmed'}</span>
               {pending>0&&<span className="text-amber-500">{pending} {isAr?'انتظار':'pending'}</span>}
             </div>
-            {canEdit&&<Btn size="sm" onClick={()=>setShowAddPerson(true)} icon={<Plus size={14}/>}>{isAr?'إضافة عضو':'Add Member'}</Btn>}
+            {canEditTeam&&<Btn size="sm" onClick={()=>setShowAddPerson(true)} icon={<Plus size={14}/>}>{isAr?'إضافة عضو':'Add Member'}</Btn>}
           </div>
 
           {teamRoleNames.map(role=>(
@@ -227,16 +229,16 @@ export default function ServiceDetail() {
                             <span className="flex items-center gap-1"><StatusDot status={status}/>{STATUS_LABEL[status]||status}</span>
                           </Badge>
                           <div className="flex gap-1">
-                            {(canEdit||isMe)&&status!=='confirmed'&&(
+                            {(canEditTeam||isMe)&&status!=='confirmed'&&(
                               <button onClick={()=>updateTeamMemberStatus(id,personId,'confirmed')} className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded cursor-pointer" title={t('confirmed')}><Check size={14}/></button>
                             )}
-                            {canEdit&&status!=='declined'&&(
+                            {(canEditTeam||isMe)&&status!=='declined'&&(
                               <button onClick={()=>updateTeamMemberStatus(id,personId,'declined')} className="p-1.5 text-red-400 hover:bg-red-50 rounded cursor-pointer" title={t('declined')}><X size={14}/></button>
                             )}
-                            {(isMe||canEdit)&&status==='confirmed'&&subs.length>0&&(
+                            {!service.publishedSchedule&&(isMe||canEdit)&&status==='confirmed'&&subs.length>0&&(
                               <button onClick={()=>setSubModal({personId,person,role,subs})} aria-label={t('findSub')} className="p-1.5 text-violet-500 hover:bg-violet-50 rounded cursor-pointer" title={t('findSub')}><Users size={14}/></button>
                             )}
-                            {canEdit&&(
+                            {canEditTeam&&(
                               <button onClick={()=>removeTeamMember(id,personId)} aria-label={isAr?'إزالة العضو':'Remove member'} className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded cursor-pointer"><Trash2 size={14}/></button>
                             )}
                           </div>
@@ -253,7 +255,7 @@ export default function ServiceDetail() {
             <Card className="p-10 text-center">
               <Users size={32} className="text-slate-200 mx-auto mb-2"/>
               <p className="text-slate-500 text-sm mb-3">{isAr?'لا يوجد أعضاء في الفريق':'No team members assigned'}</p>
-              {canEdit&&<Btn size="sm" onClick={()=>setShowAddPerson(true)} icon={<Plus size={14}/>}>{isAr?'إضافة عضو':'Add Member'}</Btn>}
+              {canEditTeam&&<Btn size="sm" onClick={()=>setShowAddPerson(true)} icon={<Plus size={14}/>}>{isAr?'إضافة عضو':'Add Member'}</Btn>}
             </Card>
           )}
         </div>

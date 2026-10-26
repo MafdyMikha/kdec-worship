@@ -12,6 +12,8 @@ Do not put the service-role key in this application. Vite exposes every `VITE_*`
 
 For a new project, open **SQL Editor**, paste the complete contents of `supabase-schema-FULL.sql`, and run it once. Then run `MIGRATION_dynamic_roles_admin.sql` to install the normalized role catalogue, explicit access levels, permission matrix, audit log, and protected administration functions. Next run `MIGRATION_qa_hardening.sql` to restrict private profile fields, install the safe member directory, enforce input integrity, and protect attendance expiry. Finally run `MIGRATION_song_bulk_management.sql` to install multilingual lyrics, inline Pro Chords, private chart files, import history, and the transactional song-save functions. Run the files in that order.
 
+Then apply `MIGRATION_quarterly_scheduling.sql` for quarterly publication, private replacement approval, the schedule inbox, and shared read-only schedule access. This migration must be applied **last**, including after any legacy youth/fixed-weekly migration, because it disables automatic weekly creation. See [QUARTERLY-SCHEDULING.md](./QUARTERLY-SCHEDULING.md).
+
 For an existing project:
 
 1. Take a database backup.
@@ -22,6 +24,7 @@ For an existing project:
 6. Run `MIGRATION_dynamic_roles_admin.sql`. It imports every legacy role name, creates role-ID relationships, preserves the legacy text columns as synchronized compatibility snapshots, and promotes the oldest active legacy administrator to the first Super Admin. Review the resulting access levels before inviting additional administrators.
 7. Run `MIGRATION_qa_hardening.sql`. It is rerunnable and must be applied before deploying the matching client because the client loads team names through its safe directory function.
 8. Run `MIGRATION_song_bulk_management.sql`. It preserves existing song IDs and rows, adds the song-content relationships expected by the client, and reloads the PostgREST schema cache when it completes.
+9. Run `MIGRATION_quarterly_scheduling.sql` after all earlier upgrades. Existing meetings and assignments remain intact; only services explicitly published through the quarterly workflow adopt its assignment locks. Do not run files under `test/sql/` in Supabase; they are isolated local test scaffolding only.
 
 If `MIGRATION_security_data_integrity.sql` was already applied before explicit attendance dates and end times were introduced, run `MIGRATION_attendance_session_timing.sql` once. New upgrades do not need the smaller migration because the main migration already includes the same columns and RPC behavior.
 
