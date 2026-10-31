@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { Avatar } from '../ui'
-import { KDEC_LOGO } from '../../assets/kdecLogo.js'
+import BrandLogo from '../BrandLogo.jsx'
 import { format } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { ACCESS_LEVEL_LABELS, hasPermission } from '../../lib/permissions.js'
@@ -45,7 +45,11 @@ export default function Header({ title }) {
   return (
     <header className="worship-header min-h-16 flex items-center justify-between px-4 md:px-8 flex-shrink-0 gap-2 z-20">
       {/* Page title */}
-      <div className="text-sm text-slate-500 truncate flex-1"><span className="hidden lg:inline">KDEC Worship <span className="mx-3" aria-hidden="true">/</span></span>{title}</div>
+      <div className="worship-header-identity">
+        <BrandLogo className="worship-header-logo" />
+        <span className="worship-header-divider" aria-hidden="true" />
+        <div className="text-sm text-slate-500 truncate">{title}</div>
+      </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
 

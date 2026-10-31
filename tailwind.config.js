@@ -5,14 +5,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a', 950:'#172554' },
-        // Existing indigo utilities share the KDEC blue brand palette.
-        indigo: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 800:'#1e40af', 900:'#1e3a8a', 950:'#172554' },
-        slate: { 50:'#f5f8fc', 100:'#edf3fa', 200:'#dce5f0', 300:'#b6c7dc', 400:'#60758f', 500:'#536981', 600:'#405671', 700:'#2c4360', 800:'#182f4d', 900:'#102139', 950:'#091527' },
+        brand: { 50:'#f0f5f5', 100:'#e1ebed', 200:'#c4d6dc', 300:'#a3bec9', 400:'#6e95a7', 500:'#446b80', 600:'#294d62', 700:'#233a50', 800:'#1b2e3c', 900:'#14232d', 950:'#101923' },
+        // Existing indigo utilities share the Option B His Presence palette.
+        indigo: { 50:'#f0f5f5', 100:'#e1ebed', 200:'#c4d6dc', 300:'#a3bec9', 400:'#6e95a7', 500:'#446b80', 600:'#294d62', 700:'#233a50', 800:'#1b2e3c', 900:'#14232d', 950:'#101923' },
+        slate: { 50:'#f6f5f1', 100:'#eeece5', 200:'#dedbd2', 300:'#c5c0b5', 400:'#8a877e', 500:'#6c6b63', 600:'#55594f', 700:'#384749', 800:'#25353b', 900:'#14232d', 950:'#101923' },
         white: '#ffffff',
       },
       fontFamily: {
-        display: ['"Outfit"', 'sans-serif'],
+        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         body: ['"DM Sans"', 'sans-serif'],
       },
       animation: {

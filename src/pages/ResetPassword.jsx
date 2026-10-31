@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, KeyRound, CheckCircle, AlertCircle, Lock } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { KDEC_LOGO } from '../assets/kdecLogo.js'
+import BrandLogo from '../components/BrandLogo.jsx'
 
 export default function ResetPassword() {
   const { updatePassword, finishPasswordRecovery } = useStore()
@@ -33,10 +33,9 @@ export default function ResetPassword() {
         <div className="worship-login-card rounded-3xl overflow-hidden">
 
           <div className="worship-login-heading px-8 py-7 text-center">
-            <div className="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg p-1.5">
-              <img src={KDEC_LOGO} alt="KDEC" className="w-full h-full object-contain"/>
-            </div>
-            <h1 className="font-display font-bold text-white text-2xl">KDEC Worship</h1>
+            <BrandLogo className="worship-auth-logo" />
+            <h1 className="sr-only">KDEC Worship</h1>
+            <p className="worship-brand-mantra">{isAr ? 'جيل يسعى إلى محضره' : 'A generation pursuing His presence.'}</p>
           </div>
 
           <div className="px-8 py-7 space-y-5">

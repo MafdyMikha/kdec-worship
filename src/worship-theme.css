@@ -41,7 +41,7 @@
 @media(max-width:640px){.worship-service-layout>aside{display:block}.worship-next-service{padding:20px;}.worship-service-header{padding:16px;}.worship-service-header>div:last-child{flex-wrap:wrap;}.worship-service-header h2{font-size:24px;}.worship-app button,.worship-app a{touch-action:manipulation;}.worship-app .worship-button{min-height:44px;}}
 @media(prefers-reduced-motion:reduce){.worship-app *,.worship-login *{animation:none!important;transition:none!important;}}
 
-/* KDEC blue & white: shared surfaces and interaction treatments. */
+/* Option B · His Presence: shared surfaces and interaction treatments. */
 .worship-header {
   background: var(--bg-card);
   min-height: 76px;
@@ -80,7 +80,7 @@
 .worship-button { transition: background-color .15s, border-color .15s, box-shadow .15s; }
 .worship-button:active { transform: translateY(1px); }
 .worship-button:disabled { transform: none; }
-.worship-button.bg-indigo-600 { box-shadow: 0 3px 8px rgb(37 99 235 / 18%); }
+.worship-button.bg-indigo-600 { box-shadow: 0 3px 8px rgb(35 58 80 / 18%); }
 .worship-app input:not([type=checkbox]):not([type=radio]),
 .worship-app select, .worship-app textarea,
 .worship-modal input:not([type=checkbox]):not([type=radio]),
@@ -128,3 +128,28 @@
 
 .worship-sidebar.w-16 > div:first-child { padding-inline: 8px; }
 .worship-sidebar.w-16 nav { padding-inline: 6px; }
+
+/* Original Option B identity. The artwork keeps its original color and background. */
+:root { --brand-sand: #c8b896; }
+.worship-brand-logo { display:block; object-fit:contain; flex-shrink:0; max-width:100%; }
+.worship-sidebar-brand { display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px 16px; border-bottom:1px solid var(--border); }
+.worship-sidebar-brand .worship-brand-logo { width:108px; height:auto; }
+.worship-sidebar-brand.is-collapsed { padding:20px 8px; }
+.worship-sidebar-brand.is-collapsed .worship-brand-logo { width:42px; height:auto; }
+.worship-brand-caption { margin:0; max-width:190px; text-align:center; color:var(--text-s); font-size:10px; line-height:1.8; letter-spacing:1.2px; text-transform:uppercase; }
+[dir=rtl] .worship-brand-caption { letter-spacing:0; }
+.worship-header-identity { display:flex; align-items:center; gap:16px; min-width:0; flex:1; }
+.worship-header-logo { width:48px; height:auto; }
+.worship-header-divider { height:24px; width:1px; background:var(--border); flex-shrink:0; }
+.worship-login { background:radial-gradient(ellipse at top, var(--accent-soft), transparent 65%),var(--bg-page); }
+.worship-login-card { border-top:3px solid var(--brand-sand); }
+.worship-login-heading { background:#101923; color:#f6f5f1; }
+.worship-auth-logo { width:152px; height:auto; margin:0 auto 20px; }
+.worship-login-heading .worship-brand-mantra { color:#f6f5f1; font-family:'Cormorant Garamond',Georgia,serif; font-size:21px; line-height:1.4; margin:8px auto; }
+[dir=rtl] .worship-login-heading .worship-brand-mantra { font-family:'Cairo',sans-serif; font-size:18px; }
+.worship-login-heading p,.worship-login-heading button { color:#d1dce0; }
+.worship-login-heading button[aria-pressed=true] { background:#233a50; color:#f6f5f1; }
+.worship-login-heading button:focus-visible { outline-color:#c8b896; }
+.worship-page-heading h1 { font-weight:600; letter-spacing:-.4px; }
+@media(min-width:768px) { .worship-sidebar>div.worship-sidebar-brand { padding:24px 16px; } .worship-sidebar>div.worship-sidebar-brand.is-collapsed { padding:20px 8px; } }
+@media(max-width:480px) { .worship-header-identity { gap:9px; } .worship-header-logo { width:38px; } .worship-header-divider { display:none; } }

@@ -3,7 +3,7 @@ import { LayoutDashboard, Calendar, Music2, Users, MessageSquare, BarChart3, Boo
 import { useState } from 'react'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
-import { KDEC_LOGO } from '../../assets/kdecLogo.js'
+import BrandLogo from '../BrandLogo.jsx'
 import { Badge } from '../ui'
 import { canAccessAdminControl, canManageWorship, hasPermission, isAdminUser } from '../../lib/permissions.js'
 
@@ -59,19 +59,12 @@ export default function Sidebar() {
 
   return (
     <aside className={`worship-sidebar ${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 flex-col transition-all duration-300 relative hidden md:flex`}>
-      {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-4 border-b border-slate-800 ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-1 shadow-lg">
-          <img src={KDEC_LOGO} alt="KDEC" className="w-full h-full object-contain"/>
-        </div>
-        {!collapsed && (
-          <div>
-            <div className="font-display font-medium text-lg leading-tight">KDEC Worship</div>
-            <div className="text-slate-500 text-xs mt-1">
-              {isAr ? 'معًا في الخدمة' : 'Together in service'}
-            </div>
-          </div>
-        )}
+      {/* Original Option B artwork, unchanged in both sidebar sizes. */}
+      <div className={`worship-sidebar-brand ${collapsed ? 'is-collapsed' : ''}`}>
+        <BrandLogo compact={collapsed} />
+        {!collapsed && <p className="worship-brand-caption">
+          {isAr ? 'جيل يسعى إلى محضره' : 'A generation pursuing His presence.'}
+        </p>}
       </div>
 
       {/* Nav */}

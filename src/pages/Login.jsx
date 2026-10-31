@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle, CheckCircle, ArrowLeft, KeyRound } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { KDEC_LOGO } from '../assets/kdecLogo.js'
+import BrandLogo from '../components/BrandLogo.jsx'
 import { getDemoAccount } from '../lib/demoAccounts.js'
 
 export default function Login({ inviteCode }) {
@@ -126,10 +126,9 @@ export default function Login({ inviteCode }) {
 
           {/* Header */}
           <div className="worship-login-heading px-4 sm:px-8 py-7 text-center">
-            <div className="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg p-1.5">
-              <img src={KDEC_LOGO} alt="KDEC Worship" className="w-full h-full object-contain"/>
-            </div>
-            <h1 className="font-display font-bold text-white text-2xl">KDEC Worship</h1>
+            <BrandLogo className="worship-auth-logo" />
+            <h1 className="sr-only">KDEC Worship</h1>
+            <p className="worship-brand-mantra">{isAr ? 'جيل يسعى إلى محضره' : 'A generation pursuing His presence.'}</p>
             <p className="text-indigo-200 text-sm mt-1">Kasr El Doubara Evangelical Church</p>
             <div className="flex items-center justify-center gap-1 mt-3" role="group" aria-label={isAr ? 'لغة الواجهة' : 'Interface language'}>
               <button type="button" onClick={() => setLang('ar')} aria-pressed={lang === 'ar'} aria-label="العربية"
