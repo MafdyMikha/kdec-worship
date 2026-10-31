@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Music2, Users, QrCode,
-  MessageSquare, Home, BarChart3, Megaphone, Settings, User,
+  MessageSquare, Home, BarChart3,  Settings, User,
   ChevronUp, X, ClipboardList, ShieldCog
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -64,7 +64,7 @@ export default function MobileNav() {
   // 4 primary tabs always visible + "More" button
   const adminPrimary = [
     { to: '/',           icon: <LayoutDashboard size={22}/>, label: t('dashboard')    },
-    { to: '/services',   icon: <Calendar size={22}/>,        label: t('services')     },
+    { to: '/schedule',   icon: <Calendar size={22}/>,        label: t('schedule')     },
     { to: '/songs',      icon: <Music2 size={22}/>,          label: t('songs')        },
     { to: '/people',     icon: <Users size={22}/>,           label: t('people'), permission:'users.view' },
   ]
@@ -77,16 +77,14 @@ export default function MobileNav() {
   ]
 
   const managerPrimary = [
+    { to: '/schedule', icon: <Calendar size={22}/>, label: t('schedule') },
     { to: '/',           icon: <Home size={22}/>,     label: t('home')     },
-    { to: '/services',   icon: <Calendar size={22}/>, label: t('services') },
     { to: '/songs',      icon: <Music2 size={22}/>,   label: t('songs')    },
-    { to: '/schedule',   icon: <Calendar size={22}/>, label: t('schedule') },
+    { to: '/requests',   icon: <ClipboardList size={22}/>, label: t('requests') },
   ]
 
   const adminMore = [
-    { to: '/schedule',      icon: <Calendar size={20}/>,     label: t('schedule')      },
     { to: '/attendance',    icon: <QrCode size={20}/>,       label: t('attendance')    },
-    { to: '/events',        icon: <Megaphone size={20}/>,    label: t('events')        },
     { to: '/requests',      icon: <ClipboardList size={20}/>,label: t('requests')      },
     { to: '/whatsapp',      icon: <WaIcon/>,                 label: t('whatsappBulk'), permission:'users.view' },
     { to: '/reports',       icon: <BarChart3 size={20}/>,    label: t('reports'), permission:'reports.view' },
@@ -98,7 +96,6 @@ export default function MobileNav() {
   ]
 
   const memberMore = [
-    { to: '/events',        icon: <Megaphone size={20}/>,    label: t('events')        },
     { to: '/requests',      icon: <ClipboardList size={20}/>,label: t('requests')      },
     { to: '/announcements', icon: <MessageSquare size={20}/>,label: t('announcements'), badge: announcements.length },
     { to: '/profile',       icon: <User size={20}/>,         label: t('profile')       },

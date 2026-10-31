@@ -129,6 +129,14 @@ create table public.services (
   time                  text default '10:00',
   type                  text default 'Sunday Service',
   status                text default 'scheduled' check (status in ('scheduled','completed','cancelled','draft')),
+  event_kind            text not null default 'service' check(event_kind in ('youth_meeting','service','general_meeting','prayer_shift','conference')),
+  end_date              date,
+  end_time              text,
+  location              text not null default '',
+  location_url          text not null default '',
+  timezone              text not null default 'Africa/Cairo' check(timezone='Africa/Cairo'),
+  published_at          timestamptz,
+  archived_at           timestamptz,
   notes                 text default '',
   setlist_blocks        jsonb not null default '{}'::jsonb
                           check (jsonb_typeof(setlist_blocks) = 'object'),
@@ -2437,21 +2445,7 @@ create trigger protect_fixed_weekly_service before insert or update on public.se
 
 -- Active members may ensure the server-defined schedule, but cannot supply
 -- dates, titles, team assignments or any other write payload to this function.
-create or replace function public.ensure_weekly_services()
-returns void language plpgsql security definer set search_path = public as $$
-declare
-  v_today date := (now() at time zone 'Africa/Cairo')::date;
-begin
-  if not public.is_active_member() then
-    raise exception 'Active membership required' using errcode = '42501';
-  end if;
-  insert into public.services(title,date,time,type,weekly_template_key)
-    select t.title, v_today + offset_day, t.time, 'Weekly Meeting', t.key
-    from public.weekly_service_templates t cross join generate_series(0,83) offset_day
-    where t.key = 'youth' and extract(dow from (v_today + offset_day)) = t.weekday
-    on conflict (weekly_template_key,date) where weekly_template_key is not null do nothing;
-end;
-$$;
+create or replace function public.ensure_weekly_services() returns void language plpgsql as $$begin return;end;$$;
 revoke all on function public.ensure_weekly_services() from public, anon;
 grant execute on function public.ensure_weekly_services() to authenticated;
 
@@ -2509,3 +2503,6 @@ create trigger validate_rehearsal_schedule
 before insert or update of practice, date, time on public.services
 for each row execute function public.validate_rehearsal_schedule();
 commit;
+
+-- Fresh installations must also apply the documented dynamic-role, quarterly and
+-- unified-calendar migrations for RPCs and RLS. Cleanup is an existing-data opt-in.

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Calendar, Music2, Users, MessageSquare, BarChart3, BookOpen, ChevronLeft, ChevronRight, Settings, UserPlus, QrCode, Megaphone, Home, MessageCircle, ClipboardList, ShieldCog } from 'lucide-react'
+import { LayoutDashboard, Calendar, Music2, Users, MessageSquare, BarChart3, BookOpen, ChevronLeft, ChevronRight, Settings, UserPlus, QrCode,  Home, MessageCircle, ClipboardList, ShieldCog } from 'lucide-react'
 import { useState } from 'react'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
@@ -22,12 +22,10 @@ export default function Sidebar() {
 
   const adminNav = [
     { to:'/',              icon:<LayoutDashboard size={20}/>, key:'dashboard'    },
-    { to:'/services',      icon:<Calendar size={20}/>,        key:'services'     },
     { to:'/songs',         icon:<Music2 size={20}/>,          key:'songs'        },
     { to:'/people',        icon:<Users size={20}/>,           key:'people', permission:'users.view' },
     { to:'/schedule',      icon:<BookOpen size={20}/>,        key:'schedule'     },
     { to:'/attendance',    icon:<QrCode size={20}/>,          key:'attendance'   },
-    { to:'/events',        icon:<Megaphone size={20}/>,       key:'events'       },
     { to:'/requests',      icon:<ClipboardList size={20}/>,   key:'requests'     },
     { to:'/whatsapp',      icon:<WaIcon/>,                    key:'whatsappBulk', permission:'users.view' },
     { to:'/reports',       icon:<BarChart3 size={20}/>,       key:'reports', permission:'reports.view' },
@@ -39,14 +37,12 @@ export default function Sidebar() {
     { to:'/schedule',      icon:<Calendar size={20}/>,        key:'schedule'     },
     { to:'/songs',         icon:<Music2 size={20}/>,          key:'songs'        },
     { to:'/attendance',    icon:<QrCode size={20}/>,          key:'checkIn'      },
-    { to:'/events',        icon:<Megaphone size={20}/>,       key:'events'       },
     { to:'/requests',      icon:<ClipboardList size={20}/>,   key:'requests'     },
     { to:'/announcements', icon:<MessageSquare size={20}/>,   key:'announcements', badge: announcements.length },
   ]
 
   const managerNav = [
     memberNav[0],
-    { to:'/services', icon:<Calendar size={20}/>, key:'services' },
     ...memberNav.slice(1),
   ]
 

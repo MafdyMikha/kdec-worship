@@ -1,5 +1,7 @@
 # Quarterly scheduling: setup and verification
 
+> Current calendar-first release: apply `MIGRATION_unified_calendar.sql` after this workflow. [UNIFIED-CALENDAR.md](./UNIFIED-CALENDAR.md) supersedes the navigation, draft visibility, required leader, date-range and deployment details below. The protected replacement state machine remains.
+
 ## Deployment
 
 1. Back up the current database. Use the separate Supabase test project for acceptance testing first; no production migration has been applied by this change.

@@ -26,10 +26,10 @@ export function normalizeQuarterly({quarters=[],slots=[],attempts=[],inbox=[],au
 }
 
 // Each page uses a stable primary-key order. Return errors without partial data.
-export async function loadScheduleRows(client, table) {
+export async function loadScheduleRows(client, table, selection='*') {
   const data=[]
   for(let offset=0;;offset+=500){
-    const result=await client.from(table).select('*').order('id').range(offset,offset+499)
+    const result=await client.from(table).select(selection).order('id').range(offset,offset+499)
     if(result.error)return {data:null,error:result.error}
     data.push(...result.data)
     if(result.data.length<500)return {data,error:null}

@@ -41,7 +41,7 @@ export default function ServiceDetail() {
   if (!service) return (
     <div className="text-center py-16">
       <p className="text-slate-500">{isAr?'لا توجد خدمة بهذا المعرف':'Service not found'}</p>
-      <Btn variant="ghost" onClick={() => navigate('/services')} className="mt-4">{isAr?'← العودة':'← Back'}</Btn>
+      <Btn variant="ghost" onClick={() => navigate('/schedule')} className="mt-4">{isAr?'← العودة':'← Back'}</Btn>
     </div>
   )
 
@@ -96,7 +96,7 @@ export default function ServiceDetail() {
     <div className="max-w-7xl space-y-6 animate-fade-in">
       {/* Header */}
       <div className="worship-service-header flex items-start gap-3">
-        <button onClick={() => navigate(service.weeklyTemplateKey === 'youth' ? '/services/youth' : '/services')} aria-label={isAr?'العودة للخدمات':'Back to services'} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer mt-1">
+        <button onClick={() => navigate(`/schedule?year=${service.date.slice(0,4)}&quarter=${Math.ceil(Number(service.date.slice(5,7))/3)}`)} aria-label={isAr?'العودة للتقويم':'Back to calendar'} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer mt-1">
           <ArrowLeft size={18} className={isAr?'rotate-180':''}/>
         </button>
         <div className="flex-1">
@@ -113,7 +113,7 @@ export default function ServiceDetail() {
               onClick={() => service.recurrenceGroupId ? setShowDeleteScope(true) : setConfirmDelete(true)}
               icon={<Trash2 size={14}/>}>{isAr?'إلغاء':'Cancel'}</Btn>
           )}
-          {canEdit&&<WhatsAppNotify service={service}/>}
+          {canEdit&&service.publishedSchedule&&<WhatsAppNotify service={service}/>}
         </div>
       </div>
 
@@ -334,7 +334,7 @@ export default function ServiceDetail() {
 
       {/* Delete confirm */}
       <ConfirmDialog open={canEdit&&confirmDelete} onClose={()=>setConfirmDelete(false)}
-        onConfirm={async()=>{const result=await deleteService(id);if(!result?.error)navigate('/services');return result}}
+        onConfirm={async()=>{const result=await deleteService(id);if(!result?.error)navigate('/schedule');return result}}
         title={isAr?'إلغاء الخدمة':'Cancel Service'}
         confirmLabel={isAr?'إلغاء الخدمة':'Cancel service'}
         message={isAr?`سيتم إلغاء "${service.title}" مع الحفاظ على سجلها.`:`Cancel "${service.title}" while preserving its history?`}/>
@@ -344,7 +344,7 @@ export default function ServiceDetail() {
         title={isAr?'إلغاء خدمة متكررة':'Cancel Recurring Service'} size="sm"
         footer={<>
           <Btn variant="secondary" onClick={()=>setShowDeleteScope(false)}>{t('cancel')}</Btn>
-          <Btn variant="danger" onClick={async()=>{const result=await deleteRecurringService(id,deleteScope);if(!result?.error)navigate('/services')}}>{isAr?'إلغاء':'Cancel'}</Btn>
+          <Btn variant="danger" onClick={async()=>{const result=await deleteRecurringService(id,deleteScope);if(!result?.error)navigate('/schedule')}}>{isAr?'إلغاء':'Cancel'}</Btn>
         </>}>
         <div className="space-y-3">
           <p className="text-sm text-slate-500">{isAr?'هذه الخدمة جزء من سلسلة متكررة.':'This service is part of a recurring series.'}</p>

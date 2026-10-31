@@ -2,10 +2,12 @@ import { formatClock } from '../lib/time.js'
 import { rehearsalBeforeService } from '../lib/rehearsal.js'
 /* eslint-disable react-refresh/only-export-components -- this module intentionally co-locates the provider with its public store helpers */
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react'
-import { format, parseISO } from 'date-fns'
+import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } from '../lib/supabase.js'
 import { attendanceOccurrenceDate, attendanceTiming, validateAttendanceSessionSchedule } from '../lib/attendance.js'
-import { ensureDemoWeeklyServices, isYouthMeetingDate } from '../lib/weeklyServices.js'
+import { isYouthMeetingDate } from '../lib/weeklyServices.js'
+import { normalizeQuarterly, normalizeScheduleNotification, loadScheduleRows } from '../lib/quarterlySchedule.js'
+import { cairoToday, cleanupDemoCalendar, importDemoEvents, normalizePlanningFields, planningOccurrences } from '../lib/planningCalendar.js'
 import { generateOccurrences } from '../lib/recurrence.js'
 import { mergeAuthenticatedProfile } from '../lib/authProfile.js'
 import { shouldReloadAuthProfile } from '../lib/authEvents.js'
@@ -67,7 +69,7 @@ export const DEFAULT_ORGANIZATION_SETTINGS = {
 }
 
 const normalizeRoleCategory = category => ({...category,displayOrder:category.display_order??category.displayOrder??0})
-const normalizeWorshipRole = role => ({...role,categoryId:role.category_id??role.categoryId,displayOrder:role.display_order??role.displayOrder??0,archivedAt:role.archived_at??role.archivedAt,category:role.category?normalizeRoleCategory(role.category):null})
+const normalizeWorshipRole = role => ({...role,categoryId:role.category_id??role.categoryId,displayOrder:role.display_order??role.displayOrder??0,archivedAt:role.archived_at??role.archivedAt,scheduleLeaderRole:role.schedule_leader_role??role.scheduleLeaderRole??role.name==='Worship Leader',category:role.category?normalizeRoleCategory(role.category):null})
 const normalizeProfile = (profile) => {
   const assignments=(profile.roleAssignments||profile.role_assignments||[]).map(assignment=>({
     ...assignment,roleId:assignment.role_id??assignment.roleId,isPrimary:assignment.is_primary??assignment.isPrimary,
@@ -147,6 +149,8 @@ const normalizeSong = (song) => ({
 
 const normalizeService = (service) => ({
   ...service,
+  ...normalizePlanningFields(service),
+  declinedPersonIds:(service.team||[]).filter(member=>member.status==='declined').map(member=>member.person_id??member.personId),
   weeklyTemplateKey: service.weekly_template_key,
   soundcheckTime: service.soundcheck_time,
   recurrenceGroupId: service.recurrence_group_id,
@@ -206,16 +210,6 @@ const groupAttendanceRecords = (rows = []) => rows.reduce((grouped, record) => {
 // ─────────────────────────────────────────────────────────
 // Demo seed data — rich realistic KDEC data for testing
 // ─────────────────────────────────────────────────────────
-const today = new Date()
-const fmt   = (d) => format(d,'yyyy-MM-dd')
-const daysUntil = (dow) => { const d = new Date(today); const diff = (dow - d.getDay() + 7) % 7 || 7; d.setDate(d.getDate() + diff); return d }
-const nextSun  = daysUntil(0)
-const nextWed  = daysUntil(3)
-const nextFri  = daysUntil(5)
-const in2Suns  = new Date(nextSun);  in2Suns.setDate(nextSun.getDate()  + 7)
-const in3Suns  = new Date(nextSun);  in3Suns.setDate(nextSun.getDate()  + 14)
-const lastSun  = new Date(today);    lastSun.setDate(today.getDate() - ((today.getDay() + 7) % 7 || 7))
-
 // ── 14 Team Members ───────────────────────────────────────
 const DEMO_PEOPLE = [
   // ── Admins ──
@@ -257,130 +251,6 @@ const DEMO_SONGS = [
 ]
 
 // ── 4 Services with full setlists ────────────────────────
-const DEMO_SERVICES = [
-  // 1 ─ This Sunday
-  {
-    id:'sv1', title:'خدمة أحد التسبيح',
-    date:fmt(nextSun), time:'10:00',
-    type:'Sunday Service', status:'scheduled',
-    notes:'أحد الشعانين - ترانيم فرح وتسبيح',
-    recurrenceGroupId:null, recurrenceIndex:0,
-    practice:{
-      enabled:true, date:fmt(nextFri), time:'18:00',
-      location:'قاعة الكنيسة - الدور الثاني',
-      notes:'نركز على ترنيمة يا مالئ كوني والجسر',
-      attendance:[
-        {personId:'p1',status:'attending'},{personId:'p2',status:'attending'},
-        {personId:'p3',status:'attending'},{personId:'p4',status:'maybe'},
-        {personId:'p5',status:'attending'},{personId:'p7',status:'attending'},
-        {personId:'p8',status:'absent'},
-      ]
-    },
-    setlist:[
-      { id:'sl1',  songId:'s1',  key:'Am', notes:'ابدأ بقوة',          order:1,  song:null },
-      { id:'sl2',  songId:'s5',  key:'G',  notes:'',                    order:2,  song:null },
-      { id:'sl3',  songId:'s6',  key:'A',  notes:'أسرع قليلاً',        order:3,  song:null },
-      { id:'sl4',  songId:'s2',  key:'G',  notes:'الجسر مرتين',         order:4,  song:null },
-      { id:'sl5',  songId:'s4',  key:'D',  notes:'أهدأ تدريجياً',       order:5,  song:null },
-      { id:'sl6',  songId:'s16', key:'Dm', notes:'ختام هادئ',           order:6,  song:null },
-    ],
-    team:[
-      { personId:'p1',  role:'Worship Leader',  status:'confirmed', person:null },
-      { personId:'p2',  role:'Music Director',  status:'confirmed', person:null },
-      { personId:'p3',  role:'Pianist/Keys',    status:'confirmed', person:null },
-      { personId:'p4',  role:'Acoustic Guitar', status:'pending',   person:null },
-      { personId:'p11', role:'Electric Guitar', status:'confirmed', person:null },
-      { personId:'p6',  role:'Bass Guitar',     status:'confirmed', person:null },
-      { personId:'p7',  role:'Drummer',         status:'pending',   person:null },
-      { personId:'p5',  role:'Vocalist',        status:'confirmed', person:null },
-      { personId:'p8',  role:'Vocalist',        status:'confirmed', person:null },
-      { personId:'p12', role:'Vocalist',        status:'pending',   person:null },
-      { personId:'p9',  role:'Sound Engineer',  status:'confirmed', person:null },
-      { personId:'p10', role:'Projection',      status:'confirmed', person:null },
-      { personId:'p14', role:'Camera',          status:'pending',   person:null },
-    ],
-  },
-  // 2 ─ Wednesday prayer
-  {
-    id:'sv2', title:'ليلة الصلاة الأسبوعية',
-    date:fmt(nextWed), time:'19:00',
-    type:'Prayer Night', status:'scheduled',
-    notes:'تسبيح هادئ وصلاة شفاعية - أقل من ٦ ترانيم',
-    recurrenceGroupId:null, recurrenceIndex:0, practice:null,
-    setlist:[
-      { id:'sl7',  songId:'s16', key:'Dm', notes:'افتح بهدوء',          order:1,  song:null },
-      { id:'sl8',  songId:'s11', key:'F',  notes:'',                    order:2,  song:null },
-      { id:'sl9',  songId:'s7',  key:'C',  notes:'',                    order:3,  song:null },
-      { id:'sl10', songId:'s9',  key:'D',  notes:'جسر مفتوح للصلاة',   order:4,  song:null },
-      { id:'sl11', songId:'s14', key:'C',  notes:'ختام',               order:5,  song:null },
-    ],
-    team:[
-      { personId:'p1',  role:'Worship Leader',  status:'confirmed', person:null },
-      { personId:'p3',  role:'Pianist/Keys',    status:'confirmed', person:null },
-      { personId:'p5',  role:'Vocalist',        status:'confirmed', person:null },
-      { personId:'p8',  role:'Vocalist',        status:'pending',   person:null },
-      { personId:'p9',  role:'Sound Engineer',  status:'confirmed', person:null },
-      { personId:'p10', role:'Projection',      status:'confirmed', person:null },
-    ],
-  },
-  // 3 ─ Next Sunday
-  {
-    id:'sv3', title:'خدمة أحد الفصح',
-    date:fmt(in2Suns), time:'10:00',
-    type:'Sunday Service', status:'scheduled',
-    notes:'أحد القيامة - خدمة احتفالية',
-    recurrenceGroupId:null, recurrenceIndex:0, practice:null,
-    setlist:[
-      { id:'sl12', songId:'s3',  key:'D',  notes:'افتتاح احتفالي',      order:1,  song:null },
-      { id:'sl13', songId:'s10', key:'A',  notes:'',                    order:2,  song:null },
-      { id:'sl14', songId:'s5',  key:'G',  notes:'',                    order:3,  song:null },
-      { id:'sl15', songId:'s15', key:'G',  notes:'تقليدي',              order:4,  song:null },
-      { id:'sl16', songId:'s2',  key:'G',  notes:'',                    order:5,  song:null },
-      { id:'sl17', songId:'s4',  key:'D',  notes:'ختام',               order:6,  song:null },
-    ],
-    team:[
-      { personId:'p1',  role:'Worship Leader',  status:'pending',   person:null },
-      { personId:'p2',  role:'Music Director',  status:'confirmed', person:null },
-      { personId:'p13', role:'Pianist/Keys',    status:'confirmed', person:null },
-      { personId:'p4',  role:'Acoustic Guitar', status:'confirmed', person:null },
-      { personId:'p11', role:'Electric Guitar', status:'pending',   person:null },
-      { personId:'p6',  role:'Bass Guitar',     status:'pending',   person:null },
-      { personId:'p7',  role:'Drummer',         status:'confirmed', person:null },
-      { personId:'p5',  role:'Vocalist',        status:'confirmed', person:null },
-      { personId:'p8',  role:'Vocalist',        status:'confirmed', person:null },
-      { personId:'p9',  role:'Sound Engineer',  status:'confirmed', person:null },
-      { personId:'p10', role:'Projection',      status:'pending',   person:null },
-    ],
-  },
-  // 4 ─ 3rd Sunday (recurring example)
-  {
-    id:'sv4', title:'خدمة أحد الاعتيادية',
-    date:fmt(in3Suns), time:'10:00',
-    type:'Sunday Service', status:'scheduled',
-    notes:'',
-    recurrenceGroupId:'rg1', recurrenceIndex:1, practice:null,
-    setlist:[
-      { id:'sl18', songId:'s6',  key:'Bb', notes:'',  order:1, song:null },
-      { id:'sl19', songId:'s12', key:'Bb', notes:'',  order:2, song:null },
-      { id:'sl20', songId:'s8',  key:'E',  notes:'',  order:3, song:null },
-      { id:'sl21', songId:'s13', key:'Bb', notes:'',  order:4, song:null },
-      { id:'sl22', songId:'s11', key:'F',  notes:'',  order:5, song:null },
-    ],
-    team:[
-      { personId:'p1',  role:'Worship Leader',  status:'pending', person:null },
-      { personId:'p2',  role:'Music Director',  status:'pending', person:null },
-      { personId:'p3',  role:'Pianist/Keys',    status:'pending', person:null },
-      { personId:'p4',  role:'Acoustic Guitar', status:'pending', person:null },
-      { personId:'p6',  role:'Bass Guitar',     status:'pending', person:null },
-      { personId:'p7',  role:'Drummer',         status:'pending', person:null },
-      { personId:'p5',  role:'Vocalist',        status:'pending', person:null },
-      { personId:'p12', role:'Vocalist',        status:'pending', person:null },
-      { personId:'p9',  role:'Sound Engineer',  status:'pending', person:null },
-      { personId:'p10', role:'Projection',      status:'pending', person:null },
-    ],
-  },
-]
-
 const DEMO_ANNOUNCEMENTS = [
   { id:'a1', title:'بروفة هذا الجمعة', content:'لدينا بروفة كاملة مع الفريق الجمعة الساعة ٦ م. من فضلكم أكدوا حضوركم. سنركز على ترانيم أحد الشعانين.', priority:'high',   author_id:'p1', authorName:'مافدي حنا',    created_at: new Date().toISOString() },
   { id:'a2', title:'ترنيمة جديدة في المكتبة', content:'تم إضافة ترنيمة "يسوع أنت جميل" للمكتبة. من فضلكم استمعوا إليها قبل الأحد.', priority:'normal', author_id:'p2', authorName:'كريستين رمزي', created_at: new Date(Date.now()-86400000).toISOString() },
@@ -391,9 +261,10 @@ const DEMO_ANNOUNCEMENTS = [
 function hydrateDemoServices(services, songs, people) {
   return services.map(s => ({
     ...s,
+    declinedPersonIds:(s.team||[]).filter(member=>member.status==='declined').map(member=>member.personId),
     setlistBlocks: s.setlistBlocks || {},
     setlist: (s.setlist || []).map(item => ({ ...item, song: songs.find(sg => sg.id === item.songId) || null })),
-    team:    (s.team || []).map(t => ({ ...t, person: people.find(p => p.id === t.personId) || null })),
+    team:    (s.team || []).map(t => ({ ...t, roleId:t.roleId||people.find(p=>p.id===t.personId)?.roleAssignments?.find(role=>role.worshipRole?.name===t.role)?.roleId, person: people.find(p => p.id === t.personId) || null })),
   }))
 }
 
@@ -429,6 +300,7 @@ export function AppProvider({ children }) {
   const [substituteRequests, setSubstituteRequests] = useState([])
   const [organizationSettings, setOrganizationSettings] = useState(DEFAULT_ORGANIZATION_SETTINGS)
   const [notifications,  setNotifications]  = useState([])
+  const [planningReady, setPlanningReady] = useState(false)
   const [quarterly, setQuarterly] = useState({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
   const [loading,        setLoading]        = useState(false)
   const [demoReady,      setDemoReady]      = useState(false)
@@ -443,7 +315,7 @@ export function AppProvider({ children }) {
     const timer = setInterval(async () => {
       if (document.visibilityState !== 'visible') return
       const { data, error } = await supabase.from('schedule_notifications').select('*').order('created_at', { ascending:false }).limit(100)
-      if (!cancelled && !error && activeUserIdRef.current === userId) setQuarterly(previous => ({ ...previous, inbox:data || [] }))
+      if (!cancelled && !error && activeUserIdRef.current === userId) setQuarterly(previous => ({ ...previous, inbox:(data || []).map(normalizeScheduleNotification) }))
     }, 30000)
     return () => { cancelled = true; clearInterval(timer) }
   }, [isDemoMode, quarterly.ready, currentUser?.id])
@@ -479,6 +351,7 @@ export function AppProvider({ children }) {
     setAttendanceRecords({})
     setExcuseRequests([])
     setSubstituteRequests([])
+    setPlanningReady(false)
     setQuarterly({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
     setOrganizationSettings(DEFAULT_ORGANIZATION_SETTINGS)
     setLoading(false)
@@ -537,7 +410,7 @@ export function AppProvider({ children }) {
     const s      = parseSafe(storedSongs,  DEMO_SONGS, Array.isArray, true)
     const songImports = parseSafe(storedSongImports, [])
     const a      = parseSafe(storedAnns,   DEMO_ANNOUNCEMENTS, Array.isArray, true)
-    const rawSvcs = parseSafe(storedSvcs,  DEMO_SERVICES, Array.isArray, true)
+    let rawSvcs = parseSafe(storedSvcs, [], Array.isArray)
     const evts   = parseSafe(storedEvents, [])
     const sessions = parseSafe(storedSessions, [])
     const excuses = parseSafe(storedExcuses, [])
@@ -547,6 +420,22 @@ export function AppProvider({ children }) {
     const records = parseSafe(storedRecords, {}, isPlainObject)
     const organization = parseSafe(storedOrganization, DEFAULT_ORGANIZATION_SETTINGS, isPlainObject)
 
+    const importedCalendar=importDemoEvents(rawSvcs,evts)
+    rawSvcs=importedCalendar.services
+    if(!localStorage.getItem('kdec_calendar_cleanup_v1')){
+      const cleanup=cleanupDemoCalendar(rawSvcs)
+      // Snapshot the full related demo datasets before cancellation. A storage
+      // failure aborts cleanup instead of losing the only recoverable history.
+      const backup={services:rawSvcs,affectedIds:cleanup.affected.map(event=>event.id),events:evts,eventResponses:responses,attendanceSessions:sessions,attendanceRecords:records,excuses,substitutes}
+      try {
+        localStorage.setItem('kdec_calendar_cleanup_backup_v1',JSON.stringify(backup))
+        localStorage.setItem('kdec_services',JSON.stringify(cleanup.services))
+        localStorage.setItem('kdec_calendar_cleanup_v1','done')
+        rawSvcs=cleanup.services
+      } catch {
+        toast('Calendar backup could not be saved. No demo events were archived. Free browser storage and reload.','error')
+      }
+    }
     const normalizedPeople=p.map(profile=>{
       const roleNames=Array.isArray(profile.roles)&&profile.roles.length?profile.roles:(profile.role?[profile.role]:[])
       const roleAssignments=roleNames.map((name,index)=>{const worshipRole=dynamicRoles.find(role=>role.name===name);return worshipRole?{roleId:worshipRole.id,isPrimary:name===(profile.role||roleNames[0])||index===0,worshipRole}:null}).filter(Boolean)
@@ -556,14 +445,15 @@ export function AppProvider({ children }) {
     setPeople(normalizedPeople)
     if(parsedUser){const restored=normalizedPeople.find(person=>person.id===parsedUser.id);if(restored)setCurrentUser({...restored,personId:restored.id,permissions:restored.accessLevel==='super_admin'?['*']:(matrix[restored.accessLevel]||[])})}
     setRoleCategories(categories)
-    setWorshipRoles(dynamicRoles)
+    setWorshipRoles(dynamicRoles.map(normalizeWorshipRole))
     setPermissionMatrix(matrix)
     setAuditLogs(logs)
     setSongs(s)
     setSongImportHistory(songImports)
     setAnnouncements(a)
-    setServices(hydrateDemoServices(rawSvcs, s, normalizedPeople))
-    setEvents(evts)
+    setServices(hydrateDemoServices(rawSvcs.map(row=>({...row,...normalizePlanningFields(row)})), s, normalizedPeople))
+    setPlanningReady(true)
+    setEvents(importedCalendar.events)
     setEventResponses(responses)
     setAttendanceSessions(sessions.map(session => ({
       ...session,
@@ -576,7 +466,7 @@ export function AppProvider({ children }) {
     localStorage.setItem('kdec_demo_seed_version','2026-08-data-integrity-1')
     setDemoReady(true)
     setAuthLoading(false)
-  }, [isDemoMode])
+  }, [isDemoMode, toast])
 
   // Save demo data to localStorage on change, including intentional deletions.
   useEffect(() => {
@@ -634,11 +524,12 @@ export function AppProvider({ children }) {
     setLoading(true)
     try {
       const queries = [
+        ['planningReady',supabase.from('services').select('event_kind,published_at,end_date,end_time,archived_at').limit(1)],
         ['scheduleQuarters',supabase.from('schedule_quarters').select('*')],
-        ['scheduleSlots',supabase.from('schedule_slots').select('*')],
-        ['scheduleAttempts',supabase.from('schedule_attempts').select('*')],
+        ['scheduleSlots',loadScheduleRows(supabase,'schedule_slots')],
+        ['scheduleAttempts',loadScheduleRows(supabase,'schedule_attempts')],
         ['scheduleInbox',supabase.from('schedule_notifications').select('*').order('created_at',{ascending:false}).limit(100)],
-        ['scheduleAudit',supabase.from('schedule_audit').select('*').order('created_at',{ascending:false}).limit(100)],
+        ['scheduleAudit',loadScheduleRows(supabase,'schedule_audit')],
         ['profiles', supabase.from('profiles').select('*, roleAssignments:profile_worship_roles!profile_worship_roles_profile_id_fkey(*, worshipRole:worship_roles(*, category:role_categories(*)))').order('name')],
         ['memberDirectory',supabase.rpc('get_member_directory')],
         ['roleCategories',supabase.from('role_categories').select('*').order('display_order').order('name')],
@@ -646,7 +537,7 @@ export function AppProvider({ children }) {
         ['permissionDefinitions',supabase.from('system_permissions').select('*').eq('active',true).order('display_order')],
         ['permissionMatrix',supabase.from('access_level_permissions').select('*')],
         ['songs', supabase.from('songs').select('*, lyrics:song_lyrics(*), charts:song_charts(*, versions:song_chart_versions(*))').order('title')],
-        ['services', supabase.from('services').select('*, setlist:setlist_items(*, song:songs(*)), team:service_team(*, roleDefinition:worship_roles(*))').order('date')],
+        ['services', loadScheduleRows(supabase,'services','*, setlist:setlist_items(*, song:songs(*)), team:service_team(*, roleDefinition:worship_roles(*))')],
         ['announcements', supabase.from('announcements').select('*').order('created_at',{ascending:false})],
         ['events', supabase.from('events').select('*').order('date')],
         ['eventResponses', supabase.from('event_responses').select('*')],
@@ -665,7 +556,8 @@ export function AppProvider({ children }) {
       if (expectedGeneration !== authGenerationRef.current) return
       const resultByKey = Object.fromEntries(resolved)
       const scheduleKeys = ['scheduleQuarters','scheduleSlots','scheduleAttempts','scheduleInbox','scheduleAudit']
-      setQuarterly({ quarters:resultByKey.scheduleQuarters.data||[], slots:resultByKey.scheduleSlots.data||[], attempts:resultByKey.scheduleAttempts.data||[], inbox:resultByKey.scheduleInbox.data||[], audit:resultByKey.scheduleAudit.data||[], ready:scheduleKeys.every(key=>!resultByKey[key].error) })
+      setPlanningReady(!resultByKey.planningReady.error)
+      setQuarterly(normalizeQuarterly({ quarters:resultByKey.scheduleQuarters.data||[], slots:resultByKey.scheduleSlots.data||[], attempts:resultByKey.scheduleAttempts.data||[], inbox:resultByKey.scheduleInbox.data||[], audit:resultByKey.scheduleAudit.data||[], ready:scheduleKeys.every(key=>!resultByKey[key].error) }))
       const firstError = resolved.find(([, result]) => result.error)?.[1].error
       if (firstError) toast(`Some data could not be loaded: ${firstError.message}`, 'error')
 
@@ -696,7 +588,7 @@ export function AppProvider({ children }) {
         team:(resultByKey.scheduleSlots.data?.some(slot=>slot.service_id===service.id)
           ? resultByKey.scheduleSlots.data.filter(slot=>slot.service_id===service.id && slot.person_id).map(slot=>({personId:slot.person_id,roleId:slot.role_id,role:slot.role,status:slot.state,slotId:slot.id,version:slot.version}))
           : service.team).map(member=>({...member,person:profileById.get(member.personId)||null})),
-        publishedSchedule:resultByKey.scheduleSlots.data?.some(slot=>slot.service_id===service.id)||false,
+        publishedSchedule:Boolean(service.publishedAt)||resultByKey.scheduleSlots.data?.some(slot=>slot.service_id===service.id)||false,
       })))
       if (announcementsResult.data) {
         setAnnouncements(announcementsResult.data.map(announcement => ({
@@ -731,6 +623,7 @@ export function AppProvider({ children }) {
       }
       if (resultByKey.invitations?.data) setInvitations(resultByKey.invitations.data.map(normalizeInvitation))
       if (resultByKey.attendanceSessions?.data) setAttendanceSessions(resultByKey.attendanceSessions.data.map(normalizeAttendanceSession))
+      return firstError?{error:`Some data could not be loaded: ${firstError.message}`}:{success:true}
     } finally {
       if (expectedGeneration === authGenerationRef.current) setLoading(false)
     }
@@ -1244,7 +1137,7 @@ export function AppProvider({ children }) {
     if (existing) return { id:existing.id }
     if (!hasPermission(currentUser,'services.create')) return { error:'You do not have permission to create services.' }
     if (isDemoMode) {
-      const occurrence = ensureDemoWeeklyServices([], date)[0]
+      const occurrence = {id:crypto.randomUUID(),title:'Youth Meeting',eventKind:'youth_meeting',date,time:'18:00',endDate:date,endTime:'20:00',status:'draft',team:[],setlist:[],practice:null,notes:''}
       setServices(previous => previous.some(service => service.id === occurrence.id) ? previous : [...previous, occurrence])
       return { id:occurrence.id }
     }
@@ -1252,6 +1145,28 @@ export function AppProvider({ children }) {
     if (error) return { error:error.message }
     await loadAll(Boolean(currentUser?.isAdmin || currentUser?.is_admin))
     return { id:data }
+  }
+
+  // Canonical planning writes: one server transaction for events, recurrence and teams.
+  const savePlanningEvent = async (form) => {
+    const permission=form.id?'services.edit':'services.create'
+    if(!hasPermission(currentUser,permission)&&!hasPermission(currentUser,'schedules.manage'))return {error:'Schedule management permission required.'}
+    let rows
+    try { rows=planningOccurrences(form) } catch(error) { return {error:error.message} }
+    if(isDemoMode){
+      const existing=services.find(event=>event.id===form.id)
+      if(existing?.publishedAt||existing?.publishedSchedule)return {error:'Published schedules are locked. Cancel and create a corrected event.'}
+      const saved=rows.map(row=>({...existing,id:row.id,title:row.title,type:row.event_kind,status:'draft',date:row.date,time:row.time,...normalizePlanningFields(row),practice:row.practice,notes:row.notes,
+        recurrenceGroupId:form.id?existing.recurrenceGroupId:row.recurrence_group_id,recurrenceFrequency:form.id?existing.recurrenceFrequency:row.recurrence_frequency,recurrenceIndex:form.id?existing.recurrenceIndex:row.recurrence_index,
+        setlist:existing?.setlist||[],setlistBlocks:existing?.setlistBlocks||{},team:row.team.map(member=>({personId:member.person_id,roleId:member.worship_role_id,role:worshipRoles.find(role=>role.id===member.worship_role_id)?.name,status:existing?.team.find(m=>m.personId===member.person_id)?.status||'pending',person:people.find(p=>p.id===member.person_id)}))}))
+      setServices(previous=>[...previous.filter(event=>event.id!==form.id),...saved]);return {success:true,id:saved[0].id}
+    }
+    if(!planningReady)return {error:'Apply MIGRATION_unified_calendar.sql before saving events.'}
+    const {error}=await supabase.rpc('save_planning_events',{p_events:rows,p_edit:Boolean(form.id)})
+    if(error)return {error:error.message}
+    const refreshed=await loadAll()
+    if(refreshed?.error)return {error:`Saved, but reload failed. Refresh before retrying. ${refreshed.error}`}
+    return {success:true,id:rows[0].id}
   }
 
   const addService = async (data) => {
@@ -1308,7 +1223,7 @@ export function AppProvider({ children }) {
   }
 
   const updateService = async (id, data) => {
-    if(!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to edit services.'}
+    if(!hasPermission(currentUser,'services.edit')&&!hasPermission(currentUser,'schedules.manage'))return {error:'You do not have permission to edit services.'}
     const target = services.find(service => service.id === id)
     if (['practice','date','time'].some(key => data[key] !== undefined) && !rehearsalBeforeService(data.practice === undefined ? target?.practice : data.practice, { ...target, ...data })) return { error:'Rehearsal must start before the service.' }
     if (data.soundcheckTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.soundcheckTime)) return { error:'Invalid soundcheck time.' }
@@ -1381,7 +1296,12 @@ export function AppProvider({ children }) {
     const maxIndex = Math.max(...group.map(service => service.recurrenceIndex || 0))
     const newOnes = generateOccurrences({ ...first, recurrence_group_id:groupId }, { enabled:true, frequency, count, startIndex:maxIndex, endDate:null })
     if (isDemoMode) {
-      const newSvcs = newOnes.map((o,i) => ({ ...o, id:`sv${Date.now()}_${i}`, setlist:[], setlistBlocks:{}, team: last.team.map(t=>({...t,status:'pending'})), practice:null, recurrenceGroupId:groupId, recurrenceIndex:maxIndex+i+1, recurrenceFrequency:frequency }))
+      const duration=differenceInCalendarDays(parseISO(last.endDate||last.date),parseISO(last.date))
+      const rehearsalOffset=last.practice?.enabled?differenceInCalendarDays(parseISO(last.practice.date),parseISO(last.date)):0
+      const newSvcs = newOnes.map((o,i) => ({ ...last,...o, id:crypto.randomUUID(), status:'draft',publishedAt:null,publishedSchedule:false,archivedAt:null,declinedPersonIds:[],
+        endDate:format(addDays(parseISO(o.date),duration),'yyyy-MM-dd'),setlist:[],setlistBlocks:{},team:last.team.filter(member=>member.status!=='declined').map(member=>({...member,status:'pending'})),
+        practice:last.practice?.enabled?{...last.practice,date:format(addDays(parseISO(o.date),rehearsalOffset),'yyyy-MM-dd')}:last.practice,
+        recurrenceGroupId:groupId,recurrenceIndex:maxIndex+i+1,recurrenceFrequency:frequency }))
       setServices(prev => [...prev, ...newSvcs]); toast(`Added ${count} more`); return
     }
     const occurrences = newOnes.map(occ => ({
@@ -1406,7 +1326,7 @@ export function AppProvider({ children }) {
     const item  = { id:'sl'+Date.now(), songId, key: key||song?.key, notes:notes||'', order, song }
     if (isDemoMode) {
       setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:[...s.setlist,item]}))
-      setSongs(prev => prev.map(s => s.id===songId?{...s,usageCount:(s.usageCount||0)+1,lastUsed:fmt(new Date())}:s))
+      setSongs(prev => prev.map(s => s.id===songId?{...s,usageCount:(s.usageCount||0)+1,lastUsed:cairoToday()}:s))
       toast('Song added'); return
     }
     const { error } = await supabase.from('setlist_items').insert({ service_id:serviceId, song_id:songId, key:key||song?.key, notes:notes||'', sort_order:order })
@@ -1457,7 +1377,7 @@ export function AppProvider({ children }) {
   }
 
   const updateTeamMemberStatus = async (serviceId, personId, status) => {
-    const slot = quarterly.slots.find(item=>item.service_id===serviceId && item.person_id===personId)
+    const slot = quarterly.slots.find(item=>item.serviceId===serviceId && item.personId===personId)
     if (slot) return scheduleAction('respond_schedule_assignment', {p_slot:slot.id,p_version:slot.version,p_status:status})
     if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,team:s.team.map(t=>t.personId===personId?{...t,status}:t)})); return { success:true } }
     const { error } = personId===currentUser?.id
@@ -1795,7 +1715,8 @@ export function AppProvider({ children }) {
     if (!allowed.includes(action) || !quarterly.ready) return {error:'Apply the quarterly scheduling migration before using this workflow.'}
     const { error } = await supabase.rpc(action,args)
     if (error) return {error:error.message}
-    await loadAll()
+    const refreshed=await loadAll()
+    if(refreshed?.error)return refreshed
     return {success:true}
   }
 
@@ -1820,7 +1741,7 @@ export function AppProvider({ children }) {
     isDemoMode, configurationError, currentUser, authLoading, loading, isPasswordRecovery,
     people, songs, services, announcements, invitations, events, eventResponses,
     attendanceSessions, attendanceRecords, excuseRequests, substituteRequests,
-    quarterly, scheduleAction,
+    quarterly, scheduleAction, planningReady, savePlanningEvent,
     songImportHistory,roleCategories,worshipRoles,roleUsage,permissionDefinitions,permissionMatrix,auditLogs,
     organizationSettings, notifications,
     ROLES, POSITIONS,

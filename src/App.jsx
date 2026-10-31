@@ -7,7 +7,6 @@ import { Notifications } from './components/ui'
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const MemberHome = lazy(() => import('./pages/MemberHome'))
-const Services = lazy(() => import('./pages/Services'))
 const ServiceDetail = lazy(() => import('./pages/ServiceDetail'))
 const Songs = lazy(() => import('./pages/Songs'))
 const SongDetail = lazy(() => import('./pages/SongDetail'))
@@ -19,7 +18,6 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Invitations = lazy(() => import('./pages/Invitations'))
 const Attendance = lazy(() => import('./pages/Attendance'))
-const Events = lazy(() => import('./pages/Events'))
 const WhatsAppBulk = lazy(() => import('./pages/WhatsAppBulk'))
 const Requests = lazy(() => import('./pages/Requests'))
 const AdminControl = lazy(() => import('./pages/AdminControl'))
@@ -86,7 +84,7 @@ function AuthGate() {
           <Route path="/"              element={isAdmin ? <Dashboard/> : <MemberHome/>}/>
           <Route path="/dashboard"     element={<AdminOnly><Dashboard/></AdminOnly>}/>
           <Route path="/home"          element={<MemberHome/>}/>
-          <Route path="/services"      element={<Services/>}/>
+          <Route path="/services"      element={<Navigate to="/schedule" replace/>}/>
           <Route path="/services/youth" element={<Navigate to="/services" replace/>}/>
           <Route path="/services/:id"  element={<ServiceDetail/>}/>
           <Route path="/songs"         element={<Songs/>}/>
@@ -97,7 +95,7 @@ function AuthGate() {
           <Route path="/announcements" element={<Announcements/>}/>
           <Route path="/attendance"    element={<Attendance/>}/>
           <Route path="/checkin/:token" element={<Attendance/>}/>
-          <Route path="/events"        element={<Events/>}/>
+          <Route path="/events"        element={<Navigate to="/schedule" replace/>}/>
           <Route path="/requests"      element={<Requests/>}/>
           <Route path="/settings"      element={<Settings/>}/>
           <Route path="/profile"       element={<Profile/>}/>

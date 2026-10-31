@@ -1,4 +1,4 @@
-import { addDays, format, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
 export const WEEKLY_SERVICES = [
   { key:'youth', title:'Youth Meeting', titleAr:'اجتماع الشباب', day:5, time:'18:00' },
@@ -12,22 +12,8 @@ export function weeklyServiceTitle(service, isAr) {
   return template ? (isAr ? template.titleAr : template.title) : service.title
 }
 
-export function ensureDemoWeeklyServices(services, today = format(new Date(), 'yyyy-MM-dd')) {
-  const result = [...services]
-  const existing = new Set(services.map(service => `${service.weeklyTemplateKey}:${service.date}`))
-  for (let offset = 0; offset < 84; offset++) {
-    const date = addDays(parseISO(today), offset)
-    for (const template of WEEKLY_SERVICES.filter(item => item.key === 'youth' && item.day === date.getDay())) {
-      const dateKey = format(date, 'yyyy-MM-dd')
-      if (existing.has(`${template.key}:${dateKey}`)) continue
-      result.push({ id:`weekly-${template.key}-${dateKey}`, weeklyTemplateKey:template.key,
-        title:template.title, date:dateKey, time:template.time, type:'Weekly Meeting',
-        status:'scheduled', notes:'', team:[], setlist:[], setlistBlocks:{}, practice:null,
-        soundcheckTime:null, recurrenceGroupId:null, recurrenceIndex:0 })
-    }
-  }
-  return result
-}
+// Compatibility only: loading data must never create predefined meetings.
+export function ensureDemoWeeklyServices(services) { return [...services] }
 
 export function isYouthMeetingDate(date) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(parseISO(date).getTime())

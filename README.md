@@ -55,7 +55,7 @@ Supabase mode currently loads and writes:
 - centrally managed worship roles, role categories, primary-role assignments, explicit system access levels, and admin audit history;
 - invitations;
 - songs, multilingual lyrics, manual Pro Chords, private chart versions, and bulk-import history;
-- services and recurrence metadata;
+- canonical calendar events (all five types), Cairo end dates/times, locations and explicit recurrence;
 - setlist song rows;
 - service-team assignments and response status;
 - announcements;
@@ -88,6 +88,8 @@ MIGRATION_security_data_integrity.sql current rerunnable upgrade migration
 MIGRATION_attendance_session_timing.sql small upgrade for already-migrated live databases
 MIGRATION_song_bulk_management.sql lyrics, Pro Chords, private chart storage, and audited bulk imports
 MIGRATION_quarterly_scheduling.sql quarterly schedule publication, replacement approval, notifications and RLS
+MIGRATION_unified_calendar.sql canonical event fields, silent drafts and unified publication
+MIGRATION_calendar_cleanup.sql one-time backed-up archive of active non-Youth events
 MIGRATION_multi_role.sql    superseded legacy migration; do not combine
 scripts/check-browser-env.mjs blocks server secrets before bundling
 test/                       Node unit tests
@@ -116,25 +118,37 @@ Use `npm run build` and publish `dist/`. Configure `VITE_SUPABASE_URL` and `VITE
 - Deactivate access at both the application and policy layers.
 - Review `npm audit` before releases; the checked-in dependency tree currently audits clean.
 
-### Manual services and quarterly schedules
+### Calendar-first planning and installable web app
 
-Create meetings under **Services → Add Service**, assign their teams and rehearsals,
-then use **Schedule → Quarter → Publish quarter**. The old youth-calendar route now
-opens the Services list. No weekly services are generated on data load; the quarterly
-migration disables the legacy generator and removes the fixed-template edit lock.
-Previously generated services and their data remain stored. Optional recurrence is
-still an explicit manager action.
+Open **Schedule** to plan a year and quarter directly in the calendar. Date clicks
+and **Add event** create silent drafts for Youth Meetings (the default), Services,
+General Meetings, House of Prayer Shifts and Conferences. Teams, rehearsals, notes
+and explicit recurrence are optional expandable sections. Conferences can span
+multiple days; prayer shifts can cross midnight. Scheduling uses Africa/Cairo and
+12-hour AM/PM fields. Rehearsals share their parent's persisted service ID.
 
-After publication, members respond in Schedule or their service details. Ordinary
-vacancies produce a private weighted-random proposal for the confirmed service
-Worship Leader. The candidate receives an in-app assignment notification only after
-approval. Only a Super Admin selects a replacement Worship Leader. Every active
-member can view and print/save the quarter as a branded PDF in English or Arabic.
-Published dates, rehearsals and original team assignments are locked; setlists and
-notes remain editable. Cancel a changed meeting and create a corrected service.
+**Review & publish quarter** retains protected member confirmations/declines,
+private weighted replacement proposals, Worship Leader approval, Super Admin-only
+leader replacement, notification dedupe and decision history. Members see published
+events and can filter **My assignments**; draft saves send no notifications. PDF
+export covers the entire quarter and excludes private proposals/contact/reasons.
 
-See [QUARTERLY-SCHEDULING.md](./QUARTERLY-SCHEDULING.md) for migration order,
-fairness/availability rules, isolated test commands, deployment, and live verification.
+Apply `MIGRATION_unified_calendar.sql` after the existing quarterly migration.
+Then apply the separate one-time `MIGRATION_calendar_cleanup.sql` after reviewing
+its candidate manifest and taking a managed backup. It snapshots affected records,
+then cancels/archives generated or explicitly reviewed unwanted non-Youth events, preserving linked data. Reruns leave
+later manager-created events alone. No weekly meetings are generated automatically.
+
+The HTTPS deployment is installable through **Install / Add to Home Screen** and
+launches directly to the calendar. The service worker caches only a generic offline
+page; calendar reads and writes require a connection.
+
+See [UNIFIED-CALENDAR.md](./UNIFIED-CALENDAR.md) for the persistence model, exact
+migration/deployment order, cleanup scope/recovery, isolated test commands and
+live acceptance checks. [QUARTERLY-SCHEDULING.md](./QUARTERLY-SCHEDULING.md) describes
+the original protected replacement state machine; unified-calendar guidance takes
+precedence for navigation, visibility, timing and event-type requirements.
+
 # Rehearsal preparation
 
 Service rehearsal scheduling is managed through **Prepare this meeting → Has rehearsal**, not a separate Practice tab. Managers can enter the date, time, location, optional HTTP/HTTPS location link, and notes, then save. Details and rehearsal reminders show an **Open location** link. Existing rehearsal attendance metadata is retained when editing or disabling a rehearsal.
