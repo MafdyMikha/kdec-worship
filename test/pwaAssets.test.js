@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { Buffer } from 'node:buffer'
+import { APP_ICONS } from '../src/assets/appIcons.js'
 import { inflateSync } from 'node:zlib'
 
 const readPublic = path => readFileSync(new URL(`../public/${path}`, import.meta.url))
@@ -57,7 +58,7 @@ test('manifest preserves the installed identity, calendar start and standalone d
 })
 
 test('every manifest icon and the Apple touch icon has correct dimensions and an opaque navy background', () => {
-  const icons = [...manifest.icons, { src: '/apple-touch-icon.png', sizes: '180x180' }]
+  const icons = [...manifest.icons, { src: APP_ICONS.apple180, sizes: '180x180' }]
   for (const icon of icons) {
     const asset = png(new URL(icon.src, 'https://kdec.test').pathname.slice(1))
     assert.equal(`${asset.width}x${asset.height}`, icon.sizes)
@@ -72,7 +73,7 @@ test('every manifest icon and the Apple touch icon has correct dimensions and an
     }
   }
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
-  assert.match(html, /rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon.png/)
+  assert.ok(html.includes(`rel="apple-touch-icon" sizes="180x180" href="${APP_ICONS.apple180}"`))
 })
 
 test('all maskable artwork fits inside the central 80 percent safe circle', () => {
@@ -87,5 +88,30 @@ test('all maskable artwork fits inside the central 80 percent safe circle', () =
       assert.ok(Math.hypot(x + .5 - width / 2, y + .5 - height / 2) <= width * .4, `artwork clipped at ${x},${y}`)
     }
   }
-  assert.ok(artworkPixels > 10000, 'the icon contains visible artwork')
+  assert.ok(artworkPixels > width * height * .015, 'the icon contains visible artwork')
+})
+
+
+test('installation previews and metadata reference fresh icon files with the full wordmark', () => {
+  assert.equal(manifest.icons.find(icon => icon.sizes === '192x192').src, APP_ICONS.app192)
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+  assert.ok(html.includes(`href="${APP_ICONS.favicon}"`))
+  // Keep the manifest's discovery URL stable for previously installed apps.
+  assert.ok(html.includes('href="/manifest.webmanifest?v=pwa4"'))
+  for (const icon of [...manifest.icons, { src: APP_ICONS.apple180 }]) {
+    assert.ok(icon.src.startsWith('/icons/') && !icon.src.includes('?'))
+    const { width, height, channels, pixels } = png(icon.src.slice(1))
+    let bands = 0, inBand = false
+    for (let y = 0; y < height; y++) {
+      let visible = false
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * channels
+        if (pixels[i] > 140 && pixels[i + 1] > 140 && pixels[i + 2] > 140) { visible = true; break }
+      }
+      if (visible && !inBand) bands++
+      inBand = visible
+    }
+    // The tower, KDEC and WORSHIP form three separated tiers; tower-only fails.
+    assert.ok(bands >= 3, `${icon.src} is missing the full wordmark`)
+  }
 })

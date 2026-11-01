@@ -13,7 +13,7 @@ This extends the existing manifest and `/sw.js`; there is one PWA setup.
 | Display | `standalone` |
 | Launch background | Opaque branded navy, `#101923` |
 | Icons | 192×192 and 512×512 PNG; separate 512×512 maskable PNG; 180×180 Apple touch PNG |
-| Artwork | Clean transparent `/brand/kdec-clean-tower.svg`, matching the navy/ivory website identity |
+| Artwork | Clean transparent `/brand/kdec-clean-lockup.svg`, matching the navy/ivory website identity |
 
 The clean tower and stacked wordmark are scalable SVG paths based on the selected
 navy/ivory logo direction. Website symbols inherit the active theme: navy
@@ -21,7 +21,7 @@ navy/ivory logo direction. Website symbols inherit the active theme: navy
 and collapsed sidebar use the tower alone, while the expanded sidebar and auth
 screens use the full wordmark. There is no photograph or rectangular background.
 
-Phone icons use the same tower in ivory on opaque navy, with safe padding and no
+Phone icons now use the complete tower + KDEC Worship lockup in ivory on opaque navy, with safe padding and no
 pre-rounded corners. Their background stays opaque on both light and dark phone
 wallpapers. Regenerate the SVGs with `node scripts/generate-brand-assets.mjs`; on
 macOS, regenerate SVGs and PNG icons with `sh scripts/generate-app-icons.sh`.
@@ -53,9 +53,9 @@ Appearance & readability → Reduce transparency.
    served with an immutable cache policy.
 5. On the deployed origin, check these URLs in a browser or with `curl -I`:
    `/schedule`, `/manifest.webmanifest?v=pwa4`, `/sw.js`, `/offline.html`,
-   `/offline.css`, `/offline-retry.js`, `/app-icon-192.png?v=pwa4`,
-   `/app-icon-512.png?v=pwa4`, `/app-icon-maskable-512.png?v=pwa4`, and
-   `/apple-touch-icon.png?v=3`. Expect 200 responses and the actual file content;
+   `/offline.css`, `/offline-retry.js`, `/icons/kdec-worship-v5-192.png`,
+   `/icons/kdec-worship-v5-512.png`, `/icons/kdec-worship-v5-maskable-512.png`, and
+   `/icons/kdec-worship-v5-apple-180.png`. Expect 200 responses and the actual file content;
    an HTML response for a manifest, worker, stylesheet, script or icon is a hosting
    error. The worker and manifest need revalidation, while icons are PNG images.
 6. In Chrome DevTools → Application, inspect Manifest and Service Workers. Check
@@ -81,7 +81,7 @@ HTTP LAN address opened on a phone is not a substitute for an HTTPS deployment.
    Safari's toolbar layout, Share may be inside the page/More menu.
 3. Choose **Add to Home Screen**. Leave **Open as Web App** enabled if it appears.
 4. Confirm the name **KDEC Worship**, then tap **Add**.
-5. Launch the new tower-logo icon. It should open without the browser address
+5. Launch the new KDEC Worship logo icon. It should open without the browser address
    bar, load `/schedule`, and show normal login when required.
 
 If Add to Home Screen is missing from Share, scroll down and use Edit Actions to
@@ -98,10 +98,18 @@ session revocation and browser storage eviction can require a new sign-in.
    app**, depending on the Chrome version. Browser engagement and installability
    checks determine whether a native prompt is available; it is not guaranteed to
    appear immediately. Other browsers may expose their own installation menu.
-4. Launch **KDEC Worship** from the home screen/app launcher. Confirm the tower
+4. Launch **KDEC Worship** from the home screen/app launcher. Confirm the full KDEC Worship
    icon, standalone window and `/schedule` launch route.
 
 ## Refresh an older installed icon
+
+The previous install icon used only the tower. The current icons include the
+complete KDEC Worship wordmark and use fresh `/icons/kdec-worship-v5-*.png`
+filenames in the manifest, Apple touch metadata and installation preview. The
+manifest URL, ID and launch route are unchanged. Legacy icon files are also
+regenerated for older links. A service-worker refresh does not itself replace an
+OS launcher icon; do not clear authentication storage to force an icon update.
+
 
 First save any open changes, open the updated HTTPS website, reload it online and
 apply an offered app update. Installed icon updates are controlled by the browser
@@ -152,7 +160,7 @@ Completed locally:
 - PNG decoding tests check actual dimensions, opaque navy padding and every
   artwork pixel's position within the maskable safe circle. The Apple icon uses the same clean tower SVG as the website.
 - The repository's permission, auth-event, calendar normalization, publication and
-  demo/runtime tests run with the full test suite (114 passing tests). `npm test`, `npm run lint`, and
+  demo/runtime tests run with the full test suite (115 passing tests). `npm test`, `npm run lint`, and
   `npm run build` pass. The build retains the existing non-blocking warning about
   an outdated Browserslist dataset. No dependencies were changed.
 - Authentication, permissions, store actions, database schema/RLS and publication
@@ -168,7 +176,7 @@ Not completed in this environment:
   installation correctness; these still need the deployed site.
 - Physical iPhone/Android installation, launcher appearance on light/dark
   wallpapers, standalone launch and real-device keyboard/safe-area layout remain
-  pending. The new opaque phone icon was visually checked and its ivory contrast,
+  pending. The new opaque full-logo phone icon was visually checked and its ivory contrast,
   dimensions, opacity and maskable bounds passed automated checks.
 - Live Supabase login/session restoration, calendar reloads and database-enforced
   access/publishing behavior were not tested end to end. Passing unit tests does

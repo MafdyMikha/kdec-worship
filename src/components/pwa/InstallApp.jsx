@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Download, Smartphone, CheckCircle } from 'lucide-react'
 import { usePwa } from './PwaProvider.jsx'
 import { useLang } from '../../lib/i18n.jsx'
+import { APP_ICONS } from '../../assets/appIcons.js'
 import { installSteps } from '../../lib/pwa.js'
 import { Btn, Card, Modal } from '../ui'
 
@@ -27,7 +28,7 @@ export default function InstallApp({card=false,menu=false}) {
     </div>}
     {guide&&<Modal open onClose={()=>setGuide(false)} title={isAr?'إضافة KDEC Worship إلى جهازك':'Add KDEC Worship to your device'} footer={<Btn variant="secondary" onClick={()=>setGuide(false)}>{isAr?'تم':'Done'}</Btn>}>
       <div className="space-y-4" dir={isAr?'rtl':'ltr'}>
-        <img className="pwa-guide-icon" src="/app-icon-192.png?v=pwa4" width="80" height="80" alt="KDEC Worship"/>
+        <img className="pwa-guide-icon" src={APP_ICONS.app192} width="80" height="80" alt="KDEC Worship"/>
         {!pwa.secure&&<p role="alert" className="text-amber-700">{isAr?'افتح رابط المنصة الآمن HTTPS للتثبيت. معاينة عنوان شبكة محلي HTTP لا تدعم التثبيت.':'Open the deployed HTTPS website to install. An HTTP local-network preview does not support installation.'}</p>}
         <ol className="list-decimal ps-5 space-y-3 text-sm">{installSteps(pwa.platform,isAr).map(step=><li key={step}>{step}</li>)}</ol>
         <p className="text-sm text-slate-500">{isAr?'تحتاج إلى الإنترنت لعرض أحدث جدول وحفظ الردود. قد تحتاج إلى تسجيل الدخول عند أول فتح للتطبيق.':'An internet connection is needed for the current calendar and saved responses. You may need to sign in when you first open the installed app.'}</p>
@@ -37,7 +38,7 @@ export default function InstallApp({card=false,menu=false}) {
   </>
   if(!card)return <>{content}</>
   return <Card className="pwa-install-card p-5 space-y-4">
-    <div className="flex items-start gap-3"><img src="/app-icon-192.png?v=pwa4" width="56" height="56" className="pwa-guide-icon" alt="KDEC Worship"/><div><h2 className="font-display text-xl font-semibold">{isAr?'KDEC Worship على جهازك':'KDEC Worship on your device'}</h2><p className="text-sm text-slate-500 mt-1">{isAr?'الجدول والترانيم وتكليفاتك، من أيقونة على الشاشة الرئيسية.':'Your calendar, songs and assignments, one Home Screen icon away.'}</p></div><Smartphone size={20} aria-hidden="true" className="hidden sm:block text-slate-400"/></div>
+    <div className="flex items-start gap-3"><img src={APP_ICONS.app192} width="56" height="56" className="pwa-guide-icon" alt="KDEC Worship"/><div><h2 className="font-display text-xl font-semibold">{isAr?'KDEC Worship على جهازك':'KDEC Worship on your device'}</h2><p className="text-sm text-slate-500 mt-1">{isAr?'الجدول والترانيم وتكليفاتك، من أيقونة على الشاشة الرئيسية.':'Your calendar, songs and assignments, one Home Screen icon away.'}</p></div><Smartphone size={20} aria-hidden="true" className="hidden sm:block text-slate-400"/></div>
     {content}
     {pwa.workerState==='error'&&<div className="text-sm text-slate-500"><p>{isAr?'تعذر إعداد صفحة المساعدة دون اتصال. المنصة متاحة عند الاتصال.':'Offline help could not be prepared. The app remains available online.'}</p><button type="button" className="underline" onClick={()=>void pwa.retryWorker()}>{isAr?'إعادة المحاولة':'Retry offline setup'}</button></div>}
     {pwa.workerState==='ready'&&<p className="text-xs text-slate-500">{isAr?'صفحة المساعدة دون اتصال جاهزة. بيانات الفريق لا تُخزّن في ذاكرة التطبيق المؤقتة.':'Offline help is ready. Team data is not stored in the app’s offline cache.'}</p>}
