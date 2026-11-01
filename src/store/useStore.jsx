@@ -4,7 +4,9 @@ import { rehearsalBeforeService } from '../lib/rehearsal.js'
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react'
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { supabase, hasValidConfiguration, isDemoMode as configuredDemoMode } from '../lib/supabase.js'
-import { attendanceOccurrenceDate, attendanceTiming, validateAttendanceSessionSchedule } from '../lib/attendance.js'
+import { attendanceSnapshot, attendanceCodeError, attendanceSchedule, effectiveTolerance, validOccurrence, validTolerance } from '../lib/attendancePolicy.js'
+import { buildAttendanceReport } from '../lib/attendanceReport.js'
+import { attendanceOccurrenceDate, validateAttendanceSessionSchedule } from '../lib/attendance.js'
 import { isYouthMeetingDate } from '../lib/weeklyServices.js'
 import { normalizeQuarterly, normalizeScheduleNotification, loadScheduleRows } from '../lib/quarterlySchedule.js'
 import { cairoToday, cleanupDemoCalendar, importDemoEvents, normalizePlanningFields, planningOccurrences } from '../lib/planningCalendar.js'
@@ -63,6 +65,7 @@ export const DEFAULT_ORGANIZATION_SETTINGS = {
   defaultService: 'Sunday Service',
   timezone: 'Africa/Cairo',
   attendanceLateMinutes: 15,
+  attendanceLateEnabled: true,
   excuseLimit: 3,
   excusePeriod: 'monthly',
   notificationPreferences: { reminders:true, newSongs:true, teamChanges:false, events:true },
@@ -190,6 +193,7 @@ const normalizeEvent = (event) => ({
 const normalizeAttendanceSession = (session) => ({
   ...session,
   id: session.id || session.session_id,
+  effective_late_minutes:session.effective_late_minutes ?? session.effectiveLateMinutes,
   serviceId: session.service_id,
   service: session.service || (session.service_title ? {
     id:session.service_id, title:session.service_title, date:session.service_date, time:session.service_time,
@@ -300,6 +304,7 @@ export function AppProvider({ children }) {
   const [substituteRequests, setSubstituteRequests] = useState([])
   const [organizationSettings, setOrganizationSettings] = useState(DEFAULT_ORGANIZATION_SETTINGS)
   const [notifications,  setNotifications]  = useState([])
+  const [attendanceReady,setAttendanceReady]=useState(false)
   const [planningReady, setPlanningReady] = useState(false)
   const [quarterly, setQuarterly] = useState({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
   const [loading,        setLoading]        = useState(false)
@@ -352,6 +357,7 @@ export function AppProvider({ children }) {
     setExcuseRequests([])
     setSubstituteRequests([])
     setPlanningReady(false)
+    setAttendanceReady(false)
     setQuarterly({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
     setOrganizationSettings(DEFAULT_ORGANIZATION_SETTINGS)
     setLoading(false)
@@ -453,13 +459,19 @@ export function AppProvider({ children }) {
     setAnnouncements(a)
     setServices(hydrateDemoServices(rawSvcs.map(row=>({...row,...normalizePlanningFields(row)})), s, normalizedPeople))
     setPlanningReady(true)
+    setAttendanceReady(true)
     setEvents(importedCalendar.events)
     setEventResponses(responses)
     setAttendanceSessions(sessions.map(session => ({
       ...session,
       service: rawSvcs.find(service => service.id === session.service_id) || session.service || null,
     })))
-    setAttendanceRecords(records)
+    setAttendanceRecords(Object.fromEntries(Object.entries(records).map(([id,rows])=>[id,rows.map(row=>{
+      const session=sessions.find(item=>item.id===id)
+      if(row.scheduled_start_at||!row.check_in_at||!session?.session_time||!session?.end_time)return row
+      const snapshot=attendanceSnapshot(row,{...session,effective_late_minutes:session.effective_late_minutes??organization.attendanceLateMinutes??15})
+      return {...snapshot,status:row.status,arrival_status:row.status==='late'?'late':snapshot.arrival_status==='early'?'early':'on_time',late_by_minutes:row.status==='late'?Math.max(1,snapshot.late_by_minutes):0}
+    })])))
     setExcuseRequests(excuses)
     setSubstituteRequests(substitutes)
     setOrganizationSettings({ ...DEFAULT_ORGANIZATION_SETTINGS, ...organization })
@@ -524,6 +536,7 @@ export function AppProvider({ children }) {
     setLoading(true)
     try {
       const queries = [
+        ['attendanceReady',supabase.from('services').select('custom_category,participant_ids,attendance_enabled,late_tolerance_mode,late_tolerance_minutes').limit(1)],
         ['planningReady',supabase.from('services').select('event_kind,published_at,end_date,end_time,archived_at').limit(1)],
         ['scheduleQuarters',supabase.from('schedule_quarters').select('*')],
         ['scheduleSlots',loadScheduleRows(supabase,'schedule_slots')],
@@ -556,6 +569,7 @@ export function AppProvider({ children }) {
       if (expectedGeneration !== authGenerationRef.current) return
       const resultByKey = Object.fromEntries(resolved)
       const scheduleKeys = ['scheduleQuarters','scheduleSlots','scheduleAttempts','scheduleInbox','scheduleAudit']
+      setAttendanceReady(!resultByKey.attendanceReady.error)
       setPlanningReady(!resultByKey.planningReady.error)
       setQuarterly(normalizeQuarterly({ quarters:resultByKey.scheduleQuarters.data||[], slots:resultByKey.scheduleSlots.data||[], attempts:resultByKey.scheduleAttempts.data||[], inbox:resultByKey.scheduleInbox.data||[], audit:resultByKey.scheduleAudit.data||[], ready:scheduleKeys.every(key=>!resultByKey[key].error) }))
       const firstError = resolved.find(([, result]) => result.error)?.[1].error
@@ -615,6 +629,7 @@ export function AppProvider({ children }) {
           orgNameEn: settings.name || DEFAULT_ORGANIZATION_SETTINGS.orgNameEn,
           defaultService: settings.default_service_type || DEFAULT_ORGANIZATION_SETTINGS.defaultService,
           timezone: settings.timezone || DEFAULT_ORGANIZATION_SETTINGS.timezone,
+          attendanceLateEnabled: settings.attendance_late_enabled ?? true,
           attendanceLateMinutes: settings.attendance_late_minutes ?? DEFAULT_ORGANIZATION_SETTINGS.attendanceLateMinutes,
           excuseLimit: settings.excuse_limit ?? DEFAULT_ORGANIZATION_SETTINGS.excuseLimit,
           excusePeriod: settings.excuse_period || DEFAULT_ORGANIZATION_SETTINGS.excusePeriod,
@@ -1162,6 +1177,7 @@ export function AppProvider({ children }) {
       setServices(previous=>[...previous.filter(event=>event.id!==form.id),...saved]);return {success:true,id:saved[0].id}
     }
     if(!planningReady)return {error:'Apply MIGRATION_unified_calendar.sql before saving events.'}
+    if(!attendanceReady)return {error:'Apply MIGRATION_attendance_custom_events.sql before saving attendance options or custom events.'}
     const {error}=await supabase.rpc('save_planning_events',{p_events:rows,p_edit:Boolean(form.id)})
     if(error)return {error:error.message}
     const refreshed=await loadAll()
@@ -1509,93 +1525,121 @@ export function AppProvider({ children }) {
 
   // ── ATTENDANCE ──────────────────────────────────────────
   const createAttendanceSession = async (form) => {
-    if(!hasPermission(currentUser,'reports.view')&&!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to manage attendance sessions.'}
-    const service = form.serviceId ? services.find(item => item.id===form.serviceId) : null
-    const sessionDate = form.sessionDate || service?.date
-    const sessionTime = form.sessionTime || service?.time || null
-    const endTime = form.endTime || null
-    if (!sessionDate || !sessionTime || !endTime) {
-      const message = 'Session date, start time, and end time are required.'
-      toast(message, 'error')
-      return { error:message }
+    if(!hasPermission(currentUser,'reports.view')&&!hasPermission(currentUser,'services.edit'))return {error:'Attendance management permission required.'}
+    if(form.lateToleranceMode==='custom'&&!validTolerance(form.lateToleranceMinutes))return {error:'Enter a non-negative whole number of minutes.'}
+    const service=services.find(item=>item.id===form.serviceId)
+    if(service&&(!service.publishedAt||service.status==='cancelled'||service.attendanceEnabled===false))return {error:'Publish and enable attendance for this event first.'}
+    const validation=validateAttendanceSessionSchedule(form,'Africa/Cairo')
+    if(!validation.valid)return {error:validation.error}
+    const mode=form.lateToleranceMode||'inherit'
+    const payload={name:normalizeRequiredText(form.name)||service?.title||form.label,label:form.label,service_id:form.serviceId||null,
+      session_date:form.sessionDate,session_time:form.sessionTime,end_time:form.endTime,session_end_date:form.sessionEndDate||null,
+      max_attendees:form.maxAttendees?Number(form.maxAttendees):null,repeatable:Boolean(form.repeatable),repeat_freq:form.repeatable?form.repeatFreq:null,
+      late_tolerance_mode:mode,late_tolerance_minutes:mode==='custom'?Number(form.lateToleranceMinutes):null}
+    let saved
+    if(isDemoMode){
+      const inherited=service?effectiveTolerance(service,organizationSettings):organizationSettings.attendanceLateEnabled===false?0:organizationSettings.attendanceLateMinutes
+      const snapshotMinutes=effectiveTolerance(form,{attendanceLateMinutes:inherited})
+      saved={...payload,id:crypto.randomUUID(),created_by:currentUser.id,created_at:new Date().toISOString(),active:true,qr_code:createSecureToken(32),qrCodes:{},effective_late_minutes:snapshotMinutes,
+        expires_at:form.repeatable?new Date(Math.max(Date.now(),Date.parse(form.sessionDate))+90*86400000).toISOString():validation.expiresAt.toISOString()}
+      if(!saved.session_end_date)saved.session_end_date=attendanceSchedule(saved,saved.session_date).end.toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'})
+    }else{
+      const {data,error}=await supabase.rpc('create_attendance_session',{p_form:payload})
+      if(error){toast(error.message,'error');return {error:error.message}}
+      saved=data
     }
-    const scheduleValidation=validateAttendanceSessionSchedule({sessionDate,sessionTime,endTime,repeatable:Boolean(form.repeatable)},organizationSettings.timezone)
-    if(!scheduleValidation.valid){toast(scheduleValidation.error,'error');return {error:scheduleValidation.error}}
-    const expiresAt = form.repeatable
-      ? new Date(Date.now() + 90 * 86400000).toISOString()
-      : scheduleValidation.expiresAt.toISOString()
-    const localSession = {
-      id:`sess_${Date.now()}`, name:normalizeRequiredText(form.name) || service?.title || form.label,
-      service_id:form.serviceId||null, service:service||null, label:form.label,
-      session_date:sessionDate, session_time:sessionTime, end_time:endTime,
-      max_attendees:form.maxAttendees?Number(form.maxAttendees):null,
-      repeatable:Boolean(form.repeatable), repeat_freq:form.repeatable?(form.repeatFreq||'weekly'):null, qr_code:createSecureToken(12),
-      active:true, expires_at:expiresAt, created_at:new Date().toISOString(), created_by:currentUser.id,
-    }
-    if (isDemoMode) {
-      setAttendanceSessions(prev => [localSession, ...prev]); setAttendanceRecords(prev => ({ ...prev, [localSession.id]:[] }))
-      toast('Attendance session created'); return { success:true, data:localSession }
-    }
-    const payload = {
-      name:localSession.name, service_id:localSession.service_id, label:localSession.label,
-      session_date:localSession.session_date, session_time:localSession.session_time, end_time:localSession.end_time,
-      max_attendees:localSession.max_attendees,
-      repeatable:localSession.repeatable, repeat_freq:localSession.repeat_freq,
-      qr_code:localSession.qr_code, active:true, expires_at:localSession.expires_at,
-      created_by:localSession.created_by,
-    }
-    const { data:session, error } = await supabase.from('attendance_sessions').insert(payload).select('*, service:services(*)').single()
-    if (error) { toast(error.message,'error'); return { error:error.message } }
-    const normalized = normalizeAttendanceSession(session)
-    setAttendanceSessions(prev => [normalized, ...prev]); setAttendanceRecords(prev => ({ ...prev, [normalized.id]:[] }))
-    toast('Attendance session created'); return { success:true, data:normalized }
+    const normalized=normalizeAttendanceSession({...saved,service:service||null})
+    setAttendanceSessions(previous=>[normalized,...previous]);setAttendanceRecords(previous=>({...previous,[saved.id]:[]}))
+    toast('Attendance session created');return {success:true,data:normalized}
   }
-
-  const closeAttendanceSession = async (sessionId) => {
-    if(!hasPermission(currentUser,'reports.view')&&!hasPermission(currentUser,'services.edit'))return {error:'You do not have permission to manage attendance sessions.'}
-    if (!isDemoMode) {
-      const { error } = await supabase.from('attendance_sessions').update({ active:false }).eq('id',sessionId).select('id').single()
-      if (error) { toast(error.message,'error'); return { error:error.message } }
+  const manageAttendanceQr=useCallback(async(sessionId,day,action='get')=>{
+    if(!hasPermission(currentUser,'reports.view')&&!hasPermission(currentUser,'services.edit'))return {error:'Attendance management permission required.'}
+    if(isDemoMode){
+      const session=attendanceSessions.find(item=>item.id===sessionId)
+      if(!session)return {error:'Session not found.'}
+      if(action==='close'){
+        setAttendanceSessions(previous=>previous.map(item=>item.id===sessionId?{...item,active:false}:item));return {success:true}
+      }
+      if(!session.active)return {error:'This attendance session is closed.'}
+      if(!validOccurrence(session,day))return {error:'This code is not valid for this occurrence.'}
+      if(Math.min(Date.parse(session.expires_at),attendanceSchedule(session,day).end.getTime()+6*3600000)<=Date.now())return {error:'This attendance code is not active yet or has expired.'}
+      const existing=session.qrCodes?.[day]
+      if(action==='get'&&existing)return {success:true,data:existing}
+      const code={qr_code:action==='rotate'||!existing?createSecureToken(32):existing.qr_code,occurrence_date:day,revoked:action==='revoke',version:(existing?.version||0)+1,
+        expires_at:new Date(Math.min(Date.parse(session.expires_at),attendanceSchedule(session,day).end.getTime()+6*3600000)).toISOString()}
+      setAttendanceSessions(previous=>previous.map(item=>item.id===sessionId?{...item,qrCodes:{...item.qrCodes,[day]:code}}:item))
+      return {success:true,data:code}
     }
-    setAttendanceSessions(prev => prev.map(session => session.id===sessionId ? { ...session, active:false } : session))
-    toast('Attendance session closed'); return { success:true }
+    const {data,error}=await supabase.rpc('manage_attendance_qr',{p_session:sessionId,p_date:day||null,p_action:action})
+    if(error)return {error:error.message}
+    if(action==='close')setAttendanceSessions(previous=>previous.map(item=>item.id===sessionId?{...item,active:false}:item))
+    return {success:true,data}
+  },[attendanceSessions,currentUser,isDemoMode])
+  const closeAttendanceSession=async sessionId=>{
+    const result=await manageAttendanceQr(sessionId,null,'close')
+    if(result.error)toast(result.error,'error');else toast('Attendance session closed')
+    return result
   }
-
-  const deleteAttendanceSession = closeAttendanceSession
-
-  const resolveAttendanceSession = useCallback(async (qrCode) => {
-    if (!qrCode) return { error:'Missing attendance code.' }
-    if (isDemoMode) {
-      const session = attendanceSessions.find(item => item.qr_code===qrCode)
-      if (!session || !session.active || (session.expires_at && new Date(session.expires_at) < new Date())) return { error:'This attendance link is invalid or expired.' }
-      return { success:true, data:session }
+  const deleteAttendanceSession=closeAttendanceSession
+  const resolveAttendanceSession=useCallback(async(qrCode)=>{
+    if(!currentUser||currentUser.status!=='active')return {error:'Active membership is required'}
+    if(isDemoMode){
+      const session=attendanceSessions.find(item=>Object.values(item.qrCodes||{}).some(code=>code.qr_code===qrCode))
+      const code=Object.values(session?.qrCodes||{}).find(item=>item.qr_code===qrCode)
+      const error=attendanceCodeError(session,code,code?.occurrence_date)
+      if(error)return {error}
+      const service=services.find(item=>item.id===(session.serviceId||session.service_id))
+      if(service&&(!service.publishedAt||service.status==='cancelled'||service.attendanceEnabled===false))return {error:'Publish and enable attendance for this event first.'}
+      return {success:true,data:{...session,qr_code:qrCode,occurrence_date:code.occurrence_date}}
     }
-    const { data, error } = await supabase.rpc('get_attendance_session', { p_qr_code:qrCode })
-    const session = Array.isArray(data) ? data[0] : data
-    if (error || !session) return { error:error?.message || 'This attendance link is invalid or expired.' }
-    return { success:true, data:normalizeAttendanceSession({ ...session, qr_code:qrCode }) }
-  }, [attendanceSessions, isDemoMode])
-
-  const checkInAttendance = async (qrCode) => {
-    if (isDemoMode) {
-      const sessionResult = await resolveAttendanceSession(qrCode)
-      if (sessionResult.error) return sessionResult
-      const session = sessionResult.data
-      const occurrenceDate = attendanceOccurrenceDate(session, organizationSettings.timezone)
-      const existing = (attendanceRecords[session.id]||[]).find(record => record.person_id===currentUser.id && record.occurrence_date===occurrenceDate)
-      if (existing?.check_in_at) return { success:true, data:existing }
-      if (session.max_attendees && (attendanceRecords[session.id]||[]).filter(record => record.occurrence_date===occurrenceDate && record.check_in_at).length>=session.max_attendees) return { error:'This attendance session is full.' }
-      const record = { id:`rec_${Date.now()}`, session_id:session.id, person_id:currentUser.id, occurrence_date:occurrenceDate, check_in_at:new Date().toISOString(), check_out_at:null, status:'present' }
-      record.status = attendanceTiming(record, session, organizationSettings.timezone, organizationSettings.attendanceLateMinutes).arrival === 'late' ? 'late' : 'present'
-      setAttendanceRecords(prev => ({ ...prev, [session.id]:[...(prev[session.id]||[]),record] }))
-      return { success:true, data:record }
+    const {data,error}=await supabase.rpc('resolve_attendance_code',{p_qr_code:qrCode})
+    return error?{error:error.message}:{success:true,data:normalizeAttendanceSession(data)}
+  },[attendanceSessions,services,isDemoMode,currentUser])
+  const checkInAttendance=async qrCode=>{
+    if(!currentUser||currentUser.status!=='active')return {error:'Active membership is required.'}
+    if(isDemoMode){
+      const result=await resolveAttendanceSession(qrCode)
+      if(result.error)return result
+      const session=result.data,day=session.occurrence_date
+      const existing=(attendanceRecords[session.id]||[]).find(record=>record.person_id===currentUser.id&&record.occurrence_date===day)
+      if(existing?.check_in_at)return {success:true,data:existing}
+      if(session.max_attendees&&(attendanceRecords[session.id]||[]).filter(record=>record.occurrence_date===day&&record.check_in_at).length>=session.max_attendees)return {error:'This attendance session is full.'}
+      const record=attendanceSnapshot({id:existing?.id||crypto.randomUUID(),session_id:session.id,person_id:currentUser.id,occurrence_date:day,check_in_at:new Date().toISOString(),check_out_at:null},session,organizationSettings)
+      setAttendanceRecords(previous=>({...previous,[session.id]:[...(previous[session.id]||[]).filter(item=>item.id!==record.id),record]}));return {success:true,data:record}
     }
-    const { data, error } = await supabase.rpc('check_in_attendance', { p_qr_code:qrCode })
-    const record = Array.isArray(data) ? data[0] : data
-    if (error || !record) { const message=error?.message||'Check-in failed.'; toast(message,'error'); return { error:message } }
-    setAttendanceRecords(prev => ({ ...prev, [record.session_id]:[...(prev[record.session_id]||[]).filter(item => item.id!==record.id),record] }))
-    return { success:true, data:record }
+    const {data,error}=await supabase.rpc('check_in_attendance',{p_qr_code:qrCode})
+    if(error||!data){const message=error?.message||'Check-in failed.';toast(message,'error');return {error:message}}
+    setAttendanceRecords(previous=>({...previous,[data.session_id]:[...(previous[data.session_id]||[]).filter(item=>item.id!==data.id),data]}));return {success:true,data}
   }
+  const updateEventAttendanceOptions=async(serviceId,options)=>{
+    if(!hasPermission(currentUser,'services.edit')&&!hasPermission(currentUser,'schedules.manage'))return {error:'Schedule management permission required.'}
+    if(options.lateToleranceMode==='custom'&&!validTolerance(options.lateToleranceMinutes))return {error:'Enter a non-negative whole number of minutes.'}
+    if(isDemoMode){
+      setServices(previous=>previous.map(event=>event.id===serviceId?{...event,...options}:event))
+      const minutes=effectiveTolerance(options,organizationSettings)
+      setAttendanceSessions(previous=>previous.map(session=>(session.serviceId||session.service_id)===serviceId&&(session.late_tolerance_mode||'inherit')==='inherit'?{...session,effective_late_minutes:minutes}:session))
+      return {success:true}
+    }
+    const {error}=await supabase.rpc('update_event_attendance_options',{p_service:serviceId,p_mode:options.lateToleranceMode,p_minutes:options.lateToleranceMode==='custom'?Number(options.lateToleranceMinutes):null,p_enabled:options.attendanceEnabled})
+    if(error)return {error:error.message}
+    const reload=await loadAll();return reload?.error?reload:{success:true}
+  }
+  const loadMemberAttendanceHistory=useCallback(async(personId,filters={})=>{
+    if(!currentUser||currentUser.status!=='active'||(personId!==currentUser.id&&!hasPermission(currentUser,'reports.view')))return {error:'Attendance history permission required.'}
+    let raw
+    if(!isDemoMode){
+      const {data,error}=await supabase.rpc('get_member_attendance_history',{p_person:personId,p_from:filters.from||null,p_to:filters.to||null,p_kind:filters.kind||null,p_status:filters.status||null,p_offset:filters.offset||0,p_limit:50})
+      if(error)return {error:error.message}
+      raw=data
+    }else{
+      const base=buildAttendanceReport({sessions:attendanceSessions,recordsBySession:attendanceRecords,people,timezone:'Africa/Cairo'}).rows.filter(row=>row.personId===personId)
+      const rows=base.filter(row=>(!filters.from||row.date>=filters.from)&&(!filters.to||row.date<=filters.to)&&(!filters.kind||row.sessionType===filters.kind)&&(!filters.status||row.status===filters.status))
+      return {success:true,data:{rows:rows.slice(filters.offset||0,(filters.offset||0)+50),total:rows.length,types:[...new Set(base.map(row=>row.sessionType))],summary:{records:rows.length,present:rows.filter(row=>row.checkInAt).length,late:rows.filter(row=>row.status==='late').length,absent:rows.filter(row=>row.status==='absent').length,excused:rows.filter(row=>row.status==='excused').length}}}
+    }
+    const sessions=[...new Map(raw.rows.map(row=>[row.session_id,row.session])).values()]
+    const grouped=groupAttendanceRecords(raw.rows)
+    return {success:true,data:{...raw,rows:buildAttendanceReport({sessions,recordsBySession:grouped,people,timezone:'Africa/Cairo'}).rows}}
+  },[currentUser,attendanceSessions,attendanceRecords,people,isDemoMode])
 
   const checkOutAttendance = async (sessionId) => {
     if (isDemoMode) {
@@ -1721,12 +1765,15 @@ export function AppProvider({ children }) {
   }
 
   const updateOrganizationSettings = async (settings) => {
+    if(!hasPermission(currentUser,'settings.manage'))return {error:'Settings management permission required.'}
     const next = { ...organizationSettings, ...settings, id:true }
+    if(!validTolerance(next.attendanceLateMinutes))return {error:'Enter a non-negative whole number of minutes.'}
     if (isDemoMode) { setOrganizationSettings(next); toast('Settings saved'); return { success:true } }
     const { error } = await supabase.from('organization_settings').update({
       name_ar:next.orgNameAr, name:next.orgNameEn,
       default_service_type:next.defaultService, timezone:next.timezone,
       attendance_late_minutes:Number(next.attendanceLateMinutes),
+      attendance_late_enabled:next.attendanceLateEnabled!==false,
       excuse_limit:Number(next.excuseLimit), excuse_period:next.excusePeriod,
       notification_preferences:next.notificationPreferences,
       updated_by:currentUser.id, updated_at:new Date().toISOString(),
@@ -1758,11 +1805,11 @@ export function AppProvider({ children }) {
     addAnnouncement, deleteAnnouncement,
     setPractice, updatePracticeAttendance,
     addEvent, updateEvent, deleteEvent, setEventResponse,
-    createAttendanceSession, closeAttendanceSession, deleteAttendanceSession,
+    createAttendanceSession, closeAttendanceSession, deleteAttendanceSession, manageAttendanceQr, updateEventAttendanceOptions, loadMemberAttendanceHistory,
     resolveAttendanceSession, checkInAttendance, checkOutAttendance,
     submitExcuse, requestSubstitute, reviewExcuse, cancelExcuse, fillSubstituteRequest, cancelSubstituteRequest,
     updateOrganizationSettings,
-    toast, loadAll,
+    toast, loadAll, attendanceReady,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

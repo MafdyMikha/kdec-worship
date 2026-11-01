@@ -14,12 +14,13 @@ function localDateTimeParts(date, timezone) {
     day:'2-digit',
     hour:'2-digit',
     minute:'2-digit',
+    second:'2-digit',
     hourCycle:'h23',
   }).formatToParts(date)
   const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
   return {
     date:`${values.year}-${values.month}-${values.day}`,
-    minutes:(Number(values.hour) * 60) + Number(values.minute),
+    minutes:(Number(values.hour) * 60) + Number(values.minute) + Number(values.second || 0) / 60,
   }
 }
 
@@ -71,7 +72,7 @@ export function attendanceSessionExpiry(session, timezone = 'Africa/Cairo', grac
   const startMinutes=timeToMinutes(startTime)
   const endMinutes=timeToMinutes(endTime)
   if(ordinal===null||startMinutes===null||endMinutes===null)return null
-  const endDate=dateKeyFromOrdinal(ordinal+(endMinutes<=startMinutes?1:0))
+  const endDate=session?.sessionEndDate||session?.session_end_date||dateKeyFromOrdinal(ordinal+(endMinutes<=startMinutes?1:0))
   const scheduledEnd=zonedDateTimeToUtc(endDate,endTime,timezone)
   return scheduledEnd ? new Date(scheduledEnd.getTime()+(Math.max(0,Number(graceHours)||0)*3600000)) : null
 }
@@ -113,7 +114,7 @@ export function attendanceTiming(record, session, timezone = 'Africa/Cairo', lat
     const checkInOrdinal = dateOrdinal(localCheckIn.date)
     const checkInValue = ((checkInOrdinal - occurrenceOrdinal) * 1440) + localCheckIn.minutes
     if (checkInValue < startMinutes) arrival = 'early'
-    else if (checkInValue <= startMinutes + Math.max(0, Number(lateMinutes) || 0)) arrival = 'on_time'
+    else if (checkInValue <= startMinutes + Math.max(0, Number(record?.tolerance_minutes ?? session?.effective_late_minutes ?? lateMinutes) || 0)) arrival = 'on_time'
     else arrival = 'late'
   }
 
@@ -126,5 +127,12 @@ export function attendanceTiming(record, session, timezone = 'Africa/Cairo', lat
     departure = checkOutValue < scheduledEnd ? 'early' : 'normal'
   }
 
-  return { arrival, departure }
+  if (record?.arrival_status) arrival = record.arrival_status
+  else if (record?.status === 'late') arrival = 'late'
+  if (record?.scheduled_start_at && record?.check_in_at && record?.tolerance_minutes !== null && record?.tolerance_minutes !== undefined) {
+    const delta = new Date(record.check_in_at) - new Date(record.scheduled_start_at)
+    arrival = record.arrival_status || (delta < 0 ? 'early' : delta > record.tolerance_minutes * 60000 ? 'late' : 'on_time')
+  }
+  if (record?.scheduled_end_at && record?.check_out_at) departure = new Date(record.check_out_at) < new Date(record.scheduled_end_at) ? 'early' : 'normal'
+  return { arrival, departure, lateByMinutes: record?.late_by_minutes ?? 0 }
 }

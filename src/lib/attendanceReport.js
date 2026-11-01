@@ -35,7 +35,7 @@ export function buildAttendanceReport({ sessions = [], recordsBySession = {}, pe
       sessionId:record.session_id || sessionId,
       session,
       sessionName:sessionName(session),
-      sessionType:session?.label || '',
+      sessionType:session?.service?.custom_category || session?.service?.customCategory || session?.service?.event_kind || session?.service?.eventKind || session?.label || '',
       date:sessionDate(record, session),
       startTime:session?.sessionTime || session?.session_time || '',
       endTime:session?.endTime || session?.end_time || '',
@@ -47,6 +47,7 @@ export function buildAttendanceReport({ sessions = [], recordsBySession = {}, pe
       checkOutAt:record.check_out_at,
       status:record.status || '',
       arrival:timing.arrival,
+      lateByMinutes:timing.lateByMinutes,
       departure:timing.departure,
     }
   })).sort((a, b) => `${b.date}|${b.checkInAt || ''}`.localeCompare(`${a.date}|${a.checkInAt || ''}`))

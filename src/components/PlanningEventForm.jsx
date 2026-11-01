@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import ToleranceEditor from './attendance/ToleranceEditor.jsx'
+import { effectiveTolerance } from '../lib/attendancePolicy.js'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { EVENT_TYPES, cairoToday, eventKind, planningMessage, validatePlanningEvent } from '../lib/planningCalendar.js'
@@ -7,14 +9,14 @@ import { Btn, Input, Modal, Select, Textarea } from './ui'
 
 export default function PlanningEventForm({event,date,onClose,onSaved}) {
   const {isAr}=useLang()
-  const {savePlanningEvent,people,worshipRoles}=useStore()
-  const [form,setForm]=useState(()=>event?{...event,eventKind:eventKind(event),endDate:event.endDate||event.date,endTime:event.endTime||'20:00',team:event.team.map(member=>({...member})),recurrence:{enabled:false}}:{eventKind:'youth_meeting',title:'',date:date||cairoToday(),endDate:date||cairoToday(),time:'18:00',endTime:'20:00',location:'',locationUrl:'',notes:'',team:[],practice:null,recurrence:{enabled:false,frequency:'weekly',count:8,endDate:''}})
+  const {savePlanningEvent,people,worshipRoles,organizationSettings}=useStore()
+  const [form,setForm]=useState(()=>event?{...event,eventKind:eventKind(event),endDate:event.endDate||event.date,endTime:event.endTime||'20:00',team:event.team.map(member=>({...member})),recurrence:{enabled:false}}:{customCategory:'',participantIds:[],attendanceEnabled:false,lateToleranceMode:'inherit',lateToleranceMinutes:0,eventKind:'youth_meeting',title:'',date:date||cairoToday(),endDate:date||cairoToday(),time:'18:00',endTime:'20:00',location:'',locationUrl:'',notes:'',team:[],practice:null,recurrence:{enabled:false,frequency:'weekly',count:8,endDate:''}})
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const set=fields=>setForm(previous=>({...previous,...fields}))
   const practice=fields=>set({practice:{...form.practice,...fields}})
   const recurring=fields=>set({recurrence:{...form.recurrence,...fields}})
-  const multi=['conference','prayer_shift'].includes(form.eventKind)
+  const multi=['conference','prayer_shift','custom'].includes(form.eventKind)
   const save=async()=>{
     const invalid=validatePlanningEvent(form)
     if(invalid){setError(invalid);return}
@@ -27,7 +29,8 @@ export default function PlanningEventForm({event,date,onClose,onSaved}) {
     <form onSubmit={e=>{e.preventDefault();void save()}} className="space-y-5" aria-busy={busy}>
       <p className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-800">{isAr?'توقيت القاهرة · حفظ المسودة لا يرسل أي إشعارات.':'Africa/Cairo · Saving a draft sends no notifications.'}</p>
       {error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-red-700">{planningMessage(error,isAr)}</p>}
-      <Select label={isAr?'نوع الفعالية':'Event type'} value={form.eventKind} disabled={busy} onChange={e=>set({eventKind:e.target.value,...(!['conference','prayer_shift'].includes(e.target.value)?{endDate:form.date}:{})})}>{EVENT_TYPES.map(type=><option key={type.key} value={type.key}>{isAr?type.ar:type.en}</option>)}</Select>
+      <Select label={isAr?'نوع الفعالية':'Event type'} value={form.eventKind} disabled={busy} onChange={e=>set({eventKind:e.target.value,...(!['conference','prayer_shift','custom'].includes(e.target.value)?{endDate:form.date}:{})})}>{EVENT_TYPES.map(type=><option key={type.key} value={type.key}>{isAr?type.ar:type.en}</option>)}</Select>
+      {form.eventKind==='custom'&&<Input label={isAr?'التصنيف المخصص':'Custom category'} required maxLength={100} value={form.customCategory||''} onChange={e=>set({customCategory:e.target.value})}/>}
       <Input label={isAr?'العنوان':'Title'} required maxLength={200} value={form.title} onChange={e=>set({title:e.target.value})}/>
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label={isAr?'التاريخ':'Date'} type="date" required value={form.date} onChange={e=>set({date:e.target.value,...(form.endDate===form.date||form.endDate<e.target.value?{endDate:e.target.value}:{})})}/>
@@ -38,6 +41,9 @@ export default function PlanningEventForm({event,date,onClose,onSaved}) {
       {multi&&<p className="text-sm text-slate-500">{isAr?'للفترات التي تتجاوز منتصف الليل اختر اليوم التالي كتاريخ انتهاء.':'For an overnight shift, choose the following day as the end date.'}</p>}
       <Input label={isAr?'المكان':'Location'} value={form.location} onChange={e=>set({location:e.target.value})}/>
       <Input label={isAr?'رابط المكان (اختياري)':'Location link (optional)'} type="url" placeholder="https://maps.google.com/…" value={form.locationUrl||''} onChange={e=>set({locationUrl:e.target.value})}/>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.attendanceEnabled!==false} onChange={e=>set({attendanceEnabled:e.target.checked})}/>{isAr?'تفعيل تسجيل الحضور':'Enable attendance tracking'}</label>
+      <ToleranceEditor value={form} inheritedMinutes={effectiveTolerance({},organizationSettings)} disabled={busy} onChange={set}/>
+      {form.eventKind==='custom'&&<details className="rounded-xl border border-slate-200 p-4"><summary className="font-semibold cursor-pointer">{isAr?'المشاركون (اختياري)':'Participants (optional)'}</summary><div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">{people.filter(p=>p.status==='active').map(person=><label key={person.id} className="flex items-center gap-2 text-sm min-h-11"><input type="checkbox" checked={(form.participantIds||[]).includes(person.id)} onChange={e=>set({participantIds:e.target.checked?[...(form.participantIds||[]),person.id]:(form.participantIds||[]).filter(id=>id!==person.id)})}/>{person.name}</label>)}</div></details>}
       <details className="rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer font-semibold">{isAr?'تكليفات الفريق (اختياري)':'Team assignments (optional)'}</summary><div className="mt-4 space-y-3">
         <p className="text-sm text-slate-500">{isAr?'اجتماعات الشباب والخدمات تحتاج قائد تسبيح عند النشر. البدلاء يحتاجون موافقة قائد تسبيح مؤكد.':'Youth Meetings and Services need a Worship Leader when published. Replacement offers require a confirmed Worship Leader’s approval.'}</p>
         {form.team.map((member,index)=><div key={index} className="flex flex-wrap items-end gap-2">

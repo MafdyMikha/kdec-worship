@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
-import { Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer, Check, History, Download } from 'lucide-react'
+import { Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer, Check, History } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, SearchInput, Modal, Input, Select, Textarea, Tabs, EmptyState, ConfirmDialog, StatusDot } from '../components/ui'
-import { buildAttendanceReport, downloadAttendanceReport, formatAttendanceTimestamp } from '../lib/attendanceReport.js'
+import MemberAttendanceHistory from '../components/attendance/MemberAttendanceHistory.jsx'
 import { getAccessLevelLabel, hasPermission } from '../lib/permissions.js'
 
 const ROLE_COLOR = {
@@ -38,7 +38,7 @@ function PersonCard({ person, isAdmin, currentUserId, onEdit, onDelete, onAttend
         <Avatar name={person.name} size="md"/>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-800 truncate" dir="auto">{person.name}</span>
+            <button type="button" disabled={!onAttendance} onClick={()=>onAttendance?.(person)} className="font-semibold text-slate-800 truncate text-start disabled:cursor-default" dir="auto">{person.name}</button>
             <span aria-hidden="true"><StatusDot status={person.status}/></span>
             <span className="sr-only">{person.status === 'active' ? t('active') : person.status === 'inactive' ? t('inactive') : t('onLeave')}</span>
           </div>
@@ -72,7 +72,7 @@ function PersonCard({ person, isAdmin, currentUserId, onEdit, onDelete, onAttend
           ))}
         </div>
       )}
-      {isAdmin && (
+      {onAttendance && (
         <button type="button" onClick={() => onAttendance(person)} aria-label={`${isAr?'سجل حضور':'Attendance history'} ${person.name}`}
           className="mt-3 w-full min-h-9 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-50 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors">
           <History size={14} aria-hidden="true"/>{isAr?'سجل الحضور':'Attendance history'}
@@ -314,9 +314,10 @@ function EditForm({ value,onChange,ROLES,t,isAr,protectAuthorization=false,canAs
 const blank={name:'',email:'',phone:'',whatsapp:'',roles:[],primaryRole:'',primaryRoleId:'',accessLevel:'member',status:'active',notes:'',availability:{}}
 
 export default function People() {
-  const {people,updatePerson,deletePerson,currentUser,ROLES,worshipRoles,attendanceSessions,attendanceRecords,organizationSettings}=useStore()
+  const {people,updatePerson,deletePerson,currentUser,ROLES,worshipRoles}=useStore()
   const { isAr, t } = useLang()
   const navigate = useNavigate()
+  const canViewHistory=hasPermission(currentUser,'reports.view')
   const isAdmin=hasPermission(currentUser,'users.edit')
 
   const [search,       setSearch]       = useState('')
@@ -343,28 +344,6 @@ export default function People() {
 
   const activeCount   = people.filter(p => p.status === 'active').length
   const inactiveCount = people.filter(p => p.status === 'inactive').length
-  const attendanceReport = buildAttendanceReport({
-    sessions:attendanceSessions,
-    recordsBySession:attendanceRecords,
-    people,
-    timezone:organizationSettings.timezone,
-    lateMinutes:organizationSettings.attendanceLateMinutes,
-  })
-  const personHistory = historyPerson
-    ? attendanceReport.rows.filter(row => String(row.personId) === String(historyPerson.id))
-    : []
-  const personSummary = historyPerson
-    ? attendanceReport.summaries.find(summary => String(summary.person.id) === String(historyPerson.id))
-    : null
-  const exportPersonHistory = () => {
-    if (!historyPerson || personHistory.length === 0) return
-    downloadAttendanceReport({ rows:personHistory, summaries:personSummary ? [personSummary] : [] }, {
-      isAr,
-      timezone:organizationSettings.timezone,
-      filename:`kdec-${(historyPerson.name || 'member').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-attendance`,
-    })
-  }
-
   const openEdit=p=>{setEditing(p.id);setForm({...p,roles:getRoles(p),primaryRole:p.primaryRole||p.role,accessLevel:p.accessLevel||'member'});setShowForm(true)}
   const closeEdit = () => { setShowForm(false); setEditing(null); setForm(blank) }
 
@@ -453,7 +432,7 @@ export default function People() {
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {allFiltered.map(p => (
-                <PersonCard key={p.id} person={p} isAdmin={isAdmin} currentUserId={currentUser?.id} onEdit={openEdit} onDelete={setDeleteTarget} onAttendance={setHistoryPerson} t={t} isAr={isAr}/>
+                <PersonCard key={p.id} person={p} isAdmin={isAdmin} currentUserId={currentUser?.id} onEdit={openEdit} onDelete={setDeleteTarget} onAttendance={canViewHistory?setHistoryPerson:undefined} t={t} isAr={isAr}/>
               ))}
             </div>
           ) : (
@@ -464,7 +443,7 @@ export default function People() {
 
       {/* BY ROLE */}
       {subTab === 'byRole' && (
-        <ByRoleView people={allFiltered} isAdmin={isAdmin} currentUserId={currentUser?.id} onEdit={openEdit} onDelete={setDeleteTarget} onAttendance={setHistoryPerson} t={t} isAr={isAr} ROLES={ROLES}/>
+        <ByRoleView people={allFiltered} isAdmin={isAdmin} currentUserId={currentUser?.id} onEdit={openEdit} onDelete={setDeleteTarget} onAttendance={canViewHistory?setHistoryPerson:undefined} t={t} isAr={isAr} ROLES={ROLES}/>
       )}
 
       {/* ROSTER — printable */}
@@ -488,44 +467,8 @@ export default function People() {
           canAssignAdmin={currentUser?.accessLevel==='super_admin'} protectAuthorization={editing===currentUser?.id&&isAdmin}/>
       </Modal>
 
-      <Modal open={isAdmin && !!historyPerson} onClose={()=>setHistoryPerson(null)}
-        title={`${isAr?'سجل حضور':'Attendance History'} — ${historyPerson?.name || ''}`} size="xl"
-        footer={<Btn onClick={exportPersonHistory} disabled={personHistory.length === 0} icon={<Download size={16}/>}>{isAr?'تصدير Excel':'Export Excel'}</Btn>}>
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              [isAr?'إجمالي الحضور':'Total', personSummary?.records || 0, 'text-indigo-600'],
-              [isAr?'مبكر':'Early', personSummary?.early || 0, 'text-blue-600'],
-              [isAr?'في الموعد':'On time', personSummary?.onTime || 0, 'text-emerald-600'],
-              [isAr?'متأخر':'Late', personSummary?.late || 0, 'text-red-600'],
-            ].map(([label, value, color]) => <div key={label} className="rounded-xl bg-slate-50 p-3 text-center"><div className={`text-xl font-bold ${color}`}>{value}</div><div className="text-xs text-slate-500 mt-1">{label}</div></div>)}
-          </div>
-          {personHistory.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-400">{isAr?'لا يوجد سجل حضور لهذا العضو بعد':'No attendance history for this member yet'}</div>
-          ) : (
-            <div className="space-y-3">
-              {personHistory.map(row => <Card key={row.id} className="p-4">
-                <div className="flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-slate-800" dir="auto">{row.sessionName}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{row.sessionType} · {row.date}</div>
-                  </div>
-                  <div className="text-xs text-slate-500 sm:text-end">
-                    <div>{isAr?'الدخول':'Check in'}: {formatAttendanceTimestamp(row.checkInAt, organizationSettings.timezone, isAr)}</div>
-                    <div>{isAr?'الخروج':'Check out'}: {formatAttendanceTimestamp(row.checkOutAt, organizationSettings.timezone, isAr)}</div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {row.arrival === 'early' && <Badge color="blue" size="xs">{isAr?'وصول مبكر':'Early arrival'}</Badge>}
-                  {row.arrival === 'on_time' && <Badge color="green" size="xs">{isAr?'في الموعد':'On time'}</Badge>}
-                  {row.arrival === 'late' && <Badge color="red" size="xs">{isAr?'وصول متأخر':'Late arrival'}</Badge>}
-                  {row.departure === 'early' && <Badge color="yellow" size="xs">{isAr?'خروج مبكر':'Early checkout'}</Badge>}
-                  {row.departure === 'normal' && <Badge color="green" size="xs">{isAr?'خروج طبيعي':'Normal checkout'}</Badge>}
-                </div>
-              </Card>)}
-            </div>
-          )}
-        </div>
+      <Modal open={canViewHistory && !!historyPerson} onClose={()=>setHistoryPerson(null)} title={`${isAr?'سجل حضور':'Attendance history'} — ${historyPerson?.name || ''}`} size="xl">
+        {historyPerson&&<MemberAttendanceHistory key={historyPerson.id} person={historyPerson}/>}
       </Modal>
 
       <ConfirmDialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}
