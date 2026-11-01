@@ -4,6 +4,8 @@ import { Save, Download, Shield, Globe, Database, LogOut } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { hasPermission } from '../lib/permissions.js'
+import InstallApp from '../components/pwa/InstallApp.jsx'
+import AppearanceSettings from '../components/pwa/AppearanceSettings.jsx'
 import { Card, Btn, Badge, Input, Select } from '../components/ui'
 
 function Section({ title, icon, children }) {
@@ -82,6 +84,8 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl space-y-5 animate-fade-in">
+      <InstallApp card/>
+      <AppearanceSettings/>
       {isAdmin&&(
         <Section title={t('orgSettings')} icon={<Shield size={18}/>}>
           <OrganizationForm key={`${organizationSettings.orgNameAr}-${organizationSettings.timezone}`} settings={organizationSettings}

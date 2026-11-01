@@ -153,3 +153,34 @@
 .worship-page-heading h1 { font-weight:600; letter-spacing:-.4px; }
 @media(min-width:768px) { .worship-sidebar>div.worship-sidebar-brand { padding:24px 16px; } .worship-sidebar>div.worship-sidebar-brand.is-collapsed { padding:20px 8px; } }
 @media(max-width:480px) { .worship-header-identity { gap:9px; } .worship-header-logo { width:38px; } .worship-header-divider { display:none; } }
+
+/* Installed phone windows, display cutouts and the on-screen keyboard. */
+html, body, #root { min-width: 0; max-width: 100%; }
+body { overflow-x: clip; }
+.worship-app { height: var(--app-height, 100dvh); }
+.worship-header { padding-top: env(safe-area-inset-top, 0px); min-height: calc(76px + env(safe-area-inset-top, 0px)); }
+.worship-app main { min-height: 0; overflow-x: hidden; scroll-padding-block: 16px 110px; }
+.worship-content { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.worship-login { padding-top: max(16px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
+.worship-install-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-bottom: 16px; }
+.worship-install-row > [role=status] { flex-basis: 100%; }
+.worship-install-row:empty { display: none; }
+.worship-modal-overlay { top: var(--viewport-top, 0px); bottom: auto; height: var(--app-height, 100dvh); padding-top: env(safe-area-inset-top, 0px); }
+.worship-modal { max-height: calc(var(--app-height, 100dvh) - 24px); padding-bottom: env(safe-area-inset-bottom, 0px); overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .worship-header { min-height: calc(68px + env(safe-area-inset-top, 0px)); }
+  .worship-header button { min-width: 44px; }
+  .worship-header, .worship-content, .worship-mobile-nav { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .worship-login button { min-height: 44px; }
+  .worship-app main input:not([type=checkbox]):not([type=radio]), .worship-app main select, .worship-modal input:not([type=checkbox]):not([type=radio]), .worship-modal select { min-height: 44px; min-width: 0; max-width: 100%; }
+  .worship-modal input, .worship-modal select, .worship-modal textarea { font-size: 16px; }
+  .worship-app main input, .worship-app main textarea { scroll-margin-block: 20px 120px; }
+  [data-keyboard] .worship-mobile-nav { display: none; }
+  [data-keyboard] .worship-content { padding-bottom: 24px; }
+  [data-keyboard] #mobile-more-dialog { bottom: 16px; }
+}
+@media (max-width: 359px) {
+  .worship-header { padding-inline: 8px; }
+  .worship-header-identity { gap: 4px; }
+  .worship-header-logo { width: 28px; }
+}

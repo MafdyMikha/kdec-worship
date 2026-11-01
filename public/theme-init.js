@@ -7,3 +7,5 @@ try {
   document.documentElement.classList.remove('dark')
   document.documentElement.style.colorScheme = 'light'
 }
+
+try { document.documentElement.dataset.reduceTransparency=String(localStorage.getItem('kdec_reduce_transparency')==='true') } catch { /* Solid fallbacks remain available via system settings. */ }

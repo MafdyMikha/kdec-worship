@@ -1,1 +1,27 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#294d62"><title>KDEC Worship · Offline</title><style>body{font:16px system-ui;background:#f6f5f1;color:#25353b;max-width:32rem;margin:15vh auto;padding:24px;line-height:1.7}button{background:#294d62;color:white;border:0;border-radius:12px;padding:12px 20px;cursor:pointer}</style><img src="/brand/option-b-lockup.png" width="88" height="90" alt="KDEC Worship"><h1>KDEC Worship</h1><p>You’re offline. Reconnect to load the current calendar and save responses.</p><p lang="ar" dir="rtl">أنت غير متصل. اتصل بالإنترنت لعرض التقويم الحالي وحفظ الردود.</p><button>Try again · إعادة المحاولة</button><script src="/offline-retry.js"></script></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101923">
+  <meta name="referrer" content="no-referrer">
+  <title>KDEC Worship · Offline</title>
+  <link rel="stylesheet" href="/offline.css">
+  <script src="/offline-retry.js" defer></script>
+</head>
+<body>
+  <main>
+    <img src="/brand/option-b-lockup.png" width="88" height="90" alt="KDEC Worship">
+    <p class="eyebrow">KDEC WORSHIP</p>
+    <h1>A moment to reconnect.</h1>
+    <p>You’re offline. Connect to the internet to load the current calendar and save responses. Your private team data is not stored in this offline page.</p>
+    <section lang="ar" dir="rtl">
+      <h2>لحظة لاستعادة الاتصال</h2>
+      <p>أنت غير متصل. اتصل بالإنترنت لعرض الجدول الحالي وحفظ الردود. لا تحتوي هذه الصفحة على بيانات الفريق الخاصة.</p>
+    </section>
+    <p id="connection-state" role="status" aria-live="polite"></p>
+    <button type="button" id="retry">Try again · إعادة المحاولة</button>
+    <p class="hint">Saved changes remain in your account. Unsaved changes are not uploaded automatically.<br><span lang="ar" dir="rtl">التغييرات المحفوظة تبقى في حسابك. التغييرات غير المحفوظة لا تُرفع تلقائياً.</span></p>
+  </main>
+</body>
+</html>

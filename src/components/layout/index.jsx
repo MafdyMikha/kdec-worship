@@ -1,10 +1,12 @@
 import Sidebar from './Sidebar'
 import Header from './Header'
+import PwaStatus from '../pwa/PwaStatus.jsx'
 import MobileNav from './MobileNav'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { useLocation } from 'react-router-dom'
 import { isAdminUser } from '../../lib/permissions.js'
+import InstallApp from '../pwa/InstallApp.jsx'
 
 export default function Layout({ children }) {
   const { currentUser } = useStore()
@@ -52,10 +54,12 @@ export default function Layout({ children }) {
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header title={title}/>
+        <PwaStatus/>
 
         {/* Page content — extra bottom padding on mobile for bottom nav */}
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
           <div className="worship-content p-4 md:p-8 pb-24 md:pb-8 animate-fade-in">
+            <div className="worship-install-row"><InstallApp /></div>
             {introductions[pathname] && <div className="worship-page-heading"><div><h1>{title}</h1><p>{introductions[pathname]}</p></div></div>}
             {children}
           </div>
