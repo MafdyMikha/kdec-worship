@@ -63,6 +63,7 @@ For a **fresh** project apply, in this order:
 5. `MIGRATION_rehearsal_before_service.sql`.
 6. `MIGRATION_quarterly_scheduling.sql`.
 7. `MIGRATION_unified_calendar.sql`.
+8. `MIGRATION_attendance_custom_events.sql` (always last; see `ATTENDANCE-CUSTOM-EVENTS.md`).
 
 For an **existing** project take a managed database backup and an owner-level
 schema/data export first. Do not rerun the fresh schema. If older hardening has

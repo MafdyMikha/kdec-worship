@@ -70,6 +70,9 @@ do $$begin
  begin perform check_in_attendance((select value->>'qr_code' from att_state where key='rotated'));raise exception 'TEST FAILED: revoked scan';exception when others then if sqlerrm not like '%revoked or is invalid%' then raise;end if;end;
 end$$;
 select manage_attendance_qr((select (value->>'id')::uuid from att_state where key='session'),(now() at time zone 'Africa/Cairo')::date,'close');
+do $$begin
+ begin perform resolve_attendance_code((select value->>'qr_code' from att_state where key='rotated'));raise exception 'TEST FAILED: closed scan';exception when others then if sqlerrm not like '%session is closed%' then raise;end if;end;
+end$$;
 reset role;
 -- Exact boundary uses real PostgreSQL timestamp precision (start + 3 min vs +1 ms).
 insert into attendance_sessions(id,name,session_date,session_time,end_time,expires_at,created_by,late_tolerance_mode,late_tolerance_minutes) values
@@ -83,6 +86,12 @@ select att_assert((select status='present' from attendance_records where session
 select att_assert((select status='late' from attendance_records where session_id='94000000-0000-0000-0000-000000000002' and person_id='92000000-0000-0000-0000-000000000003'),'zero grace after start is late');
 do $$begin
  begin update attendance_records set tolerance_minutes=100 where session_id='94000000-0000-0000-0000-000000000001';raise exception 'TEST FAILED: history rewrite';exception when others then if sqlerrm not like '%immutable%' then raise;end if;end;
+end$$;
+insert into attendance_sessions(id,name,session_date,session_time,end_time,created_at,expires_at,created_by,late_tolerance_mode) values('94000000-0000-0000-0000-000000000003','Expired',(now() at time zone 'Africa/Cairo')::date,'19:00','20:00',now()-interval '2 days',now()-interval '1 day','92000000-0000-0000-0000-000000000001','none');
+insert into attendance_qr_codes(session_id,occurrence_date,token) values('94000000-0000-0000-0000-000000000003',(now() at time zone 'Africa/Cairo')::date,'synthetic-expired-token');
+do $$begin
+ begin perform resolve_attendance_code('synthetic-expired-token');raise exception 'TEST FAILED: expired scan';exception when others then if sqlerrm not like '%has expired%' then raise;end if;end;
+ begin perform resolve_attendance_code('nonsense');raise exception 'TEST FAILED: invalid scan';exception when others then if sqlerrm not like '%invalid%' then raise;end if;end;
 end$$;
 select set_config('request.jwt.claim.sub','92000000-0000-0000-0000-000000000003',true);
 set local role authenticated;

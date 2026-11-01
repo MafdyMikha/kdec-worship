@@ -152,10 +152,12 @@ revoke all on function public.attendance_effective_tolerance(text,integer,uuid) 
 create or replace function public.stamp_attendance_session_policy()
 returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
 begin
+ if tg_op='INSERT' or (new.session_date,new.session_time,new.session_end_date,new.end_time) is distinct from (old.session_date,old.session_time,old.session_end_date,old.end_time) then
  if new.session_date is null or new.session_time is null or new.end_time is null then raise exception 'Session date, start time, and end time are required.'; end if;
  new.session_end_date:=coalesce(new.session_end_date,new.session_date+case when new.end_time<=new.session_time then 1 else 0 end);
  if ((new.session_date+new.session_time) at time zone 'Africa/Cairo') at time zone 'Africa/Cairo' <> new.session_date+new.session_time or ((new.session_end_date+new.end_time) at time zone 'Africa/Cairo') at time zone 'Africa/Cairo' <> new.session_end_date+new.end_time then raise exception 'This Cairo time does not exist during the daylight-saving change'; end if;
  if new.session_end_date<new.session_date or new.session_end_date>new.session_date+31 or new.session_end_date+new.end_time<=new.session_date+new.session_time then raise exception 'End must follow start, within 31 days'; end if;
+ end if;
  if tg_op='UPDATE' and exists(select 1 from attendance_records where session_id=old.id) and
  (new.session_date,new.session_time,new.session_end_date,new.end_time,new.service_id,new.repeatable,new.repeat_freq) is distinct from
  (old.session_date,old.session_time,old.session_end_date,old.end_time,old.service_id,old.repeatable,old.repeat_freq) then raise exception 'Recorded session schedule is locked; create a new session'; end if;
@@ -237,9 +239,10 @@ declare s attendance_sessions; q attendance_qr_codes; v_expiry timestamptz; svc 
 begin
  if not public.is_active_member() then raise exception 'Active membership is required' using errcode='42501'; end if;
  select * into q from attendance_qr_codes where token=btrim(p_qr_code);
- if not found or q.revoked then raise exception 'This attendance code has been revoked or is invalid.'; end if;
+ if not found then raise exception 'This attendance code has been revoked or is invalid.'; end if;
  select * into strict s from attendance_sessions where id=q.session_id;
  if not s.active then raise exception 'This attendance session is closed.'; end if;
+ if q.revoked then raise exception 'This attendance code has been revoked or is invalid.'; end if;
  if s.service_id is not null then
  select * into svc from services where id=s.service_id;
  if svc.id is null or svc.status='cancelled' or svc.archived_at is not null or svc.published_at is null or not svc.attendance_enabled then raise exception 'Publish and enable attendance for this event first.'; end if;
