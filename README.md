@@ -166,3 +166,10 @@ Clock times use 12-hour display with AM/PM. Shared time fields provide hour, min
 # Rehearsal scheduling rule
 
 An enabled rehearsal must start strictly before its service. Same-day rehearsals are allowed only at an earlier time. Apply `MIGRATION_rehearsal_before_service.sql` in Supabase SQL Editor, then deploy the frontend. The migration leaves existing records untouched; invalid rehearsal schedules must be corrected when their rehearsal/date/time fields are next saved. The fresh-project schema includes the same trigger. No authorization policies are changed.
+
+### Theme-aware logo
+
+The shared logo uses transparent SVG artwork: navy on light surfaces and ivory on
+dark surfaces. The sidebar/login show the full lockup; the small header uses the
+tower alone. Print/QR exports use the navy SVG, and phone icons use an opaque
+navy background. Source geometry is in `scripts/generate-brand-assets.mjs`.

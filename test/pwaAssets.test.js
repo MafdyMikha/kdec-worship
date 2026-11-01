@@ -62,6 +62,11 @@ test('every manifest icon and the Apple touch icon has correct dimensions and an
     const asset = png(new URL(icon.src, 'https://kdec.test').pathname.slice(1))
     assert.equal(`${asset.width}x${asset.height}`, icon.sizes)
     assert.deepEqual([...asset.pixels.subarray(0, 3)], [16, 25, 35])
+    let ivoryPixels = 0
+    for (let i = 0; i < asset.pixels.length; i += asset.channels) {
+      if (asset.pixels[i] >= 240 && asset.pixels[i + 1] >= 240 && asset.pixels[i + 2] >= 235) ivoryPixels++
+    }
+    assert.ok(ivoryPixels > asset.width * asset.height * .02, 'ivory tower must remain visible against navy')
     if (asset.channels === 4) {
       for (let i = 3; i < asset.pixels.length; i += 4) assert.equal(asset.pixels[i], 255)
     }

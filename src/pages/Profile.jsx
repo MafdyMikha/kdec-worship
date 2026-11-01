@@ -5,7 +5,7 @@ import { Save, Eye, EyeOff, Check, Calendar, Shield, Lock, Clock, Plus, X } from
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { Card, Btn, Badge, Avatar, Tabs } from '../components/ui'
-import { KDEC_LOGO } from '../assets/kdecLogo.js'
+import BrandLogo from '../components/BrandLogo.jsx'
 import { ACCESS_LEVEL_LABELS, isAdminUser } from '../lib/permissions.js'
 
 const DAYS_CONFIG = [
@@ -173,7 +173,7 @@ export default function Profile() {
               <div><strong className="text-slate-700">{confirmed}</strong> <span className="text-slate-400">{isAr?'مؤكدة':'confirmed'}</span></div>
             </div>
           </div>
-          <img src={KDEC_LOGO} alt="" className="hidden sm:block w-10 h-10 object-contain opacity-20 flex-shrink-0"/>
+          <div className="hidden sm:block"><BrandLogo compact className="w-10 h-11 opacity-30 flex-shrink-0"/></div>
         </div>
       </Card>
 

@@ -59,7 +59,7 @@ export default function Sidebar() {
 
   return (
     <aside className={`worship-sidebar ${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 flex-col transition-all duration-300 relative hidden md:flex`}>
-      {/* Original Option B artwork, unchanged in both sidebar sizes. */}
+      {/* Theme-aware clean lockup; tower only in the compact sidebar. */}
       <div className={`worship-sidebar-brand ${collapsed ? 'is-collapsed' : ''}`}>
         <BrandLogo compact={collapsed} />
         {!collapsed && <p className="worship-brand-caption">

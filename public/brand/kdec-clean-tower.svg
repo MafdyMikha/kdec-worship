@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 264" color="#294d62"><g fill="currentColor">
+  <path d="M117.5 0h5v14H134v5h-11.5v95h-5V19H106v-5h11.5Z"/>
+  <path fill-rule="evenodd" d="M96 264V126l7-7V63l7-9v63q10-9 20 0V54l7 9v56l7 7v138h-9V193h-7v71h-5V193h-6v71h-5V193h-7v71Zm24-143a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-16 36v28h8v-28a4 4 0 0 0-8 0Zm12 0v28h8v-28a4 4 0 0 0-8 0Zm12 0v28h8v-28a4 4 0 0 0-8 0Z"/>
+  <path d="M112 47l3-4v65l-3 1Zm16 0-3-4v65l3 1Z"/>
+  <path d="M7 264V250l7-7v21Z"/><path d="M233 264V250l-7-7v21Z"/><path d="M18 264V237.5l7-7v33.5Z"/><path d="M222 264V237.5l-7-7v33.5Z"/><path d="M29 264V225l7-7v46Z"/><path d="M211 264V225l-7-7v46Z"/><path d="M40 264V212.5l7-7v58.5Z"/><path d="M200 264V212.5l-7-7v58.5Z"/><path d="M51 264V200l7-7v71Z"/><path d="M189 264V200l-7-7v71Z"/><path d="M62 264V187.5l7-7v83.5Z"/><path d="M178 264V187.5l-7-7v83.5Z"/><path d="M73 264V175l7-7v96Z"/><path d="M167 264V175l-7-7v96Z"/><path d="M84 264V162.5l7-7v108.5Z"/><path d="M156 264V162.5l-7-7v108.5Z"/>
+</g></svg>

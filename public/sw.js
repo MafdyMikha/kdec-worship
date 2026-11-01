@@ -1,7 +1,7 @@
 /* Public offline help only. Never cache app HTML, bundles, auth callbacks,
    Supabase requests, calendar data, notifications or private documents. */
-const CACHE='kdec-offline-v3'
-const PUBLIC_ASSETS=['/offline.html','/offline-retry.js','/offline.css','/brand/option-b-lockup.png']
+const CACHE='kdec-offline-v4'
+const PUBLIC_ASSETS=['/offline.html','/offline-retry.js','/offline.css','/brand/kdec-clean-symbols.svg']
 self.addEventListener('install',event=>{
   // Let the user choose when to activate an update; never force a form reload.
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(PUBLIC_ASSETS.map(path=>new Request(path,{cache:'reload',credentials:'omit'})))))

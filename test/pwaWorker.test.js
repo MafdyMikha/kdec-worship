@@ -26,7 +26,7 @@ function workerFixture() {
     },
     caches: {
       open: async () => cache,
-      keys: async () => ['kdec-offline-v2', 'kdec-offline-v3', 'another-app-cache'],
+      keys: async () => ['kdec-offline-v2', 'kdec-offline-v3', 'kdec-offline-v4', 'another-app-cache'],
       delete: async key => { deleted.push(key) },
     },
     fetch: request => network(request),
@@ -48,7 +48,7 @@ function workerFixture() {
 test('installation caches only four public offline assets without credentials', async () => {
   const worker = workerFixture()
   await worker.lifecycle('install')
-  assert.deepEqual(worker.writes.map(request => request.url), ['/offline.html', '/offline-retry.js', '/offline.css', '/brand/option-b-lockup.png'])
+  assert.deepEqual(worker.writes.map(request => request.url), ['/offline.html', '/offline-retry.js', '/offline.css', '/brand/kdec-clean-symbols.svg'])
   assert.ok(worker.writes.every(request => request.credentials === 'omit' && request.cache === 'reload'))
   assert.equal(worker.skipped(), false)
 })
@@ -56,7 +56,7 @@ test('installation caches only four public offline assets without credentials', 
 test('activation removes only old KDEC offline caches and claims existing windows', async () => {
   const worker = workerFixture()
   await worker.lifecycle('activate')
-  assert.deepEqual(worker.deleted, ['kdec-offline-v2'])
+  assert.deepEqual(worker.deleted, ['kdec-offline-v2', 'kdec-offline-v3'])
   assert.equal(worker.claimed(), true)
 })
 
@@ -85,7 +85,7 @@ test('navigations stay network-only; offline returns generic content without sav
 test('public offline page assets still load when disconnected', async () => {
   const worker = workerFixture()
   worker.failNetwork()
-  for (const path of ['/offline-retry.js', '/offline.css', '/brand/option-b-lockup.png']) {
+  for (const path of ['/offline-retry.js', '/offline.css', '/brand/kdec-clean-symbols.svg']) {
     assert.equal((await worker.fetch(path)).response.publicAsset, path)
   }
 })

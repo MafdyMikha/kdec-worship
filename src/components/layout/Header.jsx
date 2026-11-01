@@ -48,7 +48,7 @@ export default function Header({ title }) {
     <header className="worship-header min-h-16 flex items-center justify-between px-4 md:px-8 flex-shrink-0 gap-2 z-20">
       {/* Page title */}
       <div className="worship-header-identity">
-        <BrandLogo className="worship-header-logo" />
+        <BrandLogo compact className="worship-header-logo" />
         <span className="worship-header-divider" aria-hidden="true" />
         <div className="text-sm text-slate-500 truncate">{title}</div>
       </div>

@@ -13,14 +13,19 @@ This extends the existing manifest and `/sw.js`; there is one PWA setup.
 | Display | `standalone` |
 | Launch background | Opaque branded navy, `#101923` |
 | Icons | 192×192 and 512×512 PNG; separate 512×512 maskable PNG; 180×180 Apple touch PNG |
-| Artwork | Existing approved `/brand/option-b-tower.png`, also used by the compact sidebar logo |
+| Artwork | Clean transparent `/brand/kdec-clean-tower.svg`, matching the navy/ivory website identity |
 
-The artwork is resized proportionally, with its original colors and background
-preserved, and centered on navy. No logo redesign, cropping or pre-rounded corners
-is applied. The complete maskable artwork rectangle fits inside the central circle
-of radius 40% of the icon width. The approved source is a 100×118 raster; higher
-resolution original artwork would improve sharpness without changing its design.
-To regenerate the same assets on macOS, run `sh scripts/generate-app-icons.sh`.
+The clean tower and stacked wordmark are scalable SVG paths based on the selected
+navy/ivory logo direction. Website symbols inherit the active theme: navy
+`#294d62` on light surfaces and ivory `#f6f5f1` on dark surfaces. The compact header
+and collapsed sidebar use the tower alone, while the expanded sidebar and auth
+screens use the full wordmark. There is no photograph or rectangular background.
+
+Phone icons use the same tower in ivory on opaque navy, with safe padding and no
+pre-rounded corners. Their background stays opaque on both light and dark phone
+wallpapers. Regenerate the SVGs with `node scripts/generate-brand-assets.mjs`; on
+macOS, regenerate SVGs and PNG icons with `sh scripts/generate-app-icons.sh`.
+The older raster originals remain in `public/brand` as source references.
 
 Install app appears above the login card and page content, in Settings, and as a
 shortcut in the user menu. Supported browsers use their native prompt; other
@@ -47,10 +52,10 @@ Appearance & readability → Reduce transparency.
    headers from `vercel.json`. `/sw.js` must have root scope and must not be
    served with an immutable cache policy.
 5. On the deployed origin, check these URLs in a browser or with `curl -I`:
-   `/schedule`, `/manifest.webmanifest?v=pwa3`, `/sw.js`, `/offline.html`,
-   `/offline.css`, `/offline-retry.js`, `/app-icon-192.png?v=pwa3`,
-   `/app-icon-512.png?v=pwa3`, `/app-icon-maskable-512.png?v=pwa3`, and
-   `/apple-touch-icon.png?v=2`. Expect 200 responses and the actual file content;
+   `/schedule`, `/manifest.webmanifest?v=pwa4`, `/sw.js`, `/offline.html`,
+   `/offline.css`, `/offline-retry.js`, `/app-icon-192.png?v=pwa4`,
+   `/app-icon-512.png?v=pwa4`, `/app-icon-maskable-512.png?v=pwa4`, and
+   `/apple-touch-icon.png?v=3`. Expect 200 responses and the actual file content;
    an HTML response for a manifest, worker, stylesheet, script or icon is a hosting
    error. The worker and manifest need revalidation, while icons are PNG images.
 6. In Chrome DevTools → Application, inspect Manifest and Service Workers. Check
@@ -117,7 +122,7 @@ browser storage merely to refresh the icon.
 ## Offline behavior and privacy
 
 The worker caches exactly four public files: `/offline.html`, `/offline.css`,
-`/offline-retry.js`, and `/brand/option-b-lockup.png`. Installation fetches them
+`/offline-retry.js`, and `/brand/kdec-clean-symbols.svg`. Installation fetches them
 without credentials and bypasses stale HTTP cache entries. Only old
 `kdec-offline-*` cache versions are removed on activation.
 
@@ -145,8 +150,7 @@ Completed locally:
 - Worker tests exercise online/offline navigation, public asset fallback, cache
   allowlisting, non-GET/API/auth bypass and cleanup limited to KDEC offline caches.
 - PNG decoding tests check actual dimensions, opaque navy padding and every
-  artwork pixel's position within the maskable safe circle. The Apple icon was
-  visually inspected against the existing approved tower.
+  artwork pixel's position within the maskable safe circle. The Apple icon uses the same clean tower SVG as the website.
 - The repository's permission, auth-event, calendar normalization, publication and
   demo/runtime tests run with the full test suite (114 passing tests). `npm test`, `npm run lint`, and
   `npm run build` pass. The build retains the existing non-blocking warning about
@@ -156,12 +160,16 @@ Completed locally:
 
 Not completed in this environment:
 
-- Browser/computer-use startup failed; the in-app browser was unavailable.
-- The sandbox rejected localhost listening and requests with `EPERM`, so a local
-  HTTP preview could not be exercised. Production files were built and inspected
-  on disk; deployed status codes, HTTPS, headers and MIME delivery remain pending.
+- The initial PWA handoff could not start a browser or localhost server. During
+  the subsequent logo refinement, both became available. The branding was checked
+  in an isolated local demo at 1440px desktop and 390px Arabic/RTL mobile width,
+  including both themes, reload persistence and collapsed-sidebar rendering.
+  Those checks do not establish deployed HTTPS, headers, MIME delivery or PWA
+  installation correctness; these still need the deployed site.
 - Physical iPhone/Android installation, launcher appearance on light/dark
-  wallpapers, standalone launch and EN/AR mobile/keyboard layout remain pending.
+  wallpapers, standalone launch and real-device keyboard/safe-area layout remain
+  pending. The new opaque phone icon was visually checked and its ivory contrast,
+  dimensions, opacity and maskable bounds passed automated checks.
 - Live Supabase login/session restoration, calendar reloads and database-enforced
   access/publishing behavior were not tested end to end. Passing unit tests does
   not establish deployed RLS or live persistence correctness.
