@@ -157,8 +157,19 @@ unchanged; no private app/API responses or push payloads enter it.
   and testing while preserving the disable action on supported devices.
 - After an offline disable, reconnect and use Disable again to remove the saved
   server subscription. An account switch also attempts pending cleanup.
-- If tests remain pending, verify Cron history, dispatch secret equality and Edge
-  configuration. Inspect `push_jobs.state`, `attempts`, `last_status` and
+- If tests remain pending with `attempts > 0` and `last_status = 0`, the
+  dispatcher ran but encountered a local request/encryption error or transport
+  exception. Inspect **Edge Functions → push-dispatch → Logs**. Updated senders
+  emit only the job ID, stage (`payload`, `encryption`, `request`), and a fixed
+  safe reason (`crypto_unsupported`, `vapid_key_invalid`,
+  `crypto_key_invalid`, `subscription_crypto_invalid`, `request_timeout`, `request_network_error`, or
+  `request_build_failed`), never the exception text or keys. Configuration shape
+  failures emit `Push configuration rejected` with a safe reason and return HTTP
+  503 without claiming jobs. Surrounding whitespace is trimmed from server VAPID
+  values. Redeploy the updated function, then queue a fresh own-device test;
+  previous five-minute test jobs may already have expired.
+- If tests remain pending with no attempts, verify Cron history, dispatch secret
+  equality and Edge configuration. Inspect `push_jobs.state`, `attempts`, `last_status` and
   `finished_at` from an administrator SQL session. Never export subscription
   endpoints/keys or provider payloads into logs.
 - Terminal delivery rows are retained for diagnostics. For a large deployment,

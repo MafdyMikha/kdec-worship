@@ -1,16 +1,12 @@
 import { attendanceTiming } from './attendance.js'
 import { downloadExcelWorkbook } from './excelExport.js'
+import { formatClock, timeParts } from './time.js'
 
 const sessionName = session => session?.name || session?.service?.title || session?.label || 'Attendance session'
 const sessionDate = (record, session) => record?.occurrence_date || session?.sessionDate || session?.session_date || session?.service?.date || ''
 
 export function formatAttendanceTime(value, isAr = false) {
-  if (!value) return '—'
-  const [hours, minutes] = String(value).split(':').map(Number)
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return '—'
-  return new Intl.DateTimeFormat(isAr ? 'ar-EG' : 'en-US', {
-    hour:'numeric', minute:'2-digit', hour12:true, timeZone:'UTC',
-  }).format(new Date(Date.UTC(2020, 0, 1, hours, minutes)))
+  return timeParts(value) ? formatClock(value, isAr) : '—'
 }
 
 export function formatAttendanceTimestamp(value, timezone = 'Africa/Cairo', isAr = false) {

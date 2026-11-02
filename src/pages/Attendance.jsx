@@ -12,7 +12,7 @@ import AttendanceQRModal from '../components/attendance/AttendanceQRModal.jsx'
 import ToleranceEditor from '../components/attendance/ToleranceEditor.jsx'
 import { attendanceError, effectiveTolerance, sessionTolerance, CAIRO } from '../lib/attendancePolicy.js'
 import { addMinutesToTime, attendanceOccurrenceDate, attendanceTiming, dateKeyInTimezone, validateAttendanceSessionSchedule } from '../lib/attendance.js'
-import { formatAttendanceTimestamp } from '../lib/attendanceReport.js'
+import { formatAttendanceTime as formatSessionTime, formatAttendanceTimestamp } from '../lib/attendanceReport.js'
 import AttendanceSessionDetails from '../components/attendance/AttendanceSessionDetails.jsx'
 
 const SESSION_TYPES = [
@@ -31,15 +31,6 @@ const getSession = (key) => SESSION_TYPES.find(s => s.key === key) || SESSION_TY
 
 const PERIODS_AR = { total:'إجمالي', monthly:'شهرياً', weekly:'أسبوعياً' }
 const PERIODS_EN = { total:'Total',   monthly:'Monthly', weekly:'Weekly'   }
-
-const formatSessionTime = (value, isAr) => {
-  if (!value) return '—'
-  const [hours, minutes] = value.split(':').map(Number)
-  const date = new Date(Date.UTC(2020, 0, 1, hours, minutes))
-  return new Intl.DateTimeFormat(isAr ? 'ar-EG' : 'en-US', {
-    hour:'numeric', minute:'2-digit', hour12:true, timeZone:'UTC',
-  }).format(date)
-}
 
 const timingLabel = (kind, isAr) => ({
   early:isAr ? 'مبكر' : 'Early',
@@ -269,7 +260,7 @@ export default function Attendance() {
                       {sess.max_attendees && <Badge color="amber" size="xs">max {sess.max_attendees}</Badge>}
                     </div>
                     <p className="text-xs text-slate-400">
-                      {currentOccurrenceDate} · {formatSessionTime(sess.sessionTime || sess.session_time, isAr)} – {formatSessionTime(sess.endTime || sess.end_time, isAr)} · {formatDistanceToNow(new Date(sess.created_at), {addSuffix:true, locale: isAr ? arLocale : undefined})}
+                      {currentOccurrenceDate} · <bdi>{formatSessionTime(sess.sessionTime || sess.session_time, isAr)} – {formatSessionTime(sess.endTime || sess.end_time, isAr)}</bdi> · {formatDistanceToNow(new Date(sess.created_at), {addSuffix:true, locale: isAr ? arLocale : undefined})}
                     </p>
                     <div className="flex items-center gap-3 mt-2">
                       <span className="text-sm text-emerald-600 font-medium">{p} {isAr ? 'حضور' : 'present'}</span>
@@ -328,7 +319,7 @@ export default function Attendance() {
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${st.color}`}>{st.icon}</div>
                   <div>
                     <h3 className="font-semibold text-slate-800">{sess.name || sess.service?.title || sess.label}</h3>
-                    <p className="text-sm text-slate-500">{stLabel} · {occurrenceDate(sess)} · {formatSessionTime(sess.sessionTime || sess.session_time, isAr)} – {formatSessionTime(sess.endTime || sess.end_time, isAr)}</p>
+                    <p className="text-sm text-slate-500">{stLabel} · {occurrenceDate(sess)} · <bdi>{formatSessionTime(sess.sessionTime || sess.session_time, isAr)} – {formatSessionTime(sess.endTime || sess.end_time, isAr)}</bdi></p>
                   </div>
                   <Badge color="green" size="sm" className="ms-auto">{isAr?'نشط':'Active'}</Badge>
                 </div>
@@ -538,18 +529,18 @@ export default function Attendance() {
             <Input label={`${isAr?'الحد الأقصى للحضور':'Attendee Limit'} (${t('optional')})`} type="number" min="1" max="500"
               value={createForm.maxAttendees} onChange={e => setCreateForm(f => ({ ...f, maxAttendees:e.target.value }))}
               placeholder={isAr?'مثال: 30':'e.g. 30'}/>
-            <Input label={`${t('startTime')} *`} type="time" value={createForm.sessionTime}
+            <Input label={t('startTime')} type="time" required value={createForm.sessionTime}
               onChange={e => {
                 const sessionTime = e.target.value
                 setCreateForm(f => ({ ...f, sessionTime, endTime:f.endTime || addMinutesToTime(sessionTime, 120) }))
               }}/>
-            <Input label={`${isAr?'وقت النهاية':'End Time'} *`} type="time" value={createForm.endTime}
+            <Input label={isAr?'وقت النهاية':'End Time'} type="time" required value={createForm.endTime}
               onChange={e => setCreateForm(f => ({ ...f, endTime:e.target.value }))}/>
           </div>
           <p className="-mt-3 text-xs text-slate-400">
             {isAr
-              ? 'تأكد من صباحاً/مساءً: الساعة 4 مساءً تُسجل 16:00. الخروج قبل وقت النهاية يُعتبر مبكراً.'
-              : 'Check AM/PM carefully: 4:00 PM is 16:00. Checkout before the end time is marked early.'}
+              ? 'اختر الساعة والدقيقة ثم AM (صباحاً) أو PM (مساءً). الخروج قبل وقت النهاية يُعتبر مبكراً.'
+              : 'Choose the hour, minute, then AM or PM. Checkout before the end time is marked early.'}
           </p>
           {createError && <p className="text-sm text-red-600" role="alert">{createError}</p>}
 
@@ -620,7 +611,7 @@ export default function Attendance() {
           <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
             <Clock size={13} className="flex-shrink-0"/>
             <span>
-              {isAr ? 'الموعد' : 'Schedule'}: <strong>{createForm.sessionDate || '—'} · {formatSessionTime(createForm.sessionTime, isAr)} – {formatSessionTime(createForm.endTime, isAr)}</strong>
+              {isAr ? 'الموعد' : 'Schedule'}: <strong><bdi>{createForm.sessionDate || '—'} · {formatSessionTime(createForm.sessionTime, isAr)} – {formatSessionTime(createForm.endTime, isAr)}</bdi></strong>
               {' · '}
               {isAr ? 'حد التأخير' : 'Late limit'}: <strong>{effectiveTolerance(createForm,{attendanceLateMinutes:createForm.serviceId?effectiveTolerance(services.find(s=>s.id===createForm.serviceId),organizationSettings):lateMins})} {isAr ? 'دقيقة' : 'min'}</strong>
               {' · '}
