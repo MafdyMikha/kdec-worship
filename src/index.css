@@ -306,3 +306,9 @@ select option {
     transition-duration:0.01ms !important;
   }
 }
+
+/* Keep QR display readable and reachable in native fullscreen, including safe areas. */
+.attendance-qr-card:fullscreen {
+  width: 100vw; height: 100dvh; overflow: auto; border-radius: 0;
+  padding: max(1.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}

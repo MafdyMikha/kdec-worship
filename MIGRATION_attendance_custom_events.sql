@@ -1,5 +1,12 @@
 -- Apply AFTER MIGRATION_unified_calendar.sql. No real-account tests or notifications.
 begin;
+-- BEGIN upgrade prerequisite check (the fresh schema defers this until final migration).
+do $$begin
+ if to_regprocedure('public.has_permission(text)') is null or to_regprocedure('public.generate_legacy_service_occurrences(uuid,uuid,jsonb)') is null then
+   raise exception 'Apply the dynamic roles and unified calendar migrations before MIGRATION_attendance_custom_events.sql';
+ end if;
+end$$;
+-- END upgrade prerequisite check.
 alter table public.organization_settings add column if not exists attendance_late_enabled boolean not null default true;
 alter table public.organization_settings alter column attendance_late_minutes type integer;
 alter table public.organization_settings drop constraint if exists organization_settings_attendance_late_minutes_check;
@@ -128,6 +135,29 @@ revoke all on function public.save_planning_events(jsonb,boolean) from public,an
 grant execute on function public.save_planning_events(jsonb,boolean) to authenticated;
 
 -- Preserve the protected quarterly state machine and notification dedupe keys.
+-- Series extension carries the custom metadata into silent future drafts.
+create or replace function public.generate_service_occurrences(p_group_id uuid,p_source_service_id uuid,p_occurrences jsonb)
+returns setof public.services language plpgsql security definer set search_path=public,pg_temp as $$
+declare occurrence public.services; source public.services; shifted_practice jsonb;
+begin
+ perform pg_advisory_xact_lock(762901);
+ select * into source from public.services where id=p_source_service_id;
+ for occurrence in select * from public.generate_legacy_service_occurrences(p_group_id,p_source_service_id,p_occurrences) loop
+   if source.published_at is not null then
+     delete from public.service_team copied where copied.service_id=occurrence.id and not exists(select 1 from public.schedule_slots sl where sl.service_id=source.id and sl.person_id=copied.person_id and sl.role_id=copied.worship_role_id);
+   end if;
+   shifted_practice:=source.practice;
+   if source.practice->>'enabled'='true' then shifted_practice:=jsonb_set(source.practice,'{date}',to_jsonb((occurrence.date+((source.practice->>'date')::date-source.date))::text)); end if;
+   update public.services set custom_category=source.custom_category,participant_ids=source.participant_ids,attendance_enabled=source.attendance_enabled,late_tolerance_mode=source.late_tolerance_mode,late_tolerance_minutes=source.late_tolerance_minutes,event_kind=source.event_kind,end_date=occurrence.date+(coalesce(source.end_date,source.date)-source.date),end_time=source.end_time,location=source.location,location_url=source.location_url,timezone='Africa/Cairo',status='draft',practice=shifted_practice where id=occurrence.id returning * into occurrence;
+   return next occurrence;
+ end loop;
+ return;
+end;
+$$;
+revoke all on function public.generate_service_occurrences(uuid,uuid,jsonb) from public,anon;
+grant execute on function public.generate_service_occurrences(uuid,uuid,jsonb) to authenticated;
+
+
 
 create or replace function public.attendance_effective_tolerance(p_mode text,p_minutes integer,p_service uuid default null)
 returns integer language plpgsql stable security definer set search_path=public,pg_temp as $$
@@ -166,6 +196,9 @@ begin
  end if;
  return new;
 end$$;
+-- Replaces the legacy one-day/organization-timezone expiry trigger. The creation
+-- RPC derives expiry from the explicit Cairo end date; writes are RPC-only.
+drop trigger if exists attendance_session_schedule_guard on public.attendance_sessions;
 drop trigger if exists stamp_attendance_session_policy on attendance_sessions;
 create trigger stamp_attendance_session_policy before insert or update on attendance_sessions for each row execute function stamp_attendance_session_policy();
 
@@ -327,4 +360,5 @@ returns table (
   service_time     text
 )
 language plpgsql security definer set search_path=public,pg_temp as $$declare v jsonb;begin v:=resolve_attendance_code(p_qr_code);return query select (v->>'id')::uuid,(v->>'service_id')::uuid,(v->>'name')::text,(v->>'label')::text,(v->>'session_date')::date,(v->>'session_time')::time,(v->>'end_time')::time,(v->>'active')::boolean,(v->>'max_attendees')::integer,(v->>'repeatable')::boolean,(v->>'repeat_freq')::text,(v->>'expires_at')::timestamptz,(v->>'service_title')::text,(v->>'service_date')::date,(v->>'service_time')::text;end$$;
+notify pgrst, 'reload schema';
 commit;

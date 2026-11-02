@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { AppProvider, useStore } from './store/useStore.jsx'
 import { ADMIN_CONTROL_PERMISSIONS, hasAnyPermission, hasPermission, isAdminUser } from './lib/permissions.js'
+import { reconcilePushAccount } from './lib/pushClient.js'
 import Layout from './components/layout'
 import { Notifications } from './components/ui'
 const Login = lazy(() => import('./pages/Login'))
@@ -66,6 +67,9 @@ function PermissionOnlyAny({ permissions, children }) {
 
 function AuthGate() {
   const { currentUser, authLoading, configurationError, isPasswordRecovery, notifications } = useStore()
+  useEffect(() => {
+    if (!authLoading && !configurationError) void reconcilePushAccount(currentUser?.id || null).catch(() => {})
+  }, [authLoading, configurationError, currentUser?.id])
   const inviteCode = new URLSearchParams(window.location.search).get('invite')
 
   let content

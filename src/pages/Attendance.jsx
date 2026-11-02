@@ -10,7 +10,7 @@ import { Card, Btn, Badge, Avatar, Modal, StatCard, Tabs, Input, Select } from '
 import AttendanceSettingsEditor from '../components/attendance/AttendanceSettingsEditor.jsx'
 import AttendanceQRModal from '../components/attendance/AttendanceQRModal.jsx'
 import ToleranceEditor from '../components/attendance/ToleranceEditor.jsx'
-import { attendanceError, effectiveTolerance, sessionTolerance } from '../lib/attendancePolicy.js'
+import { attendanceError, effectiveTolerance, sessionTolerance, CAIRO } from '../lib/attendancePolicy.js'
 import { addMinutesToTime, attendanceOccurrenceDate, attendanceTiming, dateKeyInTimezone, validateAttendanceSessionSchedule } from '../lib/attendance.js'
 import { formatAttendanceTimestamp } from '../lib/attendanceReport.js'
 import AttendanceSessionDetails from '../components/attendance/AttendanceSessionDetails.jsx'
@@ -132,7 +132,7 @@ export default function Attendance() {
   const excuseLimit = organizationSettings.excuseLimit
   const excusePeriod = organizationSettings.excusePeriod
   const BLANK_CREATE = {
-    lateToleranceMode:'inherit',lateToleranceMinutes:0,sessionEndDate:'',name:'', label:'Service', sessionDate:dateKeyInTimezone(new Date(), organizationSettings.timezone),
+    lateToleranceMode:'inherit',lateToleranceMinutes:0,sessionEndDate:'',name:'', label:'Service', sessionDate:dateKeyInTimezone(new Date(), CAIRO),
     sessionTime:'', endTime:'', serviceId:'', maxAttendees:'', repeatable:false, repeatFreq:'weekly',
   }
   const [createForm,   setCreateForm]   = useState(()=>{const event=services.find(s=>s.id===linkedEventId);return event?{...BLANK_CREATE,serviceId:event.id,name:event.title,label:event.customCategory||event.type,sessionDate:event.date,sessionEndDate:event.endDate||event.date,sessionTime:event.time,endTime:event.endTime||''}:BLANK_CREATE})
@@ -150,7 +150,7 @@ export default function Attendance() {
 
   const PERIODS = isAr ? PERIODS_AR : PERIODS_EN
 
-  const occurrenceDate = session => session.occurrence_date || attendanceOccurrenceDate(session, organizationSettings.timezone)
+  const occurrenceDate = session => session.occurrence_date || attendanceOccurrenceDate(session, CAIRO)
   const occurrenceRecords = session => (records[session.id]||[]).filter(record => record.occurrence_date===occurrenceDate(session))
   const myRecord = session => occurrenceRecords(session).find(record => record.person_id===currentUser?.id)
   const presentCount = session => occurrenceRecords(session).filter(record => record.check_in_at).length
@@ -158,10 +158,10 @@ export default function Attendance() {
   const excuseCount = personId => {
     const periodStart = excusePeriod === 'total'
       ? null
-      : attendanceOccurrenceDate({ repeatable:true, repeatFreq:excusePeriod==='weekly'?'weekly':'monthly' }, organizationSettings.timezone)
+      : attendanceOccurrenceDate({ repeatable:true, repeatFreq:excusePeriod==='weekly'?'weekly':'monthly' }, CAIRO)
     return excuseRequests.filter(request => {
       if (request.person_id!==personId || !['pending','approved'].includes(request.status)) return false
-      return !periodStart || dateKeyInTimezone(new Date(request.created_at), organizationSettings.timezone) >= periodStart
+      return !periodStart || dateKeyInTimezone(new Date(request.created_at), CAIRO) >= periodStart
     }).length
   }
   const attendanceStats = personId => {
@@ -187,7 +187,7 @@ export default function Attendance() {
       setCreateError(isAr ? 'التاريخ ووقت البداية ووقت النهاية مطلوبة.' : 'Date, start time, and end time are required.')
       return
     }
-    const scheduleValidation=validateAttendanceSessionSchedule(createForm,organizationSettings.timezone)
+    const scheduleValidation=validateAttendanceSessionSchedule(createForm,CAIRO)
     if(!scheduleValidation.valid){
       setCreateError(isAr?'انتهت هذه الجلسة بالفعل. اختر تاريخاً قادماً أو اجعلها متكررة.':scheduleValidation.error)
       return
@@ -231,7 +231,7 @@ export default function Attendance() {
     <div className="max-w-5xl space-y-5 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Tabs tabs={isAdmin&&!routeToken ? ADMIN_TABS : MEMBER_TABS} active={tab} onChange={setTab}/>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {hasPermission(currentUser,'settings.manage')&&!routeToken && <AttendanceSettingsEditor settings={organizationSettings} onSave={updateOrganizationSettings}/>}
           {isAdmin&&!routeToken && <Btn onClick={() => setShowCreate(true)} icon={<Plus size={16}/>}>{t('newSession')}</Btn>}
         </div>
@@ -292,7 +292,7 @@ export default function Attendance() {
                     {currentRecords.map(rec => {
                       const p2  = people.find(pp=>pp.id===rec.person_id)
                       if (!p2) return null
-                      const recTiming = attendanceTiming(rec, sess, organizationSettings.timezone, lateMins)
+                      const recTiming = attendanceTiming(rec, sess, CAIRO, lateMins)
                       const late = recTiming.arrival === 'late'
                       return (
                         <div key={rec.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium ${late?'bg-amber-50 text-amber-700 border border-amber-200':'bg-emerald-50 text-emerald-700'}`}>
@@ -332,7 +332,7 @@ export default function Attendance() {
                   </div>
                   <Badge color="green" size="sm" className="ms-auto">{isAr?'نشط':'Active'}</Badge>
                 </div>
-                <CheckInWidget record={myRecord(sess)} session={sess} timezone={organizationSettings.timezone} lateMins={lateMins} t={t} isAr={isAr}
+                <CheckInWidget record={myRecord(sess)} session={sess} timezone={CAIRO} lateMins={lateMins} t={t} isAr={isAr}
                   onCheckIn={()=>checkInAttendance(sess.qr_code)}
                   onCheckOut={()=>checkOutAttendance(sess.id)}/>
               </Card>
@@ -365,7 +365,7 @@ export default function Attendance() {
                     <div className="divide-y divide-slate-50">
                       {(records[sess.id]||[]).map(rec => {
                         const p2 = people.find(pp=>pp.id===rec.person_id)
-                        const recTiming = attendanceTiming(rec, sess, organizationSettings.timezone, lateMins)
+                        const recTiming = attendanceTiming(rec, sess, CAIRO, lateMins)
                         return (
                           <div key={rec.id} className="flex items-center gap-3 px-5 py-3">
                             <Avatar name={p2?.name||'?'} size="sm"/>
@@ -456,7 +456,7 @@ export default function Attendance() {
             const sess = sessions.find(s=>s.id===sId)
             const st   = getSession(sess?.label)
             const stLabel = SESSION_LABEL[lang]?.[sess?.label] || sess?.label
-            const recTiming = attendanceTiming(r, sess, organizationSettings.timezone, lateMins)
+            const recTiming = attendanceTiming(r, sess, CAIRO, lateMins)
             return (
               <Card key={r.id} className="p-4">
                 <div className="flex items-center gap-3">
@@ -489,7 +489,7 @@ export default function Attendance() {
       <Modal open={!!viewSession} onClose={()=>setViewSession(null)}
         title={viewSession?.name || viewSession?.service?.title || (isAr?'تفاصيل الفعالية':'Event details')} size="xl">
         <AttendanceSessionDetails session={viewSession} records={viewSession ? (records[viewSession.id] || []) : []}
-          people={people} timezone={organizationSettings.timezone} lateMinutes={lateMins} isAr={isAr}/>
+          people={people} timezone={CAIRO} lateMinutes={lateMins} isAr={isAr}/>
       </Modal>
 
       {/* Create session modal */}

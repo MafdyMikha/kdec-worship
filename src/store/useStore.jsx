@@ -1,3 +1,4 @@
+import { disablePush } from '../lib/pushClient.js'
 import { formatClock } from '../lib/time.js'
 import { rehearsalBeforeService } from '../lib/rehearsal.js'
 /* eslint-disable react-refresh/only-export-components -- this module intentionally co-locates the provider with its public store helpers */
@@ -737,6 +738,7 @@ export function AppProvider({ children }) {
       setCurrentUser(null)
       return
     }
+    try { await disablePush() } catch { toast(document.documentElement.lang === 'ar' ? 'لم يكتمل إلغاء اشتراك إشعارات الجهاز. أعد الاتصال وأوقف الإشعارات من الإعدادات.' : 'Device notification cleanup was incomplete. Reconnect and disable notifications in Settings.', 'error') }
     const { error } = await supabase.auth.signOut({ scope:'local' })
     if (error) { toast(error.message,'error'); return { error:error.message } }
     setCurrentUser(null)
@@ -1644,7 +1646,7 @@ export function AppProvider({ children }) {
   const checkOutAttendance = async (sessionId) => {
     if (isDemoMode) {
       const session = attendanceSessions.find(item => item.id===sessionId)
-      const occurrenceDate = attendanceOccurrenceDate(session, organizationSettings.timezone)
+      const occurrenceDate = attendanceOccurrenceDate(session, 'Africa/Cairo')
       const existing = (attendanceRecords[sessionId]||[]).find(record => record.person_id===currentUser.id && record.occurrence_date===occurrenceDate)
       if (!existing) return { error:'Check-in record not found.' }
       const updated = { ...existing, check_out_at:new Date().toISOString() }

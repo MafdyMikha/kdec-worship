@@ -6,6 +6,7 @@ import { useLang } from '../lib/i18n.jsx'
 import { hasPermission } from '../lib/permissions.js'
 import InstallApp from '../components/pwa/InstallApp.jsx'
 import AppearanceSettings from '../components/pwa/AppearanceSettings.jsx'
+import PushSettings from '../components/push/PushSettings.jsx'
 import { Card, Btn, Badge, Input, Select } from '../components/ui'
 
 function Section({ title, icon, children }) {
@@ -86,6 +87,7 @@ export default function Settings() {
     <div className="max-w-2xl space-y-5 animate-fade-in">
       <InstallApp card/>
       <AppearanceSettings/>
+      <PushSettings key={currentUser.id}/>
       {isAdmin&&(
         <Section title={t('orgSettings')} icon={<Shield size={18}/>}>
           <OrganizationForm key={`${organizationSettings.orgNameAr}-${organizationSettings.timezone}`} settings={organizationSettings}

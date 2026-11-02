@@ -1,0 +1,3 @@
+# Auth is checked in the cron-only handler using a dedicated server secret.
+[functions.push-dispatch]
+verify_jwt = false

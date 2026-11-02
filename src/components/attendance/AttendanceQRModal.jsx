@@ -13,7 +13,10 @@ export default function AttendanceQRModal({open,onClose,session}) {
   const {isAr}=useLang(),{manageAttendanceQr}=useStore()
   const [day,setDay]=useState(()=>session?nextAttendanceOccurrence(session):'')
   const [code,setCode]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[expanded,setExpanded]=useState(false),[confirm,setConfirm]=useState('')
-  const qrRef=useRef(null)
+  const qrRef=useRef(null),cardRef=useRef(null)
+  useEffect(()=>{const changed=()=>{if(!document.fullscreenElement)setExpanded(false)};document.addEventListener('fullscreenchange',changed);return()=>document.removeEventListener('fullscreenchange',changed)},[])
+  const close=()=>{if(document.fullscreenElement===cardRef.current)void document.exitFullscreen();setExpanded(false);onClose()}
+  const toggleExpanded=async()=>{if(expanded){if(document.fullscreenElement===cardRef.current)await document.exitFullscreen();setExpanded(false)}else{setExpanded(true);try{await cardRef.current?.requestFullscreen?.()}catch{/* Expanded dialog remains available on browsers without fullscreen support. */}}}
   useEffect(()=>{
     if(!open||!session)return
     let active=true
@@ -48,11 +51,12 @@ export default function AttendanceQRModal({open,onClose,session}) {
     if(!win){setError(isAr?'اسمح بالنوافذ المنبثقة للطباعة':'Allow popups to print');return}
     try{const svg=await makeCard();win.document.write(`<!doctype html><html><head><title>KDEC Worship QR</title><style>body{margin:0;display:grid;place-items:center}svg{max-width:100%;max-height:96vh}@page{margin:10mm}</style></head><body>${svg}</body></html>`);win.document.close();win.focus();win.print()}catch(e){win.close();setError(e.message)}
   }
-  return <Modal open={open} onClose={onClose} title={isAr?'رمز الحضور الخاص بالموعد':'Attendance QR for this occurrence'} size={expanded?'full':'md'} footer={<div className="flex flex-wrap gap-2"><Btn variant="secondary" onClick={onClose}>{isAr?'إغلاق':'Close'}</Btn><Btn disabled={!url||busy} onClick={()=>void download()}>{isAr?'تنزيل البطاقة':'Download card'}</Btn><Btn disabled={!url||busy} onClick={()=>void print()}>{isAr?'طباعة':'Print'}</Btn><Btn variant="secondary" onClick={()=>setExpanded(v=>!v)}>{expanded?(isAr?'حجم عادي':'Normal size'):(isAr?'ملء الشاشة':'Full screen')}</Btn></div>}>
+  return <Modal open={open} onClose={close} title={isAr?'رمز الحضور الخاص بالموعد':'Attendance QR for this occurrence'} size={expanded?'full':'md'} footer={<div className="flex flex-wrap gap-2"><Btn variant="secondary" onClick={close}>{isAr?'إغلاق':'Close'}</Btn><Btn disabled={!url||busy} onClick={()=>void download()}>{isAr?'تنزيل البطاقة':'Download card'}</Btn><Btn disabled={!url||busy} onClick={()=>void print()}>{isAr?'طباعة':'Print'}</Btn><Btn variant="secondary" onClick={()=>void toggleExpanded()}>{expanded?(isAr?'حجم عادي':'Normal size'):(isAr?'ملء الشاشة':'Full screen')}</Btn></div>}>
     <div className="space-y-4" dir={isAr?'rtl':'ltr'}>
       {session.repeatable&&<Input label={isAr?'موعد الجلسة':'Occurrence date'} type="date" min={session.sessionDate||session.session_date} value={day} onChange={e=>setDay(e.target.value)}/>}
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center space-y-3">
-        <BrandLogo className="w-20 h-auto mx-auto"/><h3 className="text-xl font-semibold" dir="auto">{title}</h3><p className="text-sm text-slate-500"><bdi>{day} · {time}</bdi> · Africa/Cairo</p>
+      <div ref={cardRef} className="attendance-qr-card rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center space-y-3">
+        {expanded&&<Btn variant="secondary" onClick={()=>void toggleExpanded()}>{isAr?'إنهاء ملء الشاشة':'Exit full screen'}</Btn>}
+        <BrandLogo className="w-20 h-auto mx-auto"/><h3 className="text-xl font-semibold break-words" dir="auto">{title}</h3><p className="text-sm text-slate-500"><bdi>{day} · {time}</bdi> · Africa/Cairo</p>
         {busy&&<p role="status">{isAr?'جارٍ تجهيز الرمز…':'Preparing code…'}</p>}
         {url&&!busy&&<div className="mx-auto w-fit max-w-full rounded-xl bg-white p-3" ref={qrRef}><QRCodeSVG value={url} size={expanded?400:264} level="H" includeMargin style={{maxWidth:'100%',height:'auto'}}/></div>}
         {url&&!busy&&<a href={url} className="inline-flex min-h-11 items-center text-indigo-700 underline">{isAr?'فتح صفحة تسجيل الحضور':'Open check-in page'}</a>}

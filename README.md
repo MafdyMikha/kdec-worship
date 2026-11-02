@@ -173,3 +173,17 @@ The shared logo uses transparent SVG artwork: navy on light surfaces and ivory o
 dark surfaces. The sidebar/login show the full lockup; the small header uses the
 tower alone. Print/QR exports use the navy SVG, and phone icons use an opaque
 navy background. Source geometry is in `scripts/generate-brand-assets.mjs`.
+
+## Web Push notifications
+
+Web Push adds per-device opt-in, account category/language preferences, encrypted
+background delivery, and server-scheduled service/rehearsal reminders. Existing
+calendar drafts remain silent; publication, assignment, setlist and announcement
+writes queue work transactionally. Demo does not register or send real pushes.
+
+Apply `MIGRATION_web_push.sql` **last**, after the existing calendar and
+attendance/custom-events migrations, including for fresh installations. Configure
+the public VAPID key, server secrets, `push-dispatch` Edge Function and Cron before
+enabling live delivery. No infrastructure is deployed by updating the frontend.
+See [WEB-PUSH.md](WEB-PUSH.md) for exact setup, permission rules, browser/iPhone
+requirements, testing instructions and current verification limitations.
