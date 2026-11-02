@@ -27,10 +27,9 @@ wallpapers. Regenerate the SVGs with `node scripts/generate-brand-assets.mjs`; o
 macOS, regenerate SVGs and PNG icons with `sh scripts/generate-app-icons.sh`.
 The older raster originals remain in `public/brand` as source references.
 
-Install app appears above the login card and page content, in Settings, and as a
-shortcut in the user menu. Supported browsers use their native prompt; other
-browsers receive platform-specific English/Arabic instructions. The action hides
-in installed/standalone windows. The app respects light/dark mode and device
+The application does not show install buttons on the login page, page content,
+Settings, or user menu. Installation remains available through supported browsers'
+own menus, as described below. The app respects light/dark mode and device
 accessibility preferences; navigation can use solid surfaces with Settings →
 Appearance & readability → Reduce transparency.
 
@@ -77,7 +76,7 @@ HTTP LAN address opened on a phone is not a substitute for an HTTPS deployment.
 
 1. Open the deployed HTTPS website in **Safari**. If the link opened inside
    WhatsApp or another app, open it in Safari first.
-2. Tap **Install app** for guidance, or use Safari's **Share** menu. Depending on
+2. Open Safari's **Share** menu. Depending on
    Safari's toolbar layout, Share may be inside the page/More menu.
 3. Choose **Add to Home Screen**. Leave **Open as Web App** enabled if it appears.
 4. Confirm the name **KDEC Worship**, then tap **Add**.
@@ -93,11 +92,11 @@ session revocation and browser storage eviction can require a new sign-in.
 ## Install on Android
 
 1. Open the deployed HTTPS website in **Chrome**.
-2. Tap **Install app** and complete the native browser prompt when offered.
-3. If no prompt appears, use **⋮ → Add to Home screen → Install**, or **⋮ → Install
+2. Use **⋮ → Add to Home screen → Install**, or **⋮ → Install
    app**, depending on the Chrome version. Browser engagement and installability
    checks determine whether a native prompt is available; it is not guaranteed to
    appear immediately. Other browsers may expose their own installation menu.
+3. Complete the browser's installation prompt when offered.
 4. Launch **KDEC Worship** from the home screen/app launcher. Confirm the full KDEC Worship
    icon, standalone window and `/schedule` launch route.
 

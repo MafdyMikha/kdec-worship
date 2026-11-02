@@ -3,7 +3,6 @@ import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle, CheckCircle, ArrowLeft, Ke
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import BrandLogo from '../components/BrandLogo.jsx'
-import InstallApp from '../components/pwa/InstallApp.jsx'
 import PwaStatus from '../components/pwa/PwaStatus.jsx'
 import { getDemoAccount } from '../lib/demoAccounts.js'
 
@@ -124,7 +123,6 @@ export default function Login({ inviteCode }) {
   return (
     <div className="worship-login min-h-screen min-h-[100dvh] flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
-        <div className="worship-install-row"><InstallApp /></div>
         <div className="worship-login-card rounded-3xl overflow-hidden">
 
           {/* Header */}

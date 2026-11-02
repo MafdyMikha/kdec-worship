@@ -1,11 +1,10 @@
-import { Bell, User, ChevronDown, LogOut, UserPlus, Sun, Moon, Download } from 'lucide-react'
+import { Bell, User, ChevronDown, LogOut, UserPlus, Sun, Moon } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { Avatar } from '../ui'
 import BrandLogo from '../BrandLogo.jsx'
-import { usePwa } from '../pwa/PwaProvider.jsx'
 import { format } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { ACCESS_LEVEL_LABELS, hasPermission } from '../../lib/permissions.js'
@@ -22,7 +21,6 @@ function useDarkMode() {
 
 export default function Header({ title }) {
   const { currentUser, logout, announcements, quarterly } = useStore()
-  const pwa=usePwa()
   const unreadSchedule = quarterly.inbox.filter(item=>!item.readAt).length
   const { lang, setLang, t } = useLang()
   const navigate     = useNavigate()
@@ -124,8 +122,6 @@ export default function Header({ title }) {
                 <div className="text-sm font-semibold text-slate-700" dir="auto">{currentUser?.name}</div>
                 <div className="text-xs text-slate-400 truncate">{currentUser?.email}</div>
               </div>
-
-              {!pwa?.installed&&<button type="button" onClick={()=>{navigate('/settings');setOpen(false)}} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer"><Download size={15} className="text-slate-400"/>{isAr?'تثبيت التطبيق':'Install app'}</button>}
 
               {/* Dark mode toggle — visible in menu on all sizes */}
               <button

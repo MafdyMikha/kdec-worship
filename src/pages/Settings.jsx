@@ -4,7 +4,6 @@ import { Save, Download, Shield, Globe, Database, LogOut } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
 import { hasPermission } from '../lib/permissions.js'
-import InstallApp from '../components/pwa/InstallApp.jsx'
 import AppearanceSettings from '../components/pwa/AppearanceSettings.jsx'
 import PushSettings from '../components/push/PushSettings.jsx'
 import { Card, Btn, Badge, Input, Select } from '../components/ui'
@@ -85,7 +84,6 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl space-y-5 animate-fade-in">
-      <InstallApp card/>
       <AppearanceSettings/>
       <PushSettings key={currentUser.id}/>
       {isAdmin&&(

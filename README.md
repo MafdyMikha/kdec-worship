@@ -139,10 +139,11 @@ its candidate manifest and taking a managed backup. It snapshots affected record
 then cancels/archives generated or explicitly reviewed unwanted non-Youth events, preserving linked data. Reruns leave
 later manager-created events alone. No weekly meetings are generated automatically.
 
-The HTTPS deployment supports **Install app** with English/Arabic phone guidance,
-the approved tower logo as its home-screen icon, and standalone launch at
+The HTTPS deployment supports installation through the browser's menu, with
+the approved tower logo as its home-screen icon and standalone launch at
 `/schedule`. The service worker caches only public offline help; calendar reads
 and writes require a connection. Existing Supabase sessions remain persistent.
+The application does not show an **Install app** button.
 No additional Supabase migration is required for PWA installation.
 
 See [PWA-INSTALLATION.md](./PWA-INSTALLATION.md) for exact deployment and phone

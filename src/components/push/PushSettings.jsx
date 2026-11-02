@@ -4,12 +4,12 @@ import { useLang } from '../../lib/i18n.jsx'
 import { useStore } from '../../store/useStore.jsx'
 import { Card, Btn } from '../ui'
 import { PUSH_CATEGORIES } from '../../lib/pushPolicy.js'
-import { currentPushDevice, disablePush, enablePush, loadPushPreferences, pushConfigured, pushSupport, savePushPreferences, testPushDevice } from '../../lib/pushClient.js'
+import { currentPushDevice, disablePush, enablePush, loadPushPreferences, pushConfigured, pushSupport, savePushPreferences } from '../../lib/pushClient.js'
 
 const TEXT = {
   title: ['Push notifications', 'الإشعارات الفورية'],
   enable: ['Enable notifications', 'تفعيل الإشعارات'], disable: ['Disable notifications on this device', 'إيقاف الإشعارات على هذا الجهاز'],
-  test: ['Send test notification', 'إرسال إشعار تجريبي'], save: ['Save preferences', 'حفظ التفضيلات'], retry: ['Refresh status / retry', 'تحديث الحالة / إعادة المحاولة'],
+  save: ['Save preferences', 'حفظ التفضيلات'], retry: ['Refresh status / retry', 'تحديث الحالة / إعادة المحاولة'],
   busy: ['Working…', 'جارٍ التنفيذ…'], enabled: ['Enabled on this device', 'مفعّلة على هذا الجهاز'], disabled: ['Not enabled on this device', 'غير مفعّلة على هذا الجهاز'],
   unknown: ['Device status could not be verified. Refresh to retry.', 'تعذر التحقق من حالة الجهاز. حدّث الحالة لإعادة المحاولة.'],
   permission: ['Browser permission', 'إذن المتصفح'], granted: ['Allowed', 'مسموح'], denied: ['Blocked', 'محظور'], default: ['Not requested', 'لم يُطلب بعد'],
@@ -17,7 +17,6 @@ const TEXT = {
   schedule: ['Published schedule changes', 'تغييرات الجدول المنشور'], setlists: ['Published setlist updates', 'تحديثات قوائم الترانيم المنشورة'], announcements: ['Team announcements', 'إعلانات الفريق'],
   preferences: ['Account preferences apply to all your subscribed devices.', 'تُطبّق تفضيلات الحساب على جميع أجهزتك المشتركة.'],
   language: ['Notification language', 'لغة الإشعارات'], saved: ['Preferences saved.', 'تم حفظ التفضيلات.'],
-  queued: ['Test queued for this device. Allow about a minute for the server scheduler. Provider acceptance does not guarantee display.', 'تمت إضافة اختبار هذا الجهاز إلى قائمة الإرسال. انتظر نحو دقيقة لتشغيل الجدولة. قبول الإرسال لا يضمن ظهور الإشعار.'],
   demo: ['Push notifications are unavailable in demo mode. No real subscriptions or messages are created.', 'الإشعارات غير متاحة في الوضع التجريبي. لا يتم إنشاء اشتراكات أو إرسال رسائل حقيقية.'],
   configuration: ['Push is not configured. An administrator must configure the public VAPID key and deploy the notification backend.', 'الإشعارات غير مُعدّة. يجب على المسؤول إعداد مفتاح VAPID العام ونشر خدمة الإشعارات.'],
   install: ['On iPhone/iPad (iOS 16.4+): use Share → Add to Home Screen, open the installed app, then tap Enable notifications.', 'على iPhone وiPad (iOS 16.4 أو أحدث): اختر مشاركة ← إضافة إلى الشاشة الرئيسية، وافتح التطبيق المثبّت، ثم اضغط تفعيل الإشعارات.'],
@@ -30,7 +29,6 @@ const TEXT = {
   cleanup: ['Device cleanup was incomplete. Notifications are paused locally; reconnect and retry disabling to remove the server subscription.', 'لم يكتمل إلغاء الاشتراك. تم إيقاف العرض محلياً؛ أعد الاتصال وحاول الإيقاف مجدداً لإزالة اشتراك الخادم.'],
   account: ['Your account changed. Refresh and enable notifications for the current account.', 'تم تغيير الحساب. حدّث الصفحة وفعّل الإشعارات للحساب الحالي.'],
   unsubscribe: ['Could not unsubscribe this browser. Check your connection and retry.', 'تعذر إلغاء اشتراك المتصفح. تحقق من الاتصال ثم أعد المحاولة.'],
-  rateLimit: ['Wait one minute before sending another test.', 'انتظر دقيقة قبل إرسال اختبار آخر.'],
 }
 export default function PushSettings() {
   const { currentUser, isDemoMode } = useStore()
@@ -79,7 +77,6 @@ export default function PushSettings() {
       <div className="flex flex-wrap gap-2">
         <Btn disabled={!pushConfigured || state.busy || state.permission === 'denied' || Boolean(state.device)} onClick={enable}>{text('enable')}</Btn>
         <Btn variant="secondary" disabled={state.busy} onClick={() => run(disablePush)}>{text('disable')}</Btn>
-        <Btn variant="secondary" disabled={!pushConfigured || state.busy || !state.device} onClick={() => run(() => testPushDevice(state.device.id), 'queued')}>{text('test')}</Btn>
         <Btn variant="secondary" disabled={state.busy} onClick={() => { setState(value => ({ ...value, busy: true })); setRefresh(value => value + 1) }}>{text('retry')}</Btn>
       </div>
       {state.preferences && <fieldset disabled={state.busy} className="space-y-3">

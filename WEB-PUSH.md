@@ -149,12 +149,13 @@ unchanged; no private app/API responses or push payloads enter it.
   to Home Screen, open the installed app, sign in, then tap Enable notifications.
 - Permission is requested only by the Enable button. If denied, use browser/device
   notification settings to allow it; a website cannot override a denial.
-- Test queues for the current device and is limited to once per account per
-  minute. Expect scheduler latency. Focus mode, browser/OS settings, connectivity,
+- The Settings page does not show a test-notification button. The diagnostic
+  `queue_push_test` RPC remains available for the current device and is limited
+  to once per account per minute. Expect scheduler latency. Focus mode, browser/OS settings, connectivity,
   battery restrictions, expiry and provider availability affect display.
 - A missing migration/backend or offline network produces an error instead of a
   saved/enabled success state. An unavailable VAPID public key disables enabling
-  and testing while preserving the disable action on supported devices.
+  while preserving the disable action on supported devices.
 - After an offline disable, reconnect and use Disable again to remove the saved
   server subscription. An account switch also attempts pending cleanup.
 - If tests remain pending with `attempts > 0` and `last_status = 0`, the
