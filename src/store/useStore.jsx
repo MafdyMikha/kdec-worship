@@ -1,3 +1,5 @@
+import { loadReportAttendanceSessions } from '../lib/ministryData.js'
+import { useMinistry } from './useMinistry.js'
 import { disablePush } from '../lib/pushClient.js'
 import { formatClock } from '../lib/time.js'
 import { rehearsalBeforeService } from '../lib/rehearsal.js'
@@ -54,7 +56,7 @@ const DEMO_WORSHIP_ROLES = DEMO_ROLE_NAMES.map((name,index)=>{
 })
 const DEMO_PERMISSION_DEFINITIONS=SYSTEM_PERMISSIONS.map((permission_key,index)=>({permission_key,category:permission_key.split('.')[0],description:permission_key.replace('.', ' · '),display_order:(index+1)*10,active:true}))
 const DEMO_PERMISSION_MATRIX={
-  admin:SYSTEM_PERMISSIONS.filter(permission=>permission!=='permissions.manage'),
+  admin:SYSTEM_PERMISSIONS.filter(permission=>!['permissions.manage','ratings.configure','reports.own'].includes(permission)),
   leader:['users.view','services.view','services.create','services.edit','songs.manage','schedules.manage','events.manage','announcements.manage'],
   member:['services.view'],
 }
@@ -87,7 +89,7 @@ const normalizeProfile = (profile) => {
     primaryRole:primaryAssignment?.worshipRole?.name||profile.role||roles[0]||'',roles,
     accessLevel:profile.access_level||profile.accessLevel||(profile.is_admin?'admin':'member'),
     isAdmin:['super_admin','admin'].includes(profile.access_level||profile.accessLevel)||(Boolean(profile.is_admin)&&!profile.access_level),
-    joinDate:profile.join_date,timeSlots:profile.time_slots||[],lastActiveAt:profile.last_active_at,
+    joinDate:profile.join_date ?? profile.joinDate,timeSlots:profile.time_slots||[],lastActiveAt:profile.last_active_at,
     tags:profile.tags||[],availability:profile.availability||{},
   }
 }
@@ -120,6 +122,8 @@ const normalizeSong = (song) => ({
   sequence: song.sequence || [],
   themes: song.themes || [],
   tags: song.themes || [],
+  originYear:song.origin_year ?? song.originYear ?? null,
+  createdAt:song.created_at ?? song.createdAt ?? null,
   lyricVersions: (song.lyrics || []).map(lyrics => ({
     ...lyrics,
     songId:lyrics.song_id,
@@ -160,6 +164,7 @@ const normalizeService = (service) => ({
   recurrenceGroupId: service.recurrence_group_id,
   recurrenceIndex: service.recurrence_index,
   recurrenceFrequency: service.recurrence_frequency,
+  setlistFinalized:service.setlist_finalized ?? service.setlistFinalized ?? false,
   setlistBlocks: service.setlist_blocks || {},
   setlist: (service.setlist || [])
     .sort((a, b) => a.sort_order - b.sort_order)
@@ -555,11 +560,12 @@ export function AppProvider({ children }) {
         ['announcements', supabase.from('announcements').select('*').order('created_at',{ascending:false})],
         ['events', supabase.from('events').select('*').order('date')],
         ['eventResponses', supabase.from('event_responses').select('*')],
-        ['attendanceRecords', supabase.from('attendance_records').select('*').order('created_at',{ascending:false})],
+        ['attendanceRecords', loadScheduleRows(supabase,'attendance_records')],
         ['excuses', supabase.from('excuses').select('*').order('created_at',{ascending:false})],
         ['substitutes', supabase.from('substitute_requests').select('*').order('created_at',{ascending:false})],
         ['organization', supabase.from('organization_settings').select('*').eq('id',1).maybeSingle()],
         ['invitations', supabase.from('invitations').select('*, roleAssignments:invitation_worship_roles(*, worshipRole:worship_roles(*))').order('created_at',{ascending:false})],
+        ['reportAttendanceSessions',loadReportAttendanceSessions(supabase)],
         ['attendanceSessions', supabase.from('attendance_sessions').select('*, service:services(*)').order('created_at',{ascending:false})],
         ['songImportHistory', supabase.from('song_import_batches').select('*, items:song_import_items(*)').order('created_at',{ascending:false}).limit(50)],
         ['roleUsage',supabase.rpc('get_worship_role_usage')],
@@ -638,12 +644,14 @@ export function AppProvider({ children }) {
         })
       }
       if (resultByKey.invitations?.data) setInvitations(resultByKey.invitations.data.map(normalizeInvitation))
-      if (resultByKey.attendanceSessions?.data) setAttendanceSessions(resultByKey.attendanceSessions.data.map(normalizeAttendanceSession))
+      if(resultByKey.attendanceSessions?.data||resultByKey.reportAttendanceSessions?.data){const sessions=new Map((resultByKey.reportAttendanceSessions?.data||[]).map(row=>[row.id,row]));(resultByKey.attendanceSessions?.data||[]).forEach(row=>sessions.set(row.id,row));setAttendanceSessions([...sessions.values()].map(normalizeAttendanceSession))}
       return firstError?{error:`Some data could not be loaded: ${firstError.message}`}:{success:true}
     } finally {
       if (expectedGeneration === authGenerationRef.current) setLoading(false)
     }
   }, [isDemoMode, toast])
+
+  const ministry = useMinistry({currentUser,setCurrentUser,isDemoMode,demoReady,people,services,setServices,songs,setSongs,loadAll})
 
   const loadCurrentUser = useCallback(async (user) => {
     setAuthLoading(true)
@@ -972,25 +980,29 @@ export function AppProvider({ children }) {
     const prepared=prepareSongForm(data)
     if(prepared.errors.length){toast(prepared.errors[0],'error');return {error:prepared.errors[0]}}
     const cleanData=prepared.value
+    if(isDemoMode){const tagResult=ministry.registerDemoTags(cleanData.themes);if(tagResult.error)return tagResult;cleanData.themes=tagResult.data}
     const id='s'+Date.now()
     const content=createDemoSongContent(cleanData,id)
-    const song = { ...cleanData,...content,id,usageCount:0,status:'active',titleAr:cleanData.title,arrangements:data.arrangements||[] }
+    const song = { ...cleanData,...content,id,usageCount:0,status:'active',createdAt:new Date().toISOString(),titleAr:cleanData.title,arrangements:data.arrangements||[] }
     if (isDemoMode) { setSongs(prev => [...prev, song]); toast('Song added'); return { success:true } }
     const databaseTitle=cleanData.language==='en'?(cleanData.title||cleanData.titleEn):(cleanData.titleEn||cleanData.title)
     const databaseTitleAr=cleanData.language==='en'?'':cleanData.title
-    const { data:s, error } = await supabase.rpc('save_song_library_entry',{
+    const { data:s, error } = await supabase.rpc('save_song_with_metadata',{p_data:{origin_year:cleanData.originYear,
       p_song_id:null,p_title:databaseTitle,p_title_ar:databaseTitleAr,p_author:cleanData.author,p_key:cleanData.key,p_bpm:cleanData.bpm,
       p_time_signature:cleanData.timeSignature,p_language:cleanData.language,p_themes:cleanData.themes,p_sequence:cleanData.sequence,p_notes:cleanData.notes,
       p_ccli_number:cleanData.ccliNumber,p_lyrics:cleanData.lyrics,p_lyrics_sections:cleanData.lyricSections,p_pro_chords:cleanData.proChords,
-    })
+    }})
     if (error) { toast(error.message,'error'); return { error:error.message } }
-    await loadAll(true);toast('Song added');return {success:true,id:s}
+    const refreshed=await loadAll(true);if(refreshed?.error)return {error:`Saved, but reload failed. Refresh before retrying. ${refreshed.error}`}
+    const metadata=await ministry.refresh();if(metadata?.error)return {error:`Saved, but tag reload failed. ${metadata.error}`}
+    toast('Song added');return {success:true,id:s}
   }
   const updateSong = async (id, data) => {
     if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
     const prepared=prepareSongForm(data)
     if(prepared.errors.length){toast(prepared.errors[0],'error');return {error:prepared.errors[0]}}
     const cleanData=prepared.value
+    if(isDemoMode){const tagResult=ministry.registerDemoTags(cleanData.themes);if(tagResult.error)return tagResult;cleanData.themes=tagResult.data}
     if (isDemoMode) {
       setSongs(prev => prev.map(existing=>{
         if(existing.id!==id)return existing
@@ -1001,13 +1013,15 @@ export function AppProvider({ children }) {
     }
     const databaseTitle=cleanData.language==='en'?(cleanData.title||cleanData.titleEn):(cleanData.titleEn||cleanData.title)
     const databaseTitleAr=cleanData.language==='en'?'':cleanData.title
-    const { error } = await supabase.rpc('save_song_library_entry',{
+    const { error } = await supabase.rpc('save_song_with_metadata',{p_data:{origin_year:cleanData.originYear,
       p_song_id:id,p_title:databaseTitle,p_title_ar:databaseTitleAr,p_author:cleanData.author,p_key:cleanData.key,p_bpm:cleanData.bpm,
       p_time_signature:cleanData.timeSignature,p_language:cleanData.language,p_themes:cleanData.themes,p_sequence:cleanData.sequence,p_notes:cleanData.notes,
       p_ccli_number:cleanData.ccliNumber,p_lyrics:cleanData.lyrics,p_lyrics_sections:cleanData.lyricSections,p_pro_chords:cleanData.proChords,
-    })
+    }})
     if (error) { toast(error.message,'error'); return { error:error.message } }
-    await loadAll(true);toast('Song updated');return {success:true}
+    const refreshed=await loadAll(true);if(refreshed?.error)return {error:`Saved, but reload failed. Refresh before retrying. ${refreshed.error}`}
+    const metadata=await ministry.refresh();if(metadata?.error)return {error:`Saved, but tag reload failed. ${metadata.error}`}
+    toast('Song updated');return {success:true}
   }
   const deleteSong = async (id) => {
     if(!hasPermission(currentUser,'songs.manage'))return {error:'You do not have permission to manage songs.'}
@@ -1343,7 +1357,7 @@ export function AppProvider({ children }) {
     const song  = songs.find(s => s.id===songId)
     const item  = { id:'sl'+Date.now(), songId, key: key||song?.key, notes:notes||'', order, song }
     if (isDemoMode) {
-      setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:[...s.setlist,item]}))
+      setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlistFinalized:false,setlist:[...s.setlist,item]}))
       setSongs(prev => prev.map(s => s.id===songId?{...s,usageCount:(s.usageCount||0)+1,lastUsed:cairoToday()}:s))
       toast('Song added'); return
     }
@@ -1354,19 +1368,19 @@ export function AppProvider({ children }) {
   }
 
   const removeFromSetlist = async (serviceId, itemId) => {
-    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:s.setlist.filter(i=>i.id!==itemId)})); return }
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlistFinalized:false,setlist:s.setlist.filter(i=>i.id!==itemId)})); return }
     const { error } = await supabase.from('setlist_items').delete().eq('id',itemId).select('id').single()
     if (error) { toast(error.message,'error'); return { error:error.message } }
-    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:s.setlist.filter(i=>i.id!==itemId)}))
+    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlistFinalized:false,setlist:s.setlist.filter(i=>i.id!==itemId)}))
     return { success:true }
   }
 
   const reorderSetlist = async (serviceId, newSetlist) => {
-    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:newSetlist})); return }
+    if (isDemoMode) { setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlistFinalized:false,setlist:newSetlist})); return }
     const payload = newSetlist.map((item,idx) => ({ id:item.id, service_id:serviceId, song_id:item.songId, sort_order:idx+1, key:item.key, notes:item.notes||'' }))
     const { error } = await supabase.from('setlist_items').upsert(payload, { onConflict:'id' })
     if (error) { toast(error.message,'error'); return }
-    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlist:newSetlist.map((i,idx)=>({...i,order:idx+1}))}))
+    setServices(prev => prev.map(s => s.id!==serviceId?s:{...s,setlistFinalized:false,setlist:newSetlist.map((i,idx)=>({...i,order:idx+1}))}))
     return { success:true }
   }
 
@@ -1788,7 +1802,7 @@ export function AppProvider({ children }) {
 
   const value = {
     isDemoMode, configurationError, currentUser, authLoading, loading, isPasswordRecovery,
-    people, songs, services, announcements, invitations, events, eventResponses,
+    people:ministry.people, ministry, songs, services, announcements, invitations, events, eventResponses,
     attendanceSessions, attendanceRecords, excuseRequests, substituteRequests,
     quarterly, scheduleAction, planningReady, savePlanningEvent,
     songImportHistory,roleCategories,worshipRoles,roleUsage,permissionDefinitions,permissionMatrix,auditLogs,

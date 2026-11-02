@@ -1,3 +1,4 @@
+import SongTags from '../components/songs/SongTags.jsx'
 import { useState } from 'react'
 import { Plus, Music2, Edit2, Trash2, ChevronDown, ChevronUp, Globe, BookOpen, LibraryBig } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -20,6 +21,7 @@ const PART_COLOR = {
 }
 
 function SongForm({ value, onChange, isAr }) {
+  const {ministry}=useStore()
   const ALL_SEQ = [...SEQ_AR, ...SEQ_EN]
   const toggleSeq = (item) => {
     const cur = value.sequence||[]
@@ -53,9 +55,11 @@ function SongForm({ value, onChange, isAr }) {
         <option value="en">{isAr?'إنجليزي':'English'}</option>
         <option value="both">{isAr?'الاثنان':'Both'}</option>
       </Select>
-      <Input label={isAr?'التصنيفات (اختياري)':'Tags / Categories (optional)'}
+      <Input label={isAr?'سنة إصدار الترنيمة الأصلية (اختياري)':'Song origin year (optional)'} type="number" min={1000} max={new Date().getFullYear()+1} step={1} value={value.originYear??''} onChange={e=>onChange({...value,originYear:e.target.value})}/>
+      <Input label={isAr?'التصنيفات (اختياري)':'Tags / Categories (optional)'} list="song-tag-suggestions"
         placeholder={isAr?'تسبيح، عبادة، شركة':'Worship, Praise, Communion'}
-        value={value.tagsText||''} onChange={e=>onChange({...value,tagsText:e.target.value})}/>
+        value={value.tagsText||''} onChange={e=>onChange({...value,tagsText:e.target.value,themes:undefined})}/>
+      <datalist id="song-tag-suggestions">{ministry.tags.filter(tag=>tag.active).map(tag=><option key={tag.id} value={tag.name}/>)}</datalist>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">{isAr?'هيكل الترنيمة':'Song Structure'}</label>
         <div className="flex flex-wrap gap-2">
@@ -95,6 +99,9 @@ export default function Songs() {
   const navigate=useNavigate()
   const location=useLocation()
   const requestedEditSong=songs.find(song=>String(song.id)===String(location.state?.editSongId||''))
+  const [tagFilter,setTagFilter]=useState('')
+  const [yearFilter,setYearFilter]=useState('')
+  const [showTags,setShowTags]=useState(false)
   const [search,   setSearch]   = useState('')
   const [filterKey,setFilterKey]= useState('all')
   const [tab,      setTab]      = useState('all')
@@ -115,7 +122,7 @@ export default function Songs() {
     const matchQ = (s.title||'').toLowerCase().includes(q)||(s.titleEn||'').toLowerCase().includes(q)||(s.author||'').toLowerCase().includes(q)
     const matchKey = filterKey==='all'||s.key===filterKey
     const matchTab = tab==='all'||s.language==='both'||(tab==='ar'?s.language==='ar':s.language==='en')
-    return matchQ&&matchKey&&matchTab
+    return (matchQ||(s.themes||s.tags||[]).some(tag=>tag.toLowerCase().includes(q)))&&matchKey&&matchTab&&(!tagFilter||(s.themes||s.tags||[]).includes(tagFilter))&&(!yearFilter||String(s.originYear||'unknown')===yearFilter)
   }).sort((a,b)=>a.title.localeCompare(b.title,'ar'))
 
   const openAdd  = () => { setEditing(null); setForm(BLANK);setSaveError('');setShowAdd(true) }
@@ -153,6 +160,8 @@ export default function Songs() {
         </div>}
       </div>
 
+      <div className="flex flex-wrap gap-3"><Select label={isAr?'التصنيف':'Tag'} value={tagFilter} onChange={e=>setTagFilter(e.target.value)}><option value="">{isAr?'كل التصنيفات':'All tags'}</option>{[...new Set(activeSongs.flatMap(song=>song.themes||song.tags||[]))].sort().map(tag=><option key={tag}>{tag}</option>)}</Select><Select label={isAr?'سنة الإصدار الأصلية':'Origin year'} value={yearFilter} onChange={e=>setYearFilter(e.target.value)}><option value="">{isAr?'كل السنوات':'All years'}</option><option value="unknown">{isAr?'غير معروف':'Unknown'}</option>{[...new Set(activeSongs.map(song=>song.originYear).filter(Boolean))].sort((a,b)=>b-a).map(year=><option key={year}>{year}</option>)}</Select>{canManage&&<Btn variant="secondary" onClick={()=>setShowTags(true)}>{isAr?'إدارة التصنيفات':'Manage tags'}</Btn>}</div>
+      <Modal open={showTags} onClose={()=>setShowTags(false)} title={isAr?'تصنيفات الترانيم':'Song tags'}><SongTags/></Modal>
       <Tabs tabs={[
         { label:t('all'),     value:'all', count:activeSongs.length },
         { label:t('arabic'),  value:'ar',  count:activeSongs.filter(s=>['ar','both'].includes(s.language)).length },
@@ -189,7 +198,7 @@ export default function Songs() {
                     <Badge color={LANG_COLOR[song.language]||'slate'} size="xs">{LANG_LABEL[song.language]||song.language}</Badge>
                   </div>
                   {showEn[song.id]&&song.titleEn&&<div className="text-xs text-slate-400 italic mt-0.5">{song.titleEn}</div>}
-                  <div className="text-xs text-slate-400">{song.author}</div>
+                  <div className="text-xs text-slate-400">{song.author}{song.originYear?` · ${song.originYear}`:''}</div><div className="flex flex-wrap gap-1 mt-1">{(song.themes||song.tags||[]).map(tag=><Badge key={tag} color="slate" size="xs">{tag}</Badge>)}</div>
                 </div>
                 <div className="col-span-2"><Badge color="slate">{song.key}</Badge></div>
                 <div className="col-span-2 text-sm text-slate-600">{song.bpm||'—'}</div>

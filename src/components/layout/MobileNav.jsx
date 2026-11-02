@@ -87,7 +87,7 @@ export default function MobileNav() {
     { to: '/attendance',    icon: <QrCode size={20}/>,       label: t('attendance')    },
     { to: '/requests',      icon: <ClipboardList size={20}/>,label: t('requests')      },
     { to: '/whatsapp',      icon: <WaIcon/>,                 label: t('whatsappBulk'), permission:'users.view' },
-    { to: '/reports',       icon: <BarChart3 size={20}/>,    label: t('reports'), permission:'reports.view' },
+    { to: '/reports',       icon: <BarChart3 size={20}/>,    label: t('reports'), permission:'reports.view', ownReports:true },
     { to: '/announcements', icon: <MessageSquare size={20}/>,label: t('announcements'), badge: announcements.length },
     { to: '/invitations',   icon: <Users size={20}/>,        label: t('invitations'), permission:'invitations.manage' },
     { to: '/admin/settings',icon: <ShieldCog size={20}/>,    label: t('adminControl'), adminControl:true },
@@ -108,18 +108,19 @@ export default function MobileNav() {
   ]
 
   const permissionMore = [
+    { to:'/evaluations', icon:<ClipboardList size={20}/>, label:isAr?'التقييمات':'Evaluations', permission:'evaluations.manage' },
     { to:'/people', icon:<Users size={20}/>, label:t('people'), permission:'users.view' },
     { to:'/whatsapp', icon:<WaIcon/>, label:t('whatsappBulk'), permission:'users.view' },
-    { to:'/reports', icon:<BarChart3 size={20}/>, label:t('reports'), permission:'reports.view' },
+    { to:'/reports', icon:<BarChart3 size={20}/>, label:t('reports'), permission:'reports.view', ownReports:true },
     { to:'/invitations', icon:<Users size={20}/>, label:t('invitations'), permission:'invitations.manage' },
     { to:'/admin/settings', icon:<ShieldCog size={20}/>, label:t('adminControl'), adminControl:true },
   ]
   const basePrimary = isAdmin ? adminPrimary : isManager ? managerPrimary : memberPrimary
   const baseMore = isAdmin ? adminMore : isManager ? managerMore : memberMore
-  const primary = basePrimary.filter(item=>!item.permission||hasPermission(currentUser,item.permission))
+  const primary = basePrimary.filter(item=>!item.permission||(hasPermission(currentUser,item.permission)||(item.ownReports&&hasPermission(currentUser,'reports.own'))))
   const more = [
-    ...baseMore.filter(item=>(!item.permission||hasPermission(currentUser,item.permission))&&(!item.adminControl||canAccessAdminControl(currentUser))),
-    ...permissionMore.filter(item=>(item.adminControl?canAccessAdminControl(currentUser):hasPermission(currentUser,item.permission))&&!basePrimary.some(base=>base.to===item.to)&&!baseMore.some(base=>base.to===item.to)),
+    ...baseMore.filter(item=>(!item.permission||(hasPermission(currentUser,item.permission)||(item.ownReports&&hasPermission(currentUser,'reports.own'))))&&(!item.adminControl||canAccessAdminControl(currentUser))),
+    ...permissionMore.filter(item=>(item.adminControl?canAccessAdminControl(currentUser):(hasPermission(currentUser,item.permission)||(item.ownReports&&hasPermission(currentUser,'reports.own'))))&&!basePrimary.some(base=>base.to===item.to)&&!baseMore.some(base=>base.to===item.to)),
   ]
 
   return (

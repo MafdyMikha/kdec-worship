@@ -48,7 +48,13 @@ export function buildAttendanceReport({ sessions = [], recordsBySession = {}, pe
     }
   })).sort((a, b) => `${b.date}|${b.checkInAt || ''}`.localeCompare(`${a.date}|${a.checkInAt || ''}`))
 
-  const summaries = people.map(person => {
+  const summaries = summarizeAttendanceRows(rows,people)
+
+  return { rows, summaries }
+}
+
+export function summarizeAttendanceRows(rows,people) {
+  return people.map(person => {
     const personRows = rows.filter(row => String(row.personId) === String(person.id))
     return {
       person,
@@ -61,7 +67,16 @@ export function buildAttendanceReport({ sessions = [], recordsBySession = {}, pe
     }
   }).filter(summary => summary.records > 0).sort((a, b) => b.records - a.records || (a.person.name || '').localeCompare(b.person.name || ''))
 
-  return { rows, summaries }
+}
+export function filterAttendanceReport(report,quick='') {
+  const rows=report.rows.filter(row=>quick==='late'?row.arrival==='late':quick==='missing_checkout'?row.checkInAt&&!row.checkOutAt:quick==='absent'?row.status==='absent':true)
+  return {rows,summaries:summarizeAttendanceRows(rows,report.summaries.map(summary=>summary.person))}
+}
+
+export function earlyCheckoutRate(rows=[]) {
+  const eligible=rows.filter(row=>row.checkInAt&&row.checkOutAt&&['early','normal'].includes(row.departure))
+  const early=eligible.filter(row=>row.departure==='early').length
+  return {eligible:eligible.length,early,rate:eligible.length?Math.round(early/eligible.length*1000)/10:null}
 }
 
 const timingText = (value, isAr) => ({
@@ -76,8 +91,8 @@ export function downloadAttendanceReport(report, { isAr = false, timezone = 'Afr
     ? ['الجلسة / الفعالية','النوع','التاريخ','البداية','النهاية','العضو','الدور','الدخول','حالة الوصول','الخروج','حالة المغادرة','الحالة']
     : ['Session / Event','Type','Date','Start','End','Member','Role','Check in','Arrival','Check out','Departure','Status']
   const summaryColumns = isAr
-    ? ['العضو','إجمالي الحضور','مبكر','في الموعد','متأخر','خروج مبكر','خروج طبيعي']
-    : ['Member','Total attendance','Early','On time','Late','Early checkout','Normal checkout']
+    ? ['العضو','إجمالي الحضور','في الموعد','متأخر','خروج مبكر %']
+    : ['Member','Total attendance','On time','Late','Early checkout %']
 
   downloadExcelWorkbook(filename, [
     {
@@ -95,8 +110,8 @@ export function downloadAttendanceReport(report, { isAr = false, timezone = 'Afr
       name:isAr ? 'ملخص الأعضاء' : 'Member Summary',
       columns:summaryColumns,
       rows:report.summaries.map(summary => [
-        summary.person.name, summary.records, summary.early, summary.onTime, summary.late,
-        summary.earlyCheckout, summary.normalCheckout,
+        summary.person.name, summary.records, summary.onTime, summary.late,
+        earlyCheckoutRate(report.rows.filter(row=>row.personId===summary.person.id)).rate,
       ]),
     },
   ])

@@ -1,3 +1,5 @@
+import MinistryMemberPanel, { GuestMembers, MinistryStatus } from '../components/MinistryMemberPanel.jsx'
+import { MEMBER_CATEGORIES, SERVING_STATUSES } from '../lib/ministry.js'
 import { useState, useMemo } from 'react'
 import { Edit2, Trash2, Mail, Phone, Users, UserPlus, Grid3X3, List, Printer, Check, History } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -14,11 +16,6 @@ const ROLE_COLOR = {
   'Projection':'slate','AUX Instrument':'amber','Camera':'red',
 }
 
-const DAYS_CONFIG = [
-  { key:'sun' }, { key:'mon' }, { key:'tue' },
-  { key:'wed' }, { key:'thu' }, { key:'fri' }, { key:'sat' },
-]
-
 // A person may have `roles` (array, new) or just `role` (string, legacy) — always normalize to an array
 const getRoles = (person) =>
   (Array.isArray(person?.roles) && person.roles.length > 0)
@@ -28,7 +25,7 @@ const getRoles = (person) =>
 // ── Person Card ─────────────────────────────────────────────
 function PersonCard({ person, isAdmin, currentUserId, onEdit, onDelete, onAttendance, t, isAr }) {
   const phone     = person.whatsapp || person.phone
-  const availDays = DAYS_CONFIG.filter(d => person.availability?.[d.key])
+  const [details,setDetails]=useState(false)
   const roles     = getRoles(person)
   const accessLabel = getAccessLevelLabel(person, isAr ? 'ar' : 'en')
 
@@ -61,17 +58,14 @@ function PersonCard({ person, isAdmin, currentUserId, onEdit, onDelete, onAttend
           : <Badge color="slate" size="sm">—</Badge>}
       </div>
 
+      {person.leaderQuote&&roles.includes('Worship Leader')&&<blockquote className="mt-3 text-xs text-slate-600 italic" dir="auto">{person.leaderQuote}</blockquote>}
       <div className="mt-3 space-y-1">
         {person.email && <div className="flex items-center gap-2 text-xs text-slate-500"><Mail size={11}/><span className="truncate">{person.email}</span></div>}
         {phone && <div className="flex items-center gap-2 text-xs text-slate-500" dir="ltr"><Phone size={11}/>{phone}</div>}
       </div>
-      {availDays.length > 0 && (
-        <div className="flex gap-1 mt-3 pt-3 border-t border-slate-100 flex-wrap">
-          {availDays.map(d => (
-            <span key={d.key} className="px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">{t(d.key)}</span>
-          ))}
-        </div>
-      )}
+      <div className="mt-2 flex flex-wrap gap-1"><Badge color="slate">{MEMBER_CATEGORIES[person.category||'member']?.[isAr?'ar':'en']}</Badge><Badge color="slate">{SERVING_STATUSES[person.servingStatus||'active']?.[isAr?'ar':'en']}</Badge></div>
+      <Btn variant="secondary" size="sm" className="mt-3 w-full" onClick={()=>setDetails(true)}>{isAr?'الحالة والتقييمات':'Status & ratings'}</Btn>
+      <Modal open={details} onClose={()=>setDetails(false)} title={person.name} size="lg">{details&&<MinistryMemberPanel key={person.id} person={person}/>}</Modal>
       {onAttendance && (
         <button type="button" onClick={() => onAttendance(person)} aria-label={`${isAr?'سجل حضور':'Attendance history'} ${person.name}`}
           className="mt-3 w-full min-h-9 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-50 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors">
@@ -174,49 +168,6 @@ function RosterView({ people, t, isAr }) {
   )
 }
 
-// ── Availability Grid View ──────────────────────────────────
-function AvailabilityView({ people, t }) {
-  const DAYS = DAYS_CONFIG.map(d => ({ ...d, label: t(d.key) }))
-  const active = people.filter(p => p.status === 'active')
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] text-sm">
-          <caption className="sr-only">{t('availabilityView')}</caption>
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th scope="col" className="px-4 py-3 text-start text-xs font-semibold text-slate-500 sticky start-0 z-10 bg-slate-50">{t('name')}</th>
-              {DAYS.map(d => (
-                <th key={d.key} scope="col" className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{d.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {active.map(p => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <th scope="row" className="px-4 py-3 sticky start-0 z-10 bg-white text-start">
-                  <div className="flex items-center gap-2">
-                    <Avatar name={p.name} size="xs"/>
-                    <span className="text-sm font-medium text-slate-700 whitespace-nowrap" dir="auto">{p.name}</span>
-                  </div>
-                </th>
-                {DAYS.map(d => (
-                  <td key={d.key} className="px-3 py-3 text-center">
-                    {p.availability?.[d.key]
-                      ? <span aria-label={`${d.label}: ${t('active')}`} className="inline-flex w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full items-center justify-center text-xs">✓</span>
-                      : <span aria-label={`${d.label}: —`} className="inline-flex w-6 h-6 bg-slate-100 rounded-full items-center justify-center text-xs text-slate-500">—</span>}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  )
-}
-
 // ── Multi-select role picker (pill grid, same pattern as availability days) ──
 function RolesPicker({ selected,onChange,ROLES,isAr,primaryRole,onPrimaryChange }) {
   const toggle = (role) => {
@@ -290,21 +241,6 @@ function EditForm({ value,onChange,ROLES,t,isAr,protectAuthorization=false,canAs
         <option value="inactive">{t('inactive')}</option>
         <option value="on-leave">{t('onLeave')}</option>
       </Select>
-      <fieldset>
-        <legend className="block text-sm font-medium text-slate-700 mb-2">{t('availableDays')}</legend>
-        <div className="flex gap-2 flex-wrap">
-          {DAYS_CONFIG.map(d => {
-            const on = !!value.availability?.[d.key]
-            return (
-              <button key={d.key} type="button" aria-pressed={on}
-                onClick={() => onChange({ ...value, availability: { ...value.availability, [d.key]: !on } })}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-all ${on ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-500 hover:border-indigo-300'}`}>
-                {t(d.key)}
-              </button>
-            )
-          })}
-        </div>
-      </fieldset>
       <Textarea label={t('notes')} placeholder={isAr ? 'أي ملاحظات...' : 'Any notes...'} value={value.notes || ''} onChange={e => onChange({ ...value, notes: e.target.value })}/>
     </div>
   )
@@ -321,6 +257,8 @@ export default function People() {
   const isAdmin=hasPermission(currentUser,'users.edit')
 
   const [search,       setSearch]       = useState('')
+  const [categoryFilter,setCategoryFilter]=useState('')
+  const [servingFilter,setServingFilter]=useState('')
   const [filterRole,   setFilterRole]   = useState('all')
   const [viewMode,     setViewMode]     = useState('grid')  // grid | list (for All tab)
   const [subTab,       setSubTab]       = useState('all')   // all | byRole | roster | availability
@@ -338,9 +276,9 @@ export default function People() {
       const matchQ      = !q || p.name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q) || roles.some(r => r.toLowerCase().includes(q))
       const matchRole   = filterRole === 'all' || roles.includes(filterRole)
       const matchStatus = statusFilter === 'all' || p.status === statusFilter
-      return matchQ && matchRole && matchStatus
+      return matchQ && matchRole && matchStatus && (!categoryFilter||p.category===categoryFilter)&&(!servingFilter||p.servingStatus===servingFilter)
     }).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en'))
-  }, [people, search, filterRole, statusFilter])
+  }, [people, search, filterRole, statusFilter,categoryFilter,servingFilter])
 
   const activeCount   = people.filter(p => p.status === 'active').length
   const inactiveCount = people.filter(p => p.status === 'inactive').length
@@ -359,12 +297,14 @@ export default function People() {
     { label: t('all'),          value: 'all'          },
     { label: t('byRole'),       value: 'byRole'        },
     { label: t('roster'),       value: 'roster'        },
-    { label: t('availabilityView'), value: 'availability' },
+    { label: isAr?'مشاركون من الخارج':'Guest contributors', value:'guests' },
   ]
 
   return (
     <div className="max-w-7xl space-y-5 animate-fade-in">
 
+      <MinistryStatus/>
+      {hasPermission(currentUser,'ratings.configure')&&<Btn variant="secondary" onClick={()=>navigate('/ratings/settings')}>{isAr?'تخصيص معايير التقييم':'Customize rating criteria'}</Btn>}
       {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
@@ -408,6 +348,8 @@ export default function People() {
             <option value="on-leave">{t('onLeave')}</option>
             <option value="all">{t('all')}</option>
           </select>
+          <Select label={isAr?'فئة المشاركة':'Participation category'} value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}><option value="">{isAr?'الكل':'All'}</option>{Object.entries(MEMBER_CATEGORIES).filter(([key])=>key!=='outsider').map(([key,label])=><option key={key} value={key}>{label[isAr?'ar':'en']}</option>)}</Select>
+          <Select label={isAr?'حالة الخدمة':'Serving status'} value={servingFilter} onChange={e=>setServingFilter(e.target.value)}><option value="">{isAr?'الكل':'All'}</option>{Object.entries(SERVING_STATUSES).map(([key,label])=><option key={key} value={key}>{label[isAr?'ar':'en']}</option>)}</Select>
           {subTab === 'all' && (
             <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg sm:ms-auto" role="group" aria-label={isAr ? 'طريقة العرض' : 'View mode'}>
               <button type="button" onClick={() => setViewMode('grid')} aria-pressed={viewMode === 'grid'}
@@ -451,10 +393,7 @@ export default function People() {
         <RosterView people={people.filter(p => p.status === 'active')} t={t} isAr={isAr}/>
       )}
 
-      {/* AVAILABILITY */}
-      {subTab === 'availability' && (
-        <AvailabilityView people={people} t={t}/>
-      )}
+      {subTab==='guests'&&<GuestMembers/>}
 
       {/* Edit modal */}
       <Modal open={showForm} onClose={closeEdit}

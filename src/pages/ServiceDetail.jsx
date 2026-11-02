@@ -1,3 +1,4 @@
+import ServiceInsights from '../components/ServiceInsights.jsx'
 import { formatClock } from '../lib/time.js'
 import ServicePreparation from '../components/ServicePreparation'
 import { weeklyServiceTitle } from '../lib/weeklyServices.js'
@@ -164,6 +165,7 @@ export default function ServiceDetail() {
         </div>
       )}
 
+      <ServiceInsights key={service.id} service={service}/>
       {/* Tabs */}
       {service.publishedSchedule&&<Btn variant="secondary" onClick={()=>navigate('/schedule')}>{isAr?'الردود والبدلاء في الجدول ربع السنوي':'Manage responses and replacements in Quarterly Schedule'}</Btn>}
       <div className="flex border-b border-slate-200 gap-1 overflow-x-auto" role="tablist" aria-label={isAr?'تفاصيل الخدمة':'Service details'}>

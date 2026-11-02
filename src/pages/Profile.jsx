@@ -58,7 +58,6 @@ export default function Profile() {
   const isAdmin=isAdminUser(currentUser)
   const myServices = services.filter(s => s.team.find(tm => tm.personId === currentUser?.id))
   const confirmed  = myServices.filter(s => s.team.find(tm => tm.personId===currentUser?.id && tm.status==='confirmed')).length
-  const availDays  = DAYS_CONFIG.filter(d => form.availability?.[d.key])
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -240,30 +239,9 @@ export default function Profile() {
             <div className="w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600"><Calendar size={18}/></div>
             <div>
               <h3 className="font-display font-semibold text-slate-800">{t('weeklyAvail')}</h3>
-              <p className="text-xs text-slate-400">{isAr?'الأيام التي تكون فيها متاحاً للخدمة':'Days you are available to serve'}</p>
+              <p className="text-xs text-slate-400">{isAr?'فترات التوفر الاختيارية':'Optional availability time slots'}</p>
             </div>
           </div>
-          <fieldset>
-            <legend className="sr-only">{t('availableDays')}</legend>
-            <div className="flex gap-2 flex-wrap">
-              {DAYS_CONFIG.map(day => {
-                const on = !!form.availability?.[day.key]
-                return (
-                  <button key={day.key} type="button" aria-pressed={on}
-                    onClick={() => setForm(f => ({...f, availability:{...f.availability,[day.key]:!on}}))}
-                    className={`flex flex-col items-center gap-0.5 w-16 py-3 rounded-xl border cursor-pointer transition-all select-none ${on?'bg-indigo-600 border-indigo-600 text-white shadow-sm':'border-slate-200 text-slate-500 hover:border-indigo-300 hover:bg-indigo-50'}`}>
-                    <span className="text-xs font-bold" aria-hidden="true">{t(day.key).slice(0,1)}</span>
-                    <span className="text-xs">{t(day.key)}</span>
-                    {on && <Check size={10} aria-hidden="true"/>}
-                  </button>
-                )
-              })}
-            </div>
-          </fieldset>
-          <p className="text-xs text-slate-500">
-            {isAr?'متاح:':'Available:'} {availDays.length > 0 ? availDays.map(d => t(d.key)).join(isAr?'، ':' · ') : (isAr?'لم يتم التحديد':'None selected')}
-          </p>
-
           <div className="border-t border-slate-100 pt-4">
             <div className="flex items-center gap-2 mb-3">
               <Clock size={14} className="text-slate-400"/>

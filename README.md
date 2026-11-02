@@ -188,3 +188,9 @@ the public VAPID key, server secrets, `push-dispatch` Edge Function and Cron bef
 enabling live delivery. No infrastructure is deployed by updating the frontend.
 See [WEB-PUSH.md](WEB-PUSH.md) for exact setup, permission rules, browser/iPhone
 requirements, testing instructions and current verification limitations.
+
+## Ministry insights and evaluations
+
+Customizable musician/vocal/worship-leader profile ratings, additional ministry access roles, audition/newcomer status, guest contributors and private post-service feedback are now available. Reports distinguish assignments, actual attendance, recorded stage appearances and response history, with quarter presets, search, filters and matching exports. Songs support origin years and reusable tags; schedules support validated CSV/XLSX draft imports. Member available-day controls and the calendar's cancelled-events filter were removed while historical records are retained.
+
+For existing installations, apply `MIGRATION_ministry_insights.sql` **last**, after the current custom-attendance/calendar upgrades, before deploying this frontend. New installations use the self-contained current `supabase-schema-FULL.sql` and should not replay older workflow migrations afterward. See [MINISTRY-INSIGHTS.md](./MINISTRY-INSIGHTS.md) for the permission matrix, migration order, calculations, limitations and isolated verification commands.

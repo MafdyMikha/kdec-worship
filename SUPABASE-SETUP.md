@@ -10,9 +10,7 @@ Do not put the service-role key in this application. Vite exposes every `VITE_*`
 
 ## 2. Apply the database schema
 
-For a new project, open **SQL Editor**, paste the complete contents of `supabase-schema-FULL.sql`, and run it once. Then run `MIGRATION_dynamic_roles_admin.sql` to install the normalized role catalogue, explicit access levels, permission matrix, audit log, and protected administration functions. Next run `MIGRATION_qa_hardening.sql` to restrict private profile fields, install the safe member directory, enforce input integrity, and protect attendance expiry. Finally run `MIGRATION_song_bulk_management.sql` to install multilingual lyrics, inline Pro Chords, private chart files, import history, and the transactional song-save functions. Run the files in that order.
-
-Then apply `MIGRATION_quarterly_scheduling.sql` for quarterly publication, private replacement approval, the schedule inbox, and shared read-only schedule access. Apply it after legacy weekly migrations; next apply `MIGRATION_rehearsal_before_service.sql` and then `MIGRATION_unified_calendar.sql`. The unified migration must be last among workflow upgrades because it extends publishing, installs draft visibility and disables the parallel Events writer. See [UNIFIED-CALENDAR.md](./UNIFIED-CALENDAR.md) for the exact current order and cleanup/deployment steps.
+For a **new project**, open **SQL Editor**, paste the current complete `supabase-schema-FULL.sql`, and run it once. The file now bundles the dynamic-role, song-content, quarterly-calendar, custom-attendance and ministry-insights prerequisites. **Do not replay older workflow migrations after the current fresh schema**: they replace shared permission/calendar functions. Web-push keys and function deployment still require the separate setup described in `WEB-PUSH.md`.
 
 For an existing project:
 
@@ -29,17 +27,23 @@ For an existing project:
 10. Run `MIGRATION_rehearsal_before_service.sql`, then `MIGRATION_unified_calendar.sql`.
 11. Review/export the opening candidate query in `MIGRATION_calendar_cleanup.sql`, take a managed backup, then apply the complete cleanup file for the requested one-time active-calendar reset. It snapshots related data before cancelling/archiving generated non-Youth meetings and any explicitly reviewed unwanted event IDs; legitimate manual events and Youth records remain. Do not run cleanup on fresh projects with no legacy data to clean. See [UNIFIED-CALENDAR.md](./UNIFIED-CALENDAR.md) for scope, manifest export and recovery guidance.
 
+12. Run `MIGRATION_attendance_custom_events.sql` for the current custom events, attendance policies, QR lifecycle and safe history.
+13. If using web push, follow `WEB-PUSH.md` and apply `MIGRATION_web_push.sql`.
+14. Apply `MIGRATION_ministry_insights.sql` last, then deploy the matching frontend.
+
 If `MIGRATION_security_data_integrity.sql` was already applied before explicit attendance dates and end times were introduced, run `MIGRATION_attendance_session_timing.sql` once. New upgrades do not need the smaller migration because the main migration already includes the same columns and RPC behavior.
 
 `MIGRATION_multi_role.sql` only adds and backfills the legacy `roles` columns. It does not apply the later authorization hardening or synchronize the rest of an older database.
 
 The security migration supersedes `MIGRATION_multi_role.sql`; do not run both on a newly upgraded database. It adds/backfills the multi-role fields itself.
 
-Attendance QR tokens are secrets. Only administrators may select the base `attendance_sessions` table. Authenticated active members resolve one active, unexpired token through `get_attendance_session(text)` and check in/out through `check_in_attendance(text)` and `check_out_attendance(uuid)`. Direct member inserts or timestamp edits on `attendance_records` are intentionally denied. Every newly created session records an explicit organization-local date, start time, and end time. Arrival timing is classified as early, on time, or late using the configured grace period; departure before the scheduled end is early, while departure at or after the end is normal.
+Attendance QR tokens are secrets. Only service/schedule managers may select the base `attendance_sessions` table. Authenticated active members resolve one active, unexpired token through `get_attendance_session(text)` and check in/out through `check_in_attendance(text)` and `check_out_attendance(uuid)`. Direct member inserts or timestamp edits on `attendance_records` are intentionally denied. Every newly created session records an explicit organization-local date, start time, and end time. Arrival timing is classified as early, on time, or late using the configured grace period; departure before the scheduled end is early, while departure at or after the end is normal.
 
 Attendance, excuse, substitute, and assignment-response rows are audit-bearing workflow state. Members answer an assignment through `respond_to_service_assignment(uuid, text)` with `confirmed` or `declined`; direct member updates to `service_team` are denied. Members submit service excuses through `submit_service_excuse(uuid, text)`, which declines their matching team assignment before creating the pending excuse in the same transaction; direct authenticated inserts into `excuses` are denied. Worship managers fill an open substitute request through `fill_substitute_request(uuid, uuid)`, which reuses only a compatible pending/confirmed candidate assignment (or creates a missing pending one), declines the requester, and stamps the resolution atomically. Members can cancel their own pending/open requests, while worship managers review or cancel them. These operations accept only scheduled, non-past services using the organization timezone. Physical deletion of services, events, attendance sessions/records, excuses, and substitute requests is intentionally unavailable to authenticated clients—cancel/close them instead. Identity, workflow state, reviewer/resolver, and timestamps are enforced by database triggers.
 
 Worship managers extend an existing recurring service group through `generate_service_occurrences(uuid, uuid, jsonb)`. The source group must persist one consistent `recurrence_frequency` of `weekly`, `biweekly`, or `monthly`. The occurrence payload is a nonempty array of at most 52 objects with `date` and `recurrence_index` plus optional `title`, `time`, `type`, `notes`, and a matching `recurrence_frequency`. The database validates and locks the group/source, copies the server-owned frequency, creates every service under the authenticated manager, and copies the source team as pending in one transaction.
+
+After completing the existing calendar/custom-attendance upgrades, apply `MIGRATION_ministry_insights.sql` **last** and deploy the matching frontend. This adds the new role checks and reporting/evaluation tables without backfilling fabricated history. See [MINISTRY-INSIGHTS.md](./MINISTRY-INSIGHTS.md) for the full access matrix and verification steps. Do not run `test/sql/` files in a deployed project.
 
 ## 3. Configure the application
 

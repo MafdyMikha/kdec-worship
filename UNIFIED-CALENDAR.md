@@ -207,3 +207,7 @@ The harness resets storage only at the dedicated `127.0.0.1:5186` origin, seeds
 five synthetic published types, checks EN/AR at 1440px/390px, persistence after
 reload, no horizontal overflow, PDF print readiness and popup-blocking feedback.
 Run it only against the explicitly demo-only server. It is separate from `npm test`.
+
+## Current fresh-install and ministry extension order
+
+The current `supabase-schema-FULL.sql` includes the calendar, custom attendance and ministry extension for new projects; do not replay historical workflow migrations after it. For an existing deployment following the upgrade steps above, apply `MIGRATION_ministry_insights.sql` last, after `MIGRATION_attendance_custom_events.sql`. See `MINISTRY-INSIGHTS.md` for the additional roles, private evaluations, reporting definitions and isolated tests.

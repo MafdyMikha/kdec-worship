@@ -75,7 +75,7 @@ export default function SongDetail() {
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 text-sm">
             <div><dt className="text-slate-400">{isAr?'الفنان / الفنان الأصلي':'Artist / Original Artist'}</dt><dd className="mt-1 font-medium text-slate-800" dir="auto">{song.author||'—'}</dd></div>
             <div><dt className="text-slate-400">CCLI</dt><dd className="mt-1 font-medium text-slate-800">{song.ccliNumber||'—'}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-slate-400">{isAr?'التصنيفات':'Tags / Categories'}</dt><dd className="mt-2 flex flex-wrap gap-1">{(song.themes||[]).length?(song.themes||[]).map(tag=><Badge key={tag} color="indigo">{tag}</Badge>):'—'}</dd></div>
+            <div><dt className="text-slate-400">{isAr?'سنة الإصدار الأصلية':'Origin year'}</dt><dd className="mt-1 font-medium">{song.originYear||(isAr?'غير معروف':'Unknown')}</dd></div><div className="sm:col-span-2"><dt className="text-slate-400">{isAr?'التصنيفات':'Tags / Categories'}</dt><dd className="mt-2 flex flex-wrap gap-1">{(song.themes||[]).length?(song.themes||[]).map(tag=><Badge key={tag} color="indigo">{tag}</Badge>):'—'}</dd></div>
             <div className="sm:col-span-2"><dt className="text-slate-400">{isAr?'ملاحظات':'Notes'}</dt><dd className="mt-1 whitespace-pre-wrap text-slate-700" dir="auto">{song.notes||'—'}</dd></div>
           </dl>
         </div>}

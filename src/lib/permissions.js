@@ -1,3 +1,5 @@
+import { MINISTRY_ROLES, canEvaluate, ministryRoleNames } from './ministry.js'
+
 export const ACCESS_LEVELS = ['super_admin','admin','leader','member']
 
 export const ACCESS_LEVEL_LABELS = {
@@ -12,6 +14,7 @@ export const SYSTEM_PERMISSIONS = [
   'permissions.manage','services.view','services.create','services.edit','services.delete',
   'songs.manage','schedules.manage','events.manage','announcements.manage',
   'invitations.manage','reports.view','settings.manage',
+  'ratings.view','ratings.musician','ratings.vocal','ratings.leader','ratings.configure','reports.own',
 ]
 
 export const ADMIN_CONTROL_PERMISSIONS = [
@@ -21,7 +24,7 @@ export const ADMIN_CONTROL_PERMISSIONS = [
 
 const DEFAULT_ACCESS_PERMISSIONS = {
   super_admin:['*'],
-  admin:SYSTEM_PERMISSIONS.filter(permission=>permission!=='permissions.manage'),
+  admin:SYSTEM_PERMISSIONS.filter(permission=>!['permissions.manage','ratings.configure','reports.own'].includes(permission)),
   leader:['users.view','services.view','services.create','services.edit','songs.manage','schedules.manage','events.manage','announcements.manage'],
   member:['services.view'],
 }
@@ -57,7 +60,9 @@ export function isAdminUser(user) {
 }
 
 export function hasPermission(user, permission) {
-  if (!user || user.status==='inactive') return false
+  if (!user || user.status!=='active') return false
+  if(permission==='evaluations.manage')return canEvaluate(user)
+  if(ministryRoleNames(user).some(role=>MINISTRY_ROLES[role]?.permissions.includes(permission)))return true
   const assigned=Array.isArray(user.permissions) ? user.permissions : DEFAULT_ACCESS_PERMISSIONS[getAccessLevel(user)] || []
   return assigned.includes('*') || assigned.includes(permission)
 }

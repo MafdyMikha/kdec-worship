@@ -28,7 +28,7 @@ export default function Sidebar() {
     { to:'/attendance',    icon:<QrCode size={20}/>,          key:'attendance'   },
     { to:'/requests',      icon:<ClipboardList size={20}/>,   key:'requests'     },
     { to:'/whatsapp',      icon:<WaIcon/>,                    key:'whatsappBulk', permission:'users.view' },
-    { to:'/reports',       icon:<BarChart3 size={20}/>,       key:'reports', permission:'reports.view' },
+    { to:'/reports',       icon:<BarChart3 size={20}/>,       key:'reports', permission:'reports.view', ownReports:true },
     { to:'/announcements', icon:<MessageSquare size={20}/>,   key:'announcements', badge: announcements.length },
   ]
 
@@ -48,13 +48,14 @@ export default function Sidebar() {
 
   const baseNav = isAdmin ? adminNav : isManager ? managerNav : memberNav
   const permissionNav = [
+    { to:'/evaluations', icon:<ClipboardList size={20}/>, key:'evaluations', permission:'evaluations.manage' },
     { to:'/people', icon:<Users size={20}/>, key:'people', permission:'users.view' },
     { to:'/whatsapp', icon:<WaIcon/>, key:'whatsappBulk', permission:'users.view' },
-    { to:'/reports', icon:<BarChart3 size={20}/>, key:'reports', permission:'reports.view' },
+    { to:'/reports', icon:<BarChart3 size={20}/>, key:'reports', permission:'reports.view', ownReports:true },
   ]
   const nav = [
-    ...baseNav.filter(item=>!item.permission||hasPermission(currentUser,item.permission)),
-    ...permissionNav.filter(item=>hasPermission(currentUser,item.permission)&&!baseNav.some(base=>base.to===item.to)),
+    ...baseNav.filter(item=>!item.permission||(hasPermission(currentUser,item.permission)||(item.ownReports&&hasPermission(currentUser,'reports.own')))),
+    ...permissionNav.filter(item=>(hasPermission(currentUser,item.permission)||(item.ownReports&&hasPermission(currentUser,'reports.own')))&&!baseNav.some(base=>base.to===item.to)),
   ]
 
   return (
@@ -71,13 +72,13 @@ export default function Sidebar() {
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto" style={{ scrollbarWidth:'none' }}>
         {nav.map(item => (
           <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/dashboard'}
-            aria-label={t(item.key)}
+            aria-label={(item.key==='evaluations'?(isAr?'التقييمات':'Evaluations'):t(item.key))}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                 isActive ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
               }`}>
             <span className="flex-shrink-0">{item.icon}</span>
-            {!collapsed && <span className="flex-1">{t(item.key)}</span>}
+            {!collapsed && <span className="flex-1">{(item.key==='evaluations'?(isAr?'التقييمات':'Evaluations'):t(item.key))}</span>}
             {!collapsed && item.badge > 0 && <Badge color="indigo" size="xs">{item.badge}</Badge>}
           </NavLink>
         ))}

@@ -25,6 +25,7 @@ export function getSongProChords(song) {
 export function songToForm(song = {}) {
   return {
     ...song,
+    originYear:song.originYear ?? '',
     title:song.title || '',
     titleEn:song.titleEn && song.titleEn !== song.title ? song.titleEn : '',
     author:song.author || '',
@@ -53,7 +54,9 @@ export function prepareSongForm(data = {}) {
     : String(data.tagsText || '').split(/[,;|،]/).map(item=>normalizeRequiredText(item)).filter(Boolean)
   const lyrics=String(data.lyrics ?? '').replace(/\r\n?/g,'\n')
   const proChords=String(data.proChords ?? '').replace(/\r\n?/g,'\n')
+  const originYear=data.originYear===''||data.originYear==null?null:Number(data.originYear)
   const errors=[]
+  if(originYear!==null&&(!Number.isInteger(originYear)||originYear<1000||originYear>new Date().getFullYear()+1))errors.push('Enter a valid origin year or leave it unknown.')
   if(isBlankText(title)&&isBlankText(titleEn))errors.push('Song title is required.')
   if(!MUSICAL_KEYS.includes(key))errors.push('Choose a valid musical key.')
   if(bpm!==null&&(!Number.isInteger(bpm)||bpm<20||bpm>300))errors.push('BPM must be a whole number between 20 and 300.')
@@ -61,7 +64,7 @@ export function prepareSongForm(data = {}) {
   const parsedLyrics=parseLyricsSections(lyrics)
   const detectedSequence=parsedLyrics.sections.map(section=>section.label).filter(Boolean)
   return {
-    value:{...data,title,titleEn,author,key,bpm,timeSignature,language,themes,notes:String(data.notes||''),ccliNumber:String(data.ccliNumber||'').trim(),lyrics,proChords,lyricSections:parsedLyrics.sections,sequence:detectedSequence.length?detectedSequence:(data.sequence||[])},
+    value:{...data,originYear,title,titleEn,author,key,bpm,timeSignature,language,themes:[...new Map(themes.map(tag=>[tag.toLocaleLowerCase('en'),tag])).values()],notes:String(data.notes||''),ccliNumber:String(data.ccliNumber||'').trim(),lyrics,proChords,lyricSections:parsedLyrics.sections,sequence:detectedSequence.length?detectedSequence:(data.sequence||[])},
     errors,
   }
 }

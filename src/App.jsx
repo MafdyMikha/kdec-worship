@@ -13,6 +13,8 @@ const Songs = lazy(() => import('./pages/Songs'))
 const SongDetail = lazy(() => import('./pages/SongDetail'))
 const People = lazy(() => import('./pages/People'))
 const Schedule = lazy(() => import('./pages/Schedule'))
+const RatingSettings = lazy(() => import('./pages/Evaluations').then(module=>({default:module.RatingSettings})))
+const Evaluations = lazy(() => import('./pages/Evaluations'))
 const Reports = lazy(() => import('./pages/Reports'))
 const Announcements = lazy(() => import('./pages/Announcements'))
 const Settings = lazy(() => import('./pages/Settings'))
@@ -66,14 +68,14 @@ function PermissionOnlyAny({ permissions, children }) {
 }
 
 function AuthGate() {
-  const { currentUser, authLoading, configurationError, isPasswordRecovery, notifications } = useStore()
+  const { currentUser, authLoading, configurationError, isPasswordRecovery, notifications, ministry } = useStore()
   useEffect(() => {
     if (!authLoading && !configurationError) void reconcilePushAccount(currentUser?.id || null).catch(() => {})
   }, [authLoading, configurationError, currentUser?.id])
   const inviteCode = new URLSearchParams(window.location.search).get('invite')
 
   let content
-  if (authLoading) content = <Spinner/>
+  if (authLoading || (currentUser && ministry.loading && !ministry.ready)) content = <Spinner/>
   else if (configurationError) content = <ConfigurationError/>
 
   // Password recovery link clicked — show "set new password" screen
@@ -95,7 +97,9 @@ function AuthGate() {
           <Route path="/songs/:id"     element={<SongDetail/>}/>
           <Route path="/people"        element={<PermissionOnly permission="users.view"><People/></PermissionOnly>}/>
           <Route path="/schedule"      element={<Schedule/>}/>
-          <Route path="/reports"       element={<PermissionOnly permission="reports.view"><Reports/></PermissionOnly>}/>
+          <Route path="/reports"       element={<PermissionOnlyAny permissions={['reports.view','reports.own']}><Reports/></PermissionOnlyAny>}/>
+          <Route path="/ratings/settings" element={<PermissionOnly permission="ratings.configure"><RatingSettings/></PermissionOnly>}/>
+          <Route path="/evaluations" element={<PermissionOnly permission="evaluations.manage"><Evaluations/></PermissionOnly>}/>
           <Route path="/announcements" element={<Announcements/>}/>
           <Route path="/attendance"    element={<Attendance/>}/>
           <Route path="/checkin/:token" element={<Attendance/>}/>

@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Ministry UI fixture — local demo only</title><body>
+<h1>Ministry UI fixture</h1><p>Add synthetic services, a guest, attendance and a song to this isolated browser-local demo. Existing demo records are retained. Never use this fixture on a live origin.</p><button id="load">Load synthetic demo fixture</button><p id="result" role="status"></p>
+<script type="module">
+document.querySelector('#load').onclick=()=>{
+ if(location.hostname!=='127.0.0.1'||location.port!=='5190')throw new Error('Use only the isolated demo at 127.0.0.1:5190.')
+ const read=(key,fallback)=>JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))
+ const people=read('kdec_people',[]),roles=read('kdec_worship_roles',[])
+ if(!people.some(person=>person.id==='p1')||!people.some(person=>person.id==='p3'))throw new Error('Initialize the demo first.')
+ const leader=roles.find(role=>role.name==='Worship Leader'),keys=roles.find(role=>role.name==='Pianist/Keys')
+ const service={id:'qa-ministry-service',title:'QA Youth Meeting',eventKind:'youth_meeting',type:'youth_meeting',date:'2026-10-30',time:'18:00',endDate:'2026-10-30',endTime:'20:00',status:'completed',publishedAt:'2026-10-01T12:00:00Z',subcategory:'Evening',setlistFinalized:false,setlist:[{id:'qa-set-item',songId:'qa-ministry-song',key:'C',order:1}],team:[{personId:'p1',roleId:leader.id,role:'Worship Leader',status:'confirmed'},{personId:'p3',roleId:keys.id,role:'Pianist/Keys',status:'confirmed'}],practice:{enabled:true,date:'2026-10-29',time:'18:00',location:'QA hall'}}
+ const services=read('kdec_services',[]).filter(row=>!['qa-ministry-service','qa-ministry-cancelled','qa-ministry-meeting'].includes(row.id))
+ services.push(service,{...service,id:'qa-ministry-cancelled',title:'QA Cancelled Event',status:'cancelled'},{...service,id:'qa-ministry-meeting',title:'QA Team Gathering',eventKind:'general_meeting',type:'general_meeting',date:'2026-10-31',endDate:'2026-10-31',setlist:[],practice:null,participantIds:['p3']})
+ localStorage.setItem('kdec_services',JSON.stringify(services))
+ const songs=read('kdec_songs',[]).filter(song=>song.id!=='qa-ministry-song')
+ songs.push({id:'qa-ministry-song',title:'QA New Song',titleEn:'QA New Song',key:'C',language:'en',originYear:2020,themes:['Praise'],createdAt:'2026-10-15T12:00:00Z',status:'active',usageCount:1})
+ localStorage.setItem('kdec_songs',JSON.stringify(songs))
+ const data=read('kdec_ministry_v1',{})
+ data.guests=[...(data.guests||[]).filter(row=>row.id!=='qa-ministry-guest'),{id:'qa-ministry-guest',name:'QA Guest Musician',roles:['Keys'],status:'active',joinDate:'2026-10-01'}]
+ data.guestAssignments=[...(data.guestAssignments||[]).filter(row=>row.personId!=='qa-ministry-guest'),{serviceId:service.id,personId:'qa-ministry-guest',role:'Keys',status:'confirmed'}]
+ localStorage.setItem('kdec_ministry_v1',JSON.stringify(data))
+ document.querySelector('#result').textContent='Synthetic fixture loaded. Open the evaluation page.'
+ const link=document.createElement('a');link.href='/evaluations?service=qa-ministry-service';link.textContent='Open evaluation';document.body.append(link)
+}
+</script></body></html>
