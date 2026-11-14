@@ -31,3 +31,11 @@ export function buildDashboardSchedule(services, userId, now = new Date()) {
   })
   return { today, upcoming, nextPersonal, next: nextPersonal || upcoming[0], pending, days, assignment, personal }
 }
+
+
+export function resolveDashboardEvent(visibleDays, selectedDay, selectedEventId, upcomingEvent) {
+  const selectedEvent = visibleDays.flatMap(day => day.events).find(event => event.calendarId === selectedEventId)
+    || (selectedDay ? visibleDays[0]?.events[0] : null)
+    || null
+  return { selectedEvent, next: selectedEvent || (selectedDay ? null : upcomingEvent) }
+}

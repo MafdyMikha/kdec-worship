@@ -5,7 +5,7 @@ import { ar } from 'date-fns/locale'
 import { ArrowUpRight, Bell, CalendarDays, Check, ClipboardList, Clock3, ListMusic, RefreshCw, ScanLine, Users } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { buildDashboardSchedule } from '../lib/dashboard.js'
+import { buildDashboardSchedule, resolveDashboardEvent } from '../lib/dashboard.js'
 import { eventType, cairoToday } from '../lib/planningCalendar.js'
 import { primaryLeader } from '../lib/ministry.js'
 import { scheduleLabels } from '../lib/quarterlySchedule.js'
@@ -17,9 +17,9 @@ const detailUrl = event => `/services/${event.parentId || event.id}?view=details
 const setlistUrl = event => `${detailUrl(event)}&tab=setlist`
 const scheduleUrl = event => `/schedule?year=${event.date.slice(0, 4)}&quarter=${Math.ceil(Number(event.date.slice(5, 7)) / 3)}&event=${encodeURIComponent(event.parentId || event.id)}`
 
-function Panel({ title, icon, children, className = '' }) {
+function Panel({ title, icon, children, className = '', headingRef }) {
   return <section className={`dashboard-panel ${className}`}>
-    <h2><span className="dashboard-icon">{icon}</span>{title}</h2>
+    <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined}><span className="dashboard-icon">{icon}</span>{title}</h2>
     {children}
   </section>
 }
@@ -67,6 +67,14 @@ export default function Dashboard({ renderAssignmentActions }) {
 
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState(null)
+  const heroAction = useRef(null)
+  const responsesHeading = useRef(null)
+
+  useLayoutEffect(() => {
+    if (!notice?.returnFocus || document.activeElement !== document.body) return
+    const target = notice.returnFocus === 'hero' ? heroAction.current : responsesHeading.current
+    target?.focus()
+  }, [notice])
   const lang = isAr ? 'ar' : 'en'
   const copy = (en, arabic) => isAr ? arabic : en
   const dateLabel = (date, pattern = 'EEE, d MMM') => format(parseISO(date), pattern, { locale: isAr ? ar : undefined })
@@ -77,9 +85,8 @@ export default function Dashboard({ renderAssignmentActions }) {
   const agenda = schedule.days.map(day => ({ ...day, events: day.events.filter(event => teamView || personal(event)) }))
   const selectedDayIndex = agenda.findIndex(day => day.date === selectedDay)
   const visibleDays = agenda.filter(day => (!selectedDay || day.date === selectedDay) && day.events.length)
-  const selectedEvent = visibleDays.flatMap(day => day.events).find(event => event.calendarId === selectedEventId)
-    || (selectedDay && visibleDays[0]?.events[0]) || null
-  const next = selectedEvent || schedule.next
+  const { selectedEvent, next } = resolveDashboardEvent(visibleDays, selectedDay, selectedEventId, schedule.next)
+  const emptyDay = Boolean(selectedDay && !next)
   const nextRole = next && personal(next) ? assignment(next) : null
   const nextSource = services.find(event => event.id === next?.parentId)
   const setlist = [...(nextSource?.setlist || [])].sort((a, b) => a.order - b.order)
@@ -122,14 +129,15 @@ export default function Dashboard({ renderAssignmentActions }) {
     })),
   ].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4)
 
-  async function confirm(event) {
+  async function confirm(event, trigger, source) {
     if (saving) return
+    const hadFocus = document.activeElement === trigger
     setSaving(true)
     setNotice(null)
     try {
       const result = await updateTeamMemberStatus(event.parentId || event.id, currentUser.id, 'confirmed')
       if (!result?.success || result.error) throw new Error()
-      setNotice({ eventId: event.parentId, text: copy('Attendance confirmed.', 'تم تأكيد حضورك.') })
+      setNotice({ eventId: event.parentId, returnFocus: hadFocus ? source : null, text: copy('Attendance confirmed.', 'تم تأكيد حضورك.') })
     } catch {
       setNotice({ error: true, text: copy('Couldn’t verify your response. Refresh before trying again.', 'تعذّر التحقق من ردك. حدّث الصفحة قبل المحاولة مرة أخرى.') })
     } finally {
@@ -171,16 +179,16 @@ export default function Dashboard({ renderAssignmentActions }) {
     <div className="dashboard-grid">
       <section className="dashboard-hero" aria-labelledby="dashboard-next">
         <div className={selectedEvent ? 'dashboard-event-enter' : undefined} key={next?.calendarId}>
-          <p className="dashboard-kicker"><Clock3 size={16} aria-hidden="true"/>{selectedEvent ? copy('Selected event', 'الفعالية المختارة') : copy('Next up', 'الموعد القادم')}{next && !personal(next) && <span>· {copy('Team event', 'فعالية الفريق')}</span>}</p>
-          <h2 id="dashboard-next"><bdi>{next?.title || (loading ? t('loading') : dashboardErrors.services ? unavailable : copy('No upcoming assignments', 'لا توجد تكليفات قادمة'))}</bdi></h2>
+          <p className="dashboard-kicker"><Clock3 size={16} aria-hidden="true"/>{emptyDay ? dateLabel(selectedDay) : selectedEvent ? copy('Selected event', 'الفعالية المختارة') : copy('Next up', 'الموعد القادم')}{next && !personal(next) && <span>· {copy('Team event', 'فعالية الفريق')}</span>}</p>
+          <h2 id="dashboard-next"><bdi>{next?.title || (loading ? t('loading') : dashboardErrors.services ? unavailable : emptyDay ? copy('No events on this day.', 'لا توجد فعاليات في هذا اليوم.') : copy('No upcoming assignments', 'لا توجد تكليفات قادمة'))}</bdi></h2>
           {next && <div className="dashboard-hero-info">
             <p><bdi>{eventName(next)}</bdi> · {dateTime(next)}</p>
             {nextRole && <p className="dashboard-role"><bdi>{nextRole.role}</bdi><span className={notice?.eventId === next.parentId && nextRole.status === 'confirmed' ? 'dashboard-event-enter dashboard-confirmed' : undefined} data-state={nextRole.status}>{notice?.eventId === next.parentId && nextRole.status === 'confirmed' && <Check size={14} aria-hidden="true"/>}{scheduleLabels[lang][nextRole.status]}</span></p>}
           </div>}
           <div className="dashboard-hero-actions">
             {nextPending && !locked(next)
-              ? <button className="dashboard-primary" type="button" disabled={saving} onClick={() => confirm(next)}><Check size={17} aria-hidden="true"/>{copy('Confirm attendance', 'تأكيد الحضور')}</button>
-              : <Link className="dashboard-primary" to={nextPending ? '/requests' : next && setlist.length ? setlistUrl(next) : next ? scheduleUrl(next) : '/schedule'}>
+              ? <button className="dashboard-primary" type="button" disabled={saving} onClick={click => confirm(next, click.currentTarget, 'hero')}><Check size={17} aria-hidden="true"/>{copy('Confirm attendance', 'تأكيد الحضور')}</button>
+              : <Link ref={heroAction} className="dashboard-primary" to={nextPending ? '/requests' : next && setlist.length ? setlistUrl(next) : next ? scheduleUrl(next) : '/schedule'}>
                 {nextPending ? copy('Review requests', 'مراجعة الطلبات') : next && setlist.length ? copy('Open setlist', 'فتح قائمة الترانيم') : copy('View schedule', 'عرض الجدول')}<ArrowUpRight size={17} aria-hidden="true"/>
               </Link>}
             {nextPending && <Link className="dashboard-hero-link" to={scheduleUrl(next)}>{copy('View event', 'عرض الفعالية')}</Link>}
@@ -189,7 +197,7 @@ export default function Dashboard({ renderAssignmentActions }) {
         </div>
       </section>
 
-      <Panel title={copy('Needs your response', 'بانتظار ردك')} icon={<ClipboardList size={17} aria-hidden="true"/>} className="dashboard-responses">
+      <Panel title={copy('Needs your response', 'بانتظار ردك')} icon={<ClipboardList size={17} aria-hidden="true"/>} className="dashboard-responses" headingRef={responsesHeading}>
         {!pending.length && empty(loading ? t('loading') : dashboardErrors.services ? unavailable : copy('You’re all caught up.', 'لا توجد تكليفات بانتظار ردك.'))}
         {pending.length > 0 && <ul className="dashboard-list">
           {nextPending && !next.isRehearsal && <li><Link to={scheduleUrl(next)}><bdi>{next.title}</bdi>{dateTime(next)}<small>{copy('Respond in event details above', 'رد من تفاصيل الفعالية أعلاه')}</small></Link></li>}
@@ -198,7 +206,7 @@ export default function Dashboard({ renderAssignmentActions }) {
             <div className="dashboard-item-actions">
               {locked(event)
                 ? <Link to="/requests">{copy('Review requests', 'مراجعة الطلبات')}</Link>
-                : <button type="button" disabled={saving} onClick={() => confirm(event)}>{t('confirm')}</button>}
+                : <button type="button" disabled={saving} onClick={click => confirm(event, click.currentTarget, 'responses')}>{t('confirm')}</button>}
               {renderAssignmentActions?.(services.find(service => service.id === event.parentId), assignment(event))}
             </div>
           </li>)}
@@ -259,7 +267,7 @@ export default function Dashboard({ renderAssignmentActions }) {
               return <li key={item.id}><span aria-hidden="true">{index + 1}</span><bdi>{(isAr ? song?.title : song?.titleEn || song?.title) || copy('Song unavailable', 'الترنيمة غير متاحة')}</bdi>{(item.key || song?.key) && <bdi className="dashboard-key">{item.key || song.key}</bdi>}</li>
             })}</ol>
             <Link className="dashboard-panel-link" to={setlistUrl(next)}>{copy('Open full setlist', 'فتح القائمة كاملة')}<ArrowUpRight size={15} aria-hidden="true"/></Link>
-          </> : empty(loading ? t('loading') : dashboardErrors.services ? unavailable : copy('No setlist available for this event.', 'لا توجد قائمة ترانيم متاحة لهذه الفعالية.'))}
+          </> : empty(loading ? t('loading') : dashboardErrors.services ? unavailable : emptyDay ? copy('No events on this day.', 'لا توجد فعاليات في هذا اليوم.') : copy('No setlist available for this event.', 'لا توجد قائمة ترانيم متاحة لهذه الفعالية.'))}
         </div>
       </Panel>
 

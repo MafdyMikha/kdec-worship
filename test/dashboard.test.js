@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildDashboardSchedule } from '../src/lib/dashboard.js'
+import { buildDashboardSchedule, resolveDashboardEvent } from '../src/lib/dashboard.js'
 
 const now = new Date('2026-11-15T08:00:00Z')
 const event = (id, fields = {}) => ({
@@ -39,4 +39,10 @@ test('declined assignments remain team events and overnight shifts cover both da
   assert.equal(schedule.next.id, 'shift')
   assert.equal(schedule.personal(schedule.upcoming[0]), false)
   assert.equal(schedule.days[1].events[0].id, 'shift')
+})
+
+test('an empty selected day hides the upcoming event until the filter clears', () => {
+  const upcoming = event('upcoming')
+  assert.equal(resolveDashboardEvent([], '2026-11-16', null, upcoming).next, null)
+  assert.equal(resolveDashboardEvent([], null, null, upcoming).next, upcoming)
 })
