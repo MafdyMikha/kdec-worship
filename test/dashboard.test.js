@@ -46,3 +46,23 @@ test('an empty selected day hides the upcoming event until the filter clears', (
   assert.equal(resolveDashboardEvent([], '2026-11-16', null, upcoming).next, null)
   assert.equal(resolveDashboardEvent([], null, null, upcoming).next, upcoming)
 })
+
+test('overnight events remain visible after midnight while response eligibility follows the server date', () => {
+  const shift = event('shift', {
+    time: '23:00', endDate: '2026-11-16', endTime: '01:00',
+    team: assigned('pending'),
+  })
+  const beforeMidnight = new Date('2026-11-15T21:59:00Z')
+  const midnight = new Date('2026-11-15T22:00:00Z')
+  const shiftSlot = { personId: 'me', serviceId: 'shift' }
+
+  assert.deepEqual(buildDashboardSchedule([shift], 'me', beforeMidnight).pending.map(item => item.id), ['shift'])
+  const cairoSchedule = buildDashboardSchedule([shift], 'me', midnight)
+  assert.equal(cairoSchedule.next.id, 'shift')
+  assert.deepEqual(cairoSchedule.pending, [])
+
+  const directAssignment = buildDashboardSchedule([shift], 'me', midnight, { timezone: 'UTC' })
+  assert.deepEqual(directAssignment.pending.map(item => item.id), ['shift'])
+  const quarterlyAssignment = buildDashboardSchedule([shift], 'me', midnight, { timezone: 'UTC', slots: [shiftSlot] })
+  assert.deepEqual(quarterlyAssignment.pending, [])
+})

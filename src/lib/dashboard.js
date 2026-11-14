@@ -5,9 +5,13 @@ const cairoClock = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 })
 
-export function buildDashboardSchedule(services, userId, now = new Date()) {
+export function buildDashboardSchedule(services, userId, now = new Date(), { timezone = 'Africa/Cairo', slots = [] } = {}) {
   const today = cairoToday(now)
   const clock = cairoClock.format(now)
+  const organizationToday = timezone === 'Africa/Cairo' ? today : new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now)
+  const scheduledAssignmentIds = new Set(slots.filter(slot => slot.personId === userId).map(slot => slot.serviceId))
   const published = services.filter(event =>
     !event.archivedAt && eventStage(event) === 'published' && event.status !== 'completed',
   )
@@ -21,7 +25,10 @@ export function buildDashboardSchedule(services, userId, now = new Date()) {
     .filter(event => (event.endDate || event.date) > today
       || (event.endTime || event.time || '23:59').slice(0, 5) >= clock)
   const nextPersonal = upcoming.find(personal)
-  const pending = upcoming.filter(event => !event.isRehearsal && assignment(event)?.status === 'pending')
+  // Quarterly slots use Cairo's date. Direct assignments use the organization's date.
+  const pending = upcoming.filter(event => !event.isRehearsal && event.status === 'scheduled'
+    && event.date >= (scheduledAssignmentIds.has(event.id) ? today : organizationToday)
+    && assignment(event)?.status === 'pending')
   const weekStart = startOfWeek(parseISO(today), { weekStartsOn: 0 })
   const weekEnd = format(addDays(weekStart, 7), 'yyyy-MM-dd')
   const week = calendarEntries(services.filter(event => eventStage(event) === 'published'), format(weekStart, 'yyyy-MM-dd'), weekEnd, { cancelled: false })

@@ -25,7 +25,7 @@ function Panel({ title, icon, children, className = '', headingRef }) {
 }
 
 export default function Dashboard({ renderAssignmentActions }) {
-  const { services, songs, people, currentUser, announcements, quarterly, worshipRoles, excuseRequests,
+  const { services, songs, people, currentUser, announcements, quarterly, organizationSettings, worshipRoles, excuseRequests,
     substituteRequests, updateTeamMemberStatus, attendanceSessions, attendanceRecords, loading, dashboardErrors, loadAll } = useStore()
   const { t, isAr } = useLang()
   const [teamView, setTeamView] = useState(false)
@@ -71,15 +71,17 @@ export default function Dashboard({ renderAssignmentActions }) {
   const responsesHeading = useRef(null)
 
   useLayoutEffect(() => {
-    if (!notice?.returnFocus || document.activeElement !== document.body) return
-    const target = notice.returnFocus === 'hero' ? heroAction.current : responsesHeading.current
+    if (saving || !notice || document.activeElement !== document.body) return
+    const target = notice.retryButton || (notice.returnFocus === 'hero' ? heroAction.current
+      : notice.returnFocus === 'responses' ? responsesHeading.current : null)
     target?.focus()
-  }, [notice])
+  }, [notice, saving])
   const lang = isAr ? 'ar' : 'en'
   const copy = (en, arabic) => isAr ? arabic : en
   const dateLabel = (date, pattern = 'EEE, d MMM') => format(parseISO(date), pattern, { locale: isAr ? ar : undefined })
   const dateTime = event => <span className="dashboard-meta">{dateLabel(event.date)} <span aria-hidden="true">·</span> <bdi>{formatClock(event.time, isAr)}</bdi></span>
-  const schedule = buildDashboardSchedule(services, currentUser.id)
+  const responseSettings = { timezone: organizationSettings.timezone, slots: quarterly.slots }
+  const schedule = buildDashboardSchedule(services, currentUser.id, new Date(), responseSettings)
   const { pending, assignment, personal } = schedule
   const canSeeTeam = schedule.upcoming.length > 0 || schedule.days.some(day => day.events.length) || teamView
   const agenda = schedule.days.map(day => ({ ...day, events: day.events.filter(event => teamView || personal(event)) }))
@@ -93,7 +95,7 @@ export default function Dashboard({ renderAssignmentActions }) {
   const leaderId = nextSource && primaryLeader(nextSource, worshipRoles)
   const leader = nextSource?.team.find(member => member.personId === leaderId)?.person || people.find(person => person.id === leaderId)
   const isUpcoming = next && schedule.upcoming.some(event => event.calendarId === next.calendarId)
-  const nextPending = isUpcoming && !next.isRehearsal && nextRole?.status === 'pending'
+  const nextPending = next && pending.some(event => event.calendarId === next.calendarId)
   const locked = event => excuseRequests.some(request => request.service_id === event.parentId && request.person_id === currentUser.id && ['pending', 'approved'].includes(request.status))
     || substituteRequests.some(request => request.service_id === event.parentId && request.requester_id === currentUser.id && ['open', 'filled'].includes(request.status))
   const canManage = hasPermission(currentUser, 'schedules.manage') || hasPermission(currentUser, 'services.edit')
@@ -131,6 +133,11 @@ export default function Dashboard({ renderAssignmentActions }) {
 
   async function confirm(event, trigger, source) {
     if (saving) return
+    const currentSchedule = buildDashboardSchedule(services, currentUser.id, new Date(), responseSettings)
+    if (!currentSchedule.pending.some(item => item.calendarId === event.calendarId)) {
+      setNotice({ error: true, text: copy('This event is no longer open for responses.', 'انتهت فترة الرد على هذه الفعالية.') })
+      return
+    }
     const hadFocus = document.activeElement === trigger
     setSaving(true)
     setNotice(null)
@@ -139,7 +146,7 @@ export default function Dashboard({ renderAssignmentActions }) {
       if (!result?.success || result.error) throw new Error()
       setNotice({ eventId: event.parentId, returnFocus: hadFocus ? source : null, text: copy('Attendance confirmed.', 'تم تأكيد حضورك.') })
     } catch {
-      setNotice({ error: true, text: copy('Couldn’t verify your response. Refresh before trying again.', 'تعذّر التحقق من ردك. حدّث الصفحة قبل المحاولة مرة أخرى.') })
+      setNotice({ error: true, retryButton: hadFocus ? trigger : null, text: copy('Couldn’t verify your response. Refresh before trying again.', 'تعذّر التحقق من ردك. حدّث الصفحة قبل المحاولة مرة أخرى.') })
     } finally {
       setSaving(false)
     }
