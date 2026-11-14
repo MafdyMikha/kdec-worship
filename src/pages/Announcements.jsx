@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Plus, Megaphone, Trash2, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 import { formatDistanceToNow, parseISO, isValid } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
@@ -16,6 +17,11 @@ export default function Announcements() {
   const [form,         setForm]         = useState(blank)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const canManage = hasPermission(currentUser,'announcements.manage')
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!hash.startsWith('#announcement-')) return
+    document.getElementById(hash.slice(1))?.focus()
+  }, [hash, announcements])
 
   const PRIORITY_CONFIG = {
     high:   { color:'red',   icon:<AlertCircle size={16}/>,   label: isAr?'عاجل':'Urgent',  border:'border-l-red-400'   },
@@ -66,7 +72,8 @@ export default function Announcements() {
             const author = getAuthor(a)
             const canDelete = canManage || a.author_id === currentUser?.id || a.author === currentUser?.id
             return (
-              <Card key={a.id} className={`p-5 border-l-4 ${config.border} group`}>
+              <article id={`announcement-${a.id}`} tabIndex={-1} key={a.id} className="scroll-mt-4">
+              <Card className={`p-5 border-l-4 ${config.border} group`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div className="mt-0.5 flex-shrink-0">{config.icon}</div>
@@ -96,6 +103,7 @@ export default function Announcements() {
                   )}
                 </div>
               </Card>
+              </article>
             )
           })}
         </div>

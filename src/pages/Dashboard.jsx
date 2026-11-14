@@ -1,203 +1,314 @@
-import { formatClock } from '../lib/time.js'
-import { Calendar, Music2, Users, CheckCircle, Clock, AlertCircle, ArrowRight, Star, QrCode, Megaphone } from 'lucide-react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { format, isValid, parseISO } from 'date-fns'
+import { ar } from 'date-fns/locale'
+import { ArrowUpRight, Bell, CalendarDays, Check, ClipboardList, Clock3, ListMusic, RefreshCw, ScanLine, Users } from 'lucide-react'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { Card, StatCard, Badge, Avatar, Btn, StatusDot } from '../components/ui'
-import { format, parseISO } from 'date-fns'
-import { ar as arLocale } from 'date-fns/locale'
-import { useNavigate } from 'react-router-dom'
-import RehearsalReminder from '../components/RehearsalReminder'
+import { buildDashboardSchedule, resolveDashboardEvent } from '../lib/dashboard.js'
+import { eventType, cairoToday } from '../lib/planningCalendar.js'
+import { primaryLeader } from '../lib/ministry.js'
+import { scheduleLabels } from '../lib/quarterlySchedule.js'
 import { hasPermission } from '../lib/permissions.js'
+import { formatClock } from '../lib/time.js'
+import './dashboard.css'
 
-export default function Dashboard() {
-  const { services, songs, people, announcements, currentUser } = useStore()
+const detailUrl = event => `/services/${event.parentId || event.id}?view=details`
+const setlistUrl = event => `${detailUrl(event)}&tab=setlist`
+const scheduleUrl = event => `/schedule?year=${event.date.slice(0, 4)}&quarter=${Math.ceil(Number(event.date.slice(5, 7)) / 3)}&event=${encodeURIComponent(event.parentId || event.id)}`
+
+function Panel({ title, icon, children, className = '', headingRef }) {
+  return <section className={`dashboard-panel ${className}`}>
+    <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined}><span className="dashboard-icon">{icon}</span>{title}</h2>
+    {children}
+  </section>
+}
+
+export default function Dashboard({ renderAssignmentActions }) {
+  const { services, songs, people, currentUser, announcements, quarterly, organizationSettings, worshipRoles, excuseRequests,
+    substituteRequests, updateTeamMemberStatus, attendanceSessions, attendanceRecords, loading, dashboardErrors, loadAll } = useStore()
   const { t, isAr } = useLang()
-  const navigate  = useNavigate()
-  const today     = new Date()
-  const locale    = isAr ? arLocale : undefined
+  const [teamView, setTeamView] = useState(false)
+  const [selectedDay, setSelectedDay] = useState(null)
+  const [selectedEventId, setSelectedEventId] = useState(null)
+  const [readinessFilter, setReadinessFilter] = useState(null)
+  const agendaRef = useRef(null)
+  const outgoingAgenda = useRef(null)
 
-  const upcoming = services
-    .filter(s => !['completed','cancelled'].includes(s.status) && s.date >= format(today,'yyyy-MM-dd'))
-    .sort((a,b) => parseISO(a.date) - parseISO(b.date)).slice(0, 3)
+  useLayoutEffect(() => {
+    const snapshot = outgoingAgenda.current
+    if (!snapshot) return
+    outgoingAgenda.current = null
+    const list = agendaRef.current
+    const layer = list.parentElement
+    layer.append(snapshot)
+    const fadeOut = snapshot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'ease-out' })
+    const fadeIn = list.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' })
+    fadeOut.onfinish = () => snapshot.remove()
+    return () => {
+      fadeOut.cancel()
+      fadeIn.cancel()
+      snapshot.remove()
+    }
+  }, [selectedDay, teamView])
 
-  const nextSvc       = upcoming[0]
-  const activeSongs   = songs.filter(s => s.status !== 'inactive')
-  const activePeople  = people.filter(p => p.status === 'active').length
-  const pendingTotal  = services.filter(s => s.status !== 'cancelled').flatMap(s => s.team.filter(t => t.status === 'pending')).length
-  const topSongs      = [...activeSongs].sort((a,b) => (b.usageCount||0)-(a.usageCount||0)).slice(0, 5)
+  function changeAgenda(apply) {
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const snapshot = agendaRef.current.cloneNode(true)
+      snapshot.inert = true
+      snapshot.setAttribute('aria-hidden', 'true')
+      snapshot.classList.add('dashboard-agenda-outgoing')
+      outgoingAgenda.current = snapshot
+    }
+    setSelectedEventId(null)
+    setReadinessFilter(null)
+    apply()
+  }
 
-  const STATUS_LABEL = { confirmed: t('confirmed'), pending: t('pending'), declined: t('declined') }
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState(null)
+  const heroAction = useRef(null)
+  const responsesHeading = useRef(null)
 
-  return (
-    <div className="space-y-6 max-w-7xl animate-fade-in">
-      <div className="worship-page-heading">
-        <div><h1>{isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0] || ''}` : `Welcome, ${currentUser?.name?.split(' ')[0] || ''}`}</h1>
-          <p className="worship-mantra"><bdi lang="en" dir="ltr">Intimacy, Sacrifice, Heart Posture</bdi></p>
-          <p>{isAr ? 'أسبوع جديد وقلب واحد. لنستعد معًا.' : 'A new week. One heart. Let’s prepare together.'}</p></div>
-        {hasPermission(currentUser,'services.create') && <Btn onClick={()=>navigate('/services')} icon={<Calendar size={16}/>}>{isAr ? 'تخطيط خدمة' : 'Plan a service'}</Btn>}
+  useLayoutEffect(() => {
+    if (saving || !notice || document.activeElement !== document.body) return
+    const target = notice.retryButton || (notice.returnFocus === 'hero' ? heroAction.current
+      : notice.returnFocus === 'responses' ? responsesHeading.current : null)
+    target?.focus()
+  }, [notice, saving])
+  const lang = isAr ? 'ar' : 'en'
+  const copy = (en, arabic) => isAr ? arabic : en
+  const dateLabel = (date, pattern = 'EEE, d MMM') => format(parseISO(date), pattern, { locale: isAr ? ar : undefined })
+  const dateTime = event => <span className="dashboard-meta">{dateLabel(event.date)} <span aria-hidden="true">·</span> <bdi>{formatClock(event.time, isAr)}</bdi></span>
+  const responseSettings = { timezone: organizationSettings.timezone, slots: quarterly.slots }
+  const schedule = buildDashboardSchedule(services, currentUser.id, new Date(), responseSettings)
+  const { pending, assignment, personal } = schedule
+  const canSeeTeam = schedule.upcoming.length > 0 || schedule.days.some(day => day.events.length) || teamView
+  const agenda = schedule.days.map(day => ({ ...day, events: day.events.filter(event => teamView || personal(event)) }))
+  const selectedDayIndex = agenda.findIndex(day => day.date === selectedDay)
+  const visibleDays = agenda.filter(day => (!selectedDay || day.date === selectedDay) && day.events.length)
+  const { selectedEvent, next } = resolveDashboardEvent(visibleDays, selectedDay, selectedEventId, schedule.next)
+  const emptyDay = Boolean(selectedDay && !next)
+  const nextRole = next && personal(next) ? assignment(next) : null
+  const nextSource = services.find(event => event.id === next?.parentId)
+  const setlist = [...(nextSource?.setlist || [])].sort((a, b) => a.order - b.order)
+  const leaderId = nextSource && primaryLeader(nextSource, worshipRoles)
+  const leader = nextSource?.team.find(member => member.personId === leaderId)?.person || people.find(person => person.id === leaderId)
+  const isUpcoming = next && schedule.upcoming.some(event => event.calendarId === next.calendarId)
+  const nextPending = next && pending.some(event => event.calendarId === next.calendarId)
+  const locked = event => excuseRequests.some(request => request.service_id === event.parentId && request.person_id === currentUser.id && ['pending', 'approved'].includes(request.status))
+    || substituteRequests.some(request => request.service_id === event.parentId && request.requester_id === currentUser.id && ['open', 'filled'].includes(request.status))
+  const canManage = hasPermission(currentUser, 'schedules.manage') || hasPermission(currentUser, 'services.edit')
+  const allReports = hasPermission(currentUser, 'reports.view')
+  const ownReports = hasPermission(currentUser, 'reports.own')
+  const showAdmin = canManage || allReports || ownReports
+  const managedUpcoming = schedule.upcoming.filter(event => !event.isRehearsal &&
+    (canManage || primaryLeader(event, worshipRoles) === currentUser.id))
+  const managedIds = new Set(managedUpcoming.map(event => event.id))
+  const openSlots = quarterly.slots.filter(slot => managedIds.has(slot.serviceId) && slot.state === 'vacant')
+  const needsResponses = managedUpcoming.filter(event => event.team.some(member => member.status === 'pending'))
+  const readinessEvent = showAdmin && managedUpcoming.find(event => event.id === next?.parentId)
+  const readiness = readinessEvent && quarterly.ready ? [
+    { id: 'confirmed', label: copy('Confirmed', 'مؤكد'), rows: readinessEvent.team.filter(member => member.status === 'confirmed') },
+    { id: 'pending', label: copy('Pending', 'بانتظار الرد'), rows: readinessEvent.team.filter(member => member.status === 'pending') },
+    { id: 'vacant', label: copy('Unfilled', 'شاغر'), rows: openSlots.filter(slot => slot.serviceId === readinessEvent.id) },
+  ] : []
+  const readinessTotal = readiness.reduce((total, group) => total + group.rows.length, 0)
+  const expandedGroup = readiness.find(group => group.id === readinessFilter)
+  const reportServiceIds = new Set(services.filter(event => primaryLeader(event, worshipRoles) === currentUser.id).map(event => event.id))
+  const scopedAttendance = attendanceSessions.filter(session => allReports || reportServiceIds.has(session.serviceId))
+  const attendanceCount = scopedAttendance.reduce((total, session) => total + (attendanceRecords[session.id] || []).filter(record => record.check_in_at).length, 0)
+
+  const updates = [
+    ...quarterly.inbox.filter(item => item.recipient === currentUser.id).flatMap(item => {
+      const event = services.find(service => service.id === item.serviceId)
+      if (!event || !scheduleLabels[lang][item.kind]) return []
+      return [{ key: `schedule-${item.id}`, date: item.createdAt, title: event.title, text: scheduleLabels[lang][item.kind], to: scheduleUrl(event) }]
+    }),
+    ...announcements.map(item => ({
+      key: `news-${item.id}`, date: item.created_at || item.date, title: item.title, text: item.content,
+      to: `/announcements#announcement-${item.id}`,
+    })),
+  ].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4)
+
+  async function confirm(event, trigger, source) {
+    if (saving) return
+    const currentSchedule = buildDashboardSchedule(services, currentUser.id, new Date(), responseSettings)
+    if (!currentSchedule.pending.some(item => item.calendarId === event.calendarId)) {
+      setNotice({ error: true, text: copy('This event is no longer open for responses.', 'انتهت فترة الرد على هذه الفعالية.') })
+      return
+    }
+    const hadFocus = document.activeElement === trigger
+    setSaving(true)
+    setNotice(null)
+    try {
+      const result = await updateTeamMemberStatus(event.parentId || event.id, currentUser.id, 'confirmed')
+      if (!result?.success || result.error) throw new Error()
+      setNotice({ eventId: event.parentId, returnFocus: hadFocus ? source : null, text: copy('Attendance confirmed.', 'تم تأكيد حضورك.') })
+    } catch {
+      setNotice({ error: true, retryButton: hadFocus ? trigger : null, text: copy('Couldn’t verify your response. Refresh before trying again.', 'تعذّر التحقق من ردك. حدّث الصفحة قبل المحاولة مرة أخرى.') })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function refresh() {
+    try {
+      await loadAll()
+    } catch {
+      setNotice({ error: true, text: copy('Couldn’t refresh the dashboard.', 'تعذّر تحديث الرئيسية.') })
+    }
+  }
+
+  const unavailable = copy('This information is temporarily unavailable.', 'هذه المعلومات غير متاحة مؤقتًا.')
+  const empty = text => <p className="dashboard-muted">{text}</p>
+  const sameEvent = pendingEvent => pendingEvent.id === next?.parentId && !next.isRehearsal
+  const remainingPending = pending.filter(event => !sameEvent(event))
+  const otherAssignments = schedule.upcoming.filter(event => !event.isRehearsal && !sameEvent(event)
+    && assignment(event)?.status === 'confirmed' && personal(event))
+  const eventName = event => event.isRehearsal ? copy('Rehearsal', 'بروفة') : eventType(event)[lang]
+  const formatUpdateDate = value => {
+    const date = parseISO(value || '')
+    return isValid(date) ? dateLabel(cairoToday(date), 'd MMM') : ''
+  }
+
+  return <div className="worship-dashboard">
+    <header className="dashboard-heading">
+      <h1>{copy('Welcome,', 'أهلاً،')} <bdi>{currentUser.name?.trim().split(/\s+/)[0] || currentUser.email}</bdi></h1>
+      <div className="dashboard-links">
+        <Link to="/schedule"><CalendarDays size={16} aria-hidden="true"/>{t('schedule')}</Link>
+        <Link to="/attendance"><ScanLine size={16} aria-hidden="true"/>{t('attendance')}</Link>
+        <button type="button" onClick={refresh} disabled={loading} aria-label={copy('Refresh dashboard', 'تحديث الرئيسية')}><RefreshCw size={16} aria-hidden="true"/></button>
       </div>
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <section className="worship-next-service xl:col-span-2">
-          <p className="worship-eyebrow">{isAr ? 'الخدمة القادمة' : 'Your next service'}</p>
-          {nextSvc ? <>
-            <h2 dir="auto">{nextSvc.title}</h2>
-            <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{formatClock(nextSvc.time)}</bdi></p>
-            <hr/>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div><div className="flex gap-1 mb-2">{nextSvc.team.slice(0,5).map(tm=><Avatar key={tm.personId} name={(tm.person || people.find(p=>p.id===tm.personId))?.name} size="sm"/>)}</div>
-                <p className="text-sm text-slate-500">{nextSvc.team.filter(tm=>tm.status==='confirmed').length} {t('confirmed')} · {nextSvc.team.filter(tm=>tm.status==='pending').length} {t('pending')}</p>
-              </div>
-              <Btn onClick={()=>navigate(`/services/${nextSvc.id}`)}>{isAr?'عرض الخدمة':'Open service'}<ArrowRight size={16} className={isAr?'rotate-180':''}/></Btn>
-            </div>
-          </> : <><h2>{t('noUpcoming')}</h2><p className="text-slate-500 mt-3">{isAr?'ستظهر خطط الفريق هنا عند إضافة خدمة.':'Your team’s plans will appear here when a service is added.'}</p></>}
-        </section>
-        <RehearsalReminder services={services}/>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label={t('activeMembers')}   value={activePeople}    icon={<Users size={20}/>}       color="indigo"/>
-        <StatCard label={t('songLibrary')}      value={activeSongs.length} icon={<Music2 size={20}/>}   color="purple"/>
-        <StatCard label={t('upcomingServices')} value={upcoming.length} icon={<Calendar size={20}/>}    color="blue"/>
-        <StatCard label={t('pendingResponses')}      value={pendingTotal}    icon={<AlertCircle size={20}/>} color="amber"/>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upcoming list */}
-        <div className="lg:col-span-2 space-y-4 min-w-0">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display font-semibold text-slate-800">{t('upcomingServices')}</h3>
-            <button onClick={() => navigate('/services')}
-              aria-label={isAr ? 'عرض كل الخدمات القادمة' : 'View all upcoming services'}
-              className="text-sm text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer">
-              {t('viewAll')} <ArrowRight size={14} aria-hidden="true" className={isAr ? 'rotate-180' : ''}/>
-            </button>
-          </div>
-
-          {upcoming.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Calendar size={32} className="text-slate-200 mx-auto mb-2"/>
-              <p className="text-slate-500 text-sm mb-3">{t('noUpcoming')}</p>
-              <Btn variant="outline" size="sm" onClick={() => navigate('/services')}>{t('createService')}</Btn>
-            </Card>
-          ) : upcoming.map((svc,i) => {
-            const conf = svc.team.filter(t=>t.status==='confirmed').length
-            const pend = svc.team.filter(t=>t.status==='pending').length
-            return (
-              <Card key={svc.id} hover onClick={() => navigate(`/services/${svc.id}`)} className="p-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-14 text-center bg-slate-50 rounded-xl py-2">
-                    <div className="text-xs font-medium text-slate-400">{format(parseISO(svc.date),'MMM',{locale})}</div>
-                    <div className="text-2xl font-display font-bold text-slate-800">{format(parseISO(svc.date),'d')}</div>
-                    <div className="text-xs text-slate-400">{format(parseISO(svc.date),isAr?'EEE':'EEE',{locale})}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      {i === 0 && <Badge color="indigo" size="xs">{isAr?'القادم':'Next Up'}</Badge>}
-                      <Badge color="blue" size="xs">{svc.type}</Badge>
-                    </div>
-                    <h4 className="font-display font-semibold text-slate-800">{svc.title}</h4>
-                    <div className="flex items-center gap-3 text-sm text-slate-500 mt-1 flex-wrap">
-                      <span className="flex items-center gap-1"><Clock size={12}/>{formatClock(svc.time)}</span>
-                      <span className="flex items-center gap-1"><Music2 size={12}/>{svc.setlist.length} {isAr?'ترنيمة':'songs'}</span>
-                      {conf>0&&<span className="text-emerald-600 flex items-center gap-1"><CheckCircle size={12}/>{conf}</span>}
-                      {pend>0&&<span className="text-amber-500">{pend} {isAr?'انتظار':'pending'}</span>}
-                    </div>
-                  </div>
-                  <ArrowRight size={16} aria-hidden="true" className={`text-slate-300 flex-shrink-0 ${isAr ? 'rotate-180' : ''}`}/>
-                </div>
-              </Card>
-            )
-          })}
-
-          {/* Quick links */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Card hover onClick={() => navigate('/attendance')} className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0"><QrCode size={18}/></div>
-              <div>
-                <div className="font-semibold text-slate-700 text-sm">{t('attendance')}</div>
-                <div className="text-xs text-slate-400">{isAr?'تسجيل حضور QR':'QR check-in'}</div>
-              </div>
-            </Card>
-            <Card hover onClick={() => navigate('/events')} className="p-4 flex items-center gap-3">
-              <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600 flex-shrink-0"><Megaphone size={18}/></div>
-              <div>
-                <div className="font-semibold text-slate-700 text-sm">{t('events')}</div>
-                <div className="text-xs text-slate-400">{isAr?'المؤتمرات والأنشطة':'Conferences & Events'}</div>
-              </div>
-            </Card>
+    </header>
+    {notice && <p className="dashboard-notice" role={notice.error ? 'alert' : 'status'}>{notice.text}</p>}
+    {loading && <p className="dashboard-muted" role="status">{t('loading')}</p>}
+    <div className="dashboard-grid">
+      <section className="dashboard-hero" aria-labelledby="dashboard-next">
+        <div className={selectedEvent ? 'dashboard-event-enter' : undefined} key={next?.calendarId}>
+          <p className="dashboard-kicker"><Clock3 size={16} aria-hidden="true"/>{emptyDay ? dateLabel(selectedDay) : selectedEvent ? copy('Selected event', 'الفعالية المختارة') : copy('Next up', 'الموعد القادم')}{next && !personal(next) && <span>· {copy('Team event', 'فعالية الفريق')}</span>}</p>
+          <h2 id="dashboard-next"><bdi>{next?.title || (loading ? t('loading') : dashboardErrors.services ? unavailable : emptyDay ? copy('No events on this day.', 'لا توجد فعاليات في هذا اليوم.') : copy('No upcoming assignments', 'لا توجد تكليفات قادمة'))}</bdi></h2>
+          {next && <div className="dashboard-hero-info">
+            <p><bdi>{eventName(next)}</bdi> · {dateTime(next)}</p>
+            {nextRole && <p className="dashboard-role"><bdi>{nextRole.role}</bdi><span className={notice?.eventId === next.parentId && nextRole.status === 'confirmed' ? 'dashboard-event-enter dashboard-confirmed' : undefined} data-state={nextRole.status}>{notice?.eventId === next.parentId && nextRole.status === 'confirmed' && <Check size={14} aria-hidden="true"/>}{scheduleLabels[lang][nextRole.status]}</span></p>}
+          </div>}
+          <div className="dashboard-hero-actions">
+            {nextPending && !locked(next)
+              ? <button className="dashboard-primary" type="button" disabled={saving} onClick={click => confirm(next, click.currentTarget, 'hero')}><Check size={17} aria-hidden="true"/>{copy('Confirm attendance', 'تأكيد الحضور')}</button>
+              : <Link ref={heroAction} className="dashboard-primary" to={nextPending ? '/requests' : next && setlist.length ? setlistUrl(next) : next ? scheduleUrl(next) : '/schedule'}>
+                {nextPending ? copy('Review requests', 'مراجعة الطلبات') : next && setlist.length ? copy('Open setlist', 'فتح قائمة الترانيم') : copy('View schedule', 'عرض الجدول')}<ArrowUpRight size={17} aria-hidden="true"/>
+              </Link>}
+            {nextPending && <Link className="dashboard-hero-link" to={scheduleUrl(next)}>{copy('View event', 'عرض الفعالية')}</Link>}
+            {isUpcoming && renderAssignmentActions?.(nextSource, nextRole)}
           </div>
         </div>
+      </section>
 
-        {/* Right column */}
-        <div className="space-y-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-display font-semibold text-slate-800 text-sm">{t('topSongs')}</h3>
-              <button onClick={() => navigate('/songs')}
-                aria-label={isAr ? 'عرض كل الترانيم' : 'View all songs'}
-                className="text-xs text-indigo-600 cursor-pointer hover:underline">{t('all')}</button>
+      <Panel title={copy('Needs your response', 'بانتظار ردك')} icon={<ClipboardList size={17} aria-hidden="true"/>} className="dashboard-responses" headingRef={responsesHeading}>
+        {!pending.length && empty(loading ? t('loading') : dashboardErrors.services ? unavailable : copy('You’re all caught up.', 'لا توجد تكليفات بانتظار ردك.'))}
+        {pending.length > 0 && <ul className="dashboard-list">
+          {nextPending && !next.isRehearsal && <li><Link to={scheduleUrl(next)}><bdi>{next.title}</bdi>{dateTime(next)}<small>{copy('Respond in event details above', 'رد من تفاصيل الفعالية أعلاه')}</small></Link></li>}
+          {remainingPending.map(event => <li className="dashboard-response" key={event.id}>
+            <Link to={scheduleUrl(event)}><bdi>{event.title}</bdi>{dateTime(event)}</Link>
+            <div className="dashboard-item-actions">
+              {locked(event)
+                ? <Link to="/requests">{copy('Review requests', 'مراجعة الطلبات')}</Link>
+                : <button type="button" disabled={saving} onClick={click => confirm(event, click.currentTarget, 'responses')}>{t('confirm')}</button>}
+              {renderAssignmentActions?.(services.find(service => service.id === event.parentId), assignment(event))}
             </div>
-            {topSongs.length === 0 ? <p className="text-sm text-slate-400 py-3 text-center">{isAr?'لا توجد ترانيم':t('noSongs')}</p> :
-            topSongs.map((song,i) => (
-              <div key={song.id} className="flex items-center gap-3 py-1.5">
-                <span className="text-xs text-slate-400 w-4 text-end">{i+1}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-700 truncate" dir="auto">{song.title}</div>
-                  <div className="text-xs text-slate-400">{song.key} · {song.usageCount||0}×</div>
-                </div>
-                {i === 0 && <Star size={12} className="text-amber-400 flex-shrink-0"/>}
-              </div>
-            ))}
-          </Card>
+          </li>)}
+        </ul>}
+        {renderAssignmentActions && otherAssignments.length > 0 && <details className="dashboard-more">
+          <summary>{copy('Manage confirmed assignments', 'إدارة التكليفات المؤكدة')}</summary>
+          <ul className="dashboard-list">{otherAssignments.map(event => <li key={event.id} className="dashboard-response">
+            <Link to={scheduleUrl(event)}><bdi>{event.title}</bdi>{dateTime(event)}</Link>
+            <div className="dashboard-item-actions">{renderAssignmentActions(services.find(service => service.id === event.parentId), assignment(event))}</div>
+          </li>)}</ul>
+        </details>}
+      </Panel>
 
-          {nextSvc && (
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display font-semibold text-slate-800 text-sm">{t('nextTeam')}</h3>
-                <Badge color={nextSvc.team.filter(t=>t.status==='pending').length>0?'yellow':'green'} size="xs">
-                  {nextSvc.team.filter(t=>t.status==='confirmed').length}/{nextSvc.team.length}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                {nextSvc.team.slice(0,6).map(tm => {
-                  const person = tm.person || people.find(p => p.id === tm.personId)
-                  if (!person) return null
-                  return (
-                    <div key={tm.personId||tm.person?.id} className="flex items-center gap-2.5">
-                      <Avatar name={person.name} size="xs"/>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-slate-700 truncate">{person.name}</div>
-                        <div className="text-xs text-slate-400">{tm.role}</div>
-                      </div>
-                      <StatusDot status={tm.status}/>
-                    </div>
-                  )
-                })}
-              </div>
-            </Card>
-          )}
-
-          {announcements.length > 0 && (
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-display font-semibold text-slate-800 text-sm">{t('announcements')}</h3>
-                <button onClick={() => navigate('/announcements')}
-                  aria-label={isAr ? 'عرض كل الإعلانات' : 'View all announcements'}
-                  className="text-xs text-indigo-600 cursor-pointer hover:underline">{t('all')}</button>
-              </div>
-              <div className="space-y-3">
-                {announcements.slice(0,2).map(a => (
-                  <div key={a.id} className={`border-r-2 border-indigo-300 ${isAr?'pr-3':'pl-3 border-r-0 border-l-2'}`}>
-                    <div className="text-xs font-semibold text-slate-700">{a.title}</div>
-                    <div className="text-xs text-slate-500 line-clamp-2 mt-0.5">{a.content}</div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+      <Panel title={copy('This week', 'هذا الأسبوع')} icon={<CalendarDays size={17} aria-hidden="true"/>} className="dashboard-agenda">
+        {canSeeTeam && <div className="dashboard-toggle" role="group" aria-label={t('schedule')}>
+          <button type="button" aria-pressed={!teamView} onClick={() => teamView && changeAgenda(() => setTeamView(false))}>{copy('My schedule', 'جدولي')}</button>
+          <button type="button" aria-pressed={teamView} onClick={() => !teamView && changeAgenda(() => setTeamView(true))}>{copy('Team schedule', 'جدول الفريق')}</button>
+        </div>}
+        <div className="dashboard-date-strip" role="group" aria-label={copy('Filter by day', 'تصفية حسب اليوم')}>
+          <span className="dashboard-date-indicator" aria-hidden="true"
+            data-visible={selectedDayIndex >= 0} style={{ '--selected-day': Math.max(selectedDayIndex, 0) }}/>
+          {agenda.map(day => <button type="button" key={day.date} aria-label={dateLabel(day.date, 'EEEE, d MMMM')}
+            aria-pressed={selectedDay === day.date} aria-current={day.date === schedule.today ? 'date' : undefined}
+            onClick={() => changeAgenda(() => setSelectedDay(selectedDay === day.date ? null : day.date))}>
+            <small>{dateLabel(day.date, 'EEE')}</small><strong>{dateLabel(day.date, 'd')}</strong>
+            <span className={day.events.length ? 'dashboard-date-dot' : ''} aria-hidden="true"/>
+          </button>)}
         </div>
-      </div>
+        <div className="dashboard-agenda-content">
+        <div className="dashboard-days" ref={agendaRef}>
+          {visibleDays.map(day => <div className="dashboard-day" key={day.date}>
+              <span className="dashboard-day-date"><time dateTime={day.date}>{dateLabel(day.date, 'EEE d')}</time>{day.date === schedule.today && <small>{copy('Today', 'اليوم')}</small>}</span>
+              <ul>{day.events.map(event => <li key={event.calendarId}>
+                <button type="button" className="dashboard-agenda-event"
+                  aria-pressed={selectedEvent?.calendarId === event.calendarId}
+                  onClick={() => {
+                    setSelectedEventId(event.calendarId)
+                    setReadinessFilter(null)
+                  }}>
+                  <bdi>{event.title}</bdi>
+                  <span className="dashboard-meta"><bdi>{formatClock(event.time, isAr)}</bdi> · <bdi>{eventName(event)}</bdi> · {personal(event) ? copy('Assigned to you', 'تكليفك') : copy('Team event', 'فعالية الفريق')}</span>
+                </button>
+              </li>)}</ul>
+            </div>)}
+        {!visibleDays.length && empty(loading ? t('loading') : dashboardErrors.services ? unavailable : selectedDay ? copy('No events on this day.', 'لا توجد فعاليات في هذا اليوم.') : copy('No events on this schedule this week.', 'لا توجد فعاليات في هذا الجدول هذا الأسبوع.'))}
+        </div>
+        </div>
+        <Link className="dashboard-panel-link" to="/schedule">{copy('View schedule', 'عرض الجدول')}<ArrowUpRight size={15} aria-hidden="true"/></Link>
+      </Panel>
+
+      <Panel title={copy('Setlist preview', 'معاينة قائمة الترانيم')} icon={<ListMusic size={17} aria-hidden="true"/>} className="dashboard-setlist">
+        <div className={selectedEvent ? 'dashboard-event-enter' : undefined} key={next?.calendarId}>
+          {selectedEvent && <p className="dashboard-setlist-event"><bdi>{selectedEvent.title}</bdi></p>}
+          {leader && <p className="dashboard-muted">{copy('Worship leader', 'قائد التسبيح')} · <bdi>{leader.name}</bdi></p>}
+          {setlist.length ? <>
+            <ol className="dashboard-tracks">{setlist.slice(0, 5).map((item, index) => {
+              const song = songs.find(song => song.id === item.songId) || item.song
+              return <li key={item.id}><span aria-hidden="true">{index + 1}</span><bdi>{(isAr ? song?.title : song?.titleEn || song?.title) || copy('Song unavailable', 'الترنيمة غير متاحة')}</bdi>{(item.key || song?.key) && <bdi className="dashboard-key">{item.key || song.key}</bdi>}</li>
+            })}</ol>
+            <Link className="dashboard-panel-link" to={setlistUrl(next)}>{copy('Open full setlist', 'فتح القائمة كاملة')}<ArrowUpRight size={15} aria-hidden="true"/></Link>
+          </> : empty(loading ? t('loading') : dashboardErrors.services ? unavailable : emptyDay ? copy('No events on this day.', 'لا توجد فعاليات في هذا اليوم.') : copy('No setlist available for this event.', 'لا توجد قائمة ترانيم متاحة لهذه الفعالية.'))}
+        </div>
+      </Panel>
+
+      <Panel title={copy('Team updates', 'مستجدات الفريق')} icon={<Bell size={17} aria-hidden="true"/>} className="dashboard-updates">
+        {updates.length ? <ul className="dashboard-list">{updates.map(item => <li key={item.key}><Link to={item.to}><bdi>{item.title}</bdi>{item.text && <small dir="auto">{item.text}</small>}<span className="dashboard-meta">{formatUpdateDate(item.date)}</span></Link></li>)}</ul>
+          : empty(loading ? t('loading') : dashboardErrors.updates ? unavailable : copy('No recent team updates.', 'لا توجد مستجدات للفريق.'))}
+        <Link className="dashboard-panel-link" to="/announcements">{t('announcements')}<ArrowUpRight size={15} aria-hidden="true"/></Link>
+      </Panel>
+
+      {showAdmin && <Panel title={copy('Team overview', 'نظرة على الفريق')} icon={<Users size={17} aria-hidden="true"/>} className="dashboard-overview">
+        {!dashboardErrors.services && !dashboardErrors.management && readiness.length > 0 && <div className="dashboard-readiness">
+          <p className="dashboard-muted">{copy('Team readiness', 'جاهزية الفريق')} · <bdi>{readinessEvent.title}</bdi></p>
+          <div className="dashboard-readiness-bar" aria-hidden="true">
+            {readiness.map(group => <span key={group.id} data-state={group.id} style={{ flexGrow: readinessTotal ? group.rows.length / readinessTotal : 0 }}/>)}
+          </div>
+          <div className="dashboard-readiness-controls">
+            {readiness.map(group => <button key={group.id} type="button" aria-pressed={readinessFilter === group.id}
+              onClick={() => setReadinessFilter(readinessFilter === group.id ? null : group.id)}>
+              <strong>{group.rows.length}</strong>{group.label}
+            </button>)}
+          </div>
+          {expandedGroup && <div className="dashboard-event-enter" key={expandedGroup.id}>
+            {expandedGroup.rows.length ? <ul className="dashboard-readiness-roles">{expandedGroup.rows.map((row, index) =>
+              <li key={row.id || row.slotId || `${row.personId}-${index}`}><bdi>{row.role}</bdi>{row.person?.name && <> · <bdi>{row.person.name}</bdi></>}</li>)}</ul>
+              : empty(copy('No roles in this group.', 'لا توجد أدوار في هذه المجموعة.'))}
+            <Link className="dashboard-panel-link" to={scheduleUrl(readinessEvent)}>{copy('Manage in schedule', 'إدارة في الجدول')}<ArrowUpRight size={15} aria-hidden="true"/></Link>
+          </div>}
+        </div>}
+        {dashboardErrors.services || dashboardErrors.management ? empty(unavailable) : <ul className="dashboard-list dashboard-metrics">
+          {quarterly.ready && (canManage || ownReports) && <li><Link to={openSlots.length ? scheduleUrl(managedUpcoming.find(event => event.id === openSlots[0].serviceId)) : '/schedule'}><span>{copy('Unfilled assignments', 'التكليفات الشاغرة')}</span><strong>{openSlots.length}</strong></Link></li>}
+          {(canManage || ownReports) && <li><Link to={needsResponses.length ? scheduleUrl(needsResponses[0]) : '/schedule'}><span>{copy('Pending team responses', 'ردود الفريق المعلقة')}</span><strong>{needsResponses.reduce((total, event) => total + event.team.filter(member => member.status === 'pending').length, 0)}</strong></Link></li>}
+          {(allReports || ownReports) && <li><Link to="/reports?tab=attendance"><span>{copy('Recorded check-ins', 'الحضور المسجل')}</span><strong>{dashboardErrors.attendance ? '—' : attendanceCount}</strong></Link></li>}
+        </ul>}
+      </Panel>}
     </div>
-  )
+  </div>
 }

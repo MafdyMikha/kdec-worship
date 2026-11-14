@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Music2, Users, QrCode,
   MessageSquare, Home, BarChart3,  Settings, User,
@@ -19,6 +19,8 @@ const WaIcon = () => (
 export default function MobileNav() {
   const { currentUser, announcements } = useStore()
   const { t, isAr } = useLang()
+  const { pathname } = useLocation()
+  const homePath = ['/home', '/dashboard'].includes(pathname) ? pathname : '/'
   const isAdmin = isAdminUser(currentUser)
   const isManager = canManageWorship(currentUser)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -63,14 +65,14 @@ export default function MobileNav() {
 
   // 4 primary tabs always visible + "More" button
   const adminPrimary = [
-    { to: '/',           icon: <LayoutDashboard size={22}/>, label: t('dashboard')    },
+    { to: homePath,           icon: <LayoutDashboard size={22}/>, label: t('dashboard')    },
     { to: '/schedule',   icon: <Calendar size={22}/>,        label: t('schedule')     },
     { to: '/songs',      icon: <Music2 size={22}/>,          label: t('songs')        },
     { to: '/people',     icon: <Users size={22}/>,           label: t('people'), permission:'users.view' },
   ]
 
   const memberPrimary = [
-    { to: '/',           icon: <Home size={22}/>,            label: t('home')         },
+    { to: homePath,           icon: <Home size={22}/>,            label: t('home')         },
     { to: '/schedule',   icon: <Calendar size={22}/>,        label: t('schedule')     },
     { to: '/songs',      icon: <Music2 size={22}/>,          label: t('songs')        },
     { to: '/attendance', icon: <QrCode size={22}/>,          label: t('checkIn')      },
@@ -78,7 +80,7 @@ export default function MobileNav() {
 
   const managerPrimary = [
     { to: '/schedule', icon: <Calendar size={22}/>, label: t('schedule') },
-    { to: '/',           icon: <Home size={22}/>,     label: t('home')     },
+    { to: homePath,           icon: <Home size={22}/>,     label: t('home')     },
     { to: '/songs',      icon: <Music2 size={22}/>,   label: t('songs')    },
     { to: '/requests',   icon: <ClipboardList size={22}/>, label: t('requests') },
   ]
@@ -179,7 +181,7 @@ export default function MobileNav() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === homePath}
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center gap-1 py-2.5 cursor-pointer transition-all ${
                   isActive ? 'text-indigo-600' : 'text-slate-400'

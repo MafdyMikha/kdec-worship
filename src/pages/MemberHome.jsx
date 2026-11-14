@@ -1,28 +1,9 @@
-import { formatClock } from '../lib/time.js'
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Clock, Calendar, CheckCircle, AlertCircle, ChevronRight, Music2, Users, X } from 'lucide-react'
-import { format, parseISO, differenceInMinutes, differenceInHours } from 'date-fns'
-import { ar } from 'date-fns/locale'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useStore } from '../store/useStore.jsx'
 import { useLang } from '../lib/i18n.jsx'
-import { Card, Badge, Btn, Modal, Textarea } from '../components/ui'
-import RehearsalReminder from '../components/RehearsalReminder'
-import { hasPermission } from '../lib/permissions.js'
-
-function TimeUntil({ dateStr, timeStr, isAr }) {
-  const [now, setNow] = useState(new Date())
-  useEffect(()=>{ const t=setInterval(()=>setNow(new Date()),60000); return ()=>clearInterval(t) },[])
-  const target = new Date(`${dateStr}T${timeStr||'00:00'}`)
-  const mins   = differenceInMinutes(target, now)
-  const hours  = differenceInHours(target, now)
-  if (mins<0) return <span className="text-slate-400 text-xs">{isAr?'انتهت':'Ended'}</span>
-  if (mins<30) return <span className="text-red-500 text-sm font-bold animate-pulse">⚡ {isAr?`تبدأ خلال ${mins} دقيقة!`:`Starts in ${mins}m!`}</span>
-  if (mins<60) return <span className="text-amber-500 text-sm font-semibold">⏰ {isAr?`بعد ${mins} دقيقة`:`In ${mins}m`}</span>
-  if (hours<24) return <span className="text-indigo-500 text-sm font-medium">🕐 {isAr?`بعد ${hours} ساعة و${mins%60} دقيقة`:`In ${hours}h ${mins%60}m`}</span>
-  const days = Math.ceil(mins/1440)
-  return <span className="text-slate-500 text-sm">📅 {isAr?`بعد ${days} ${days===1?'يوم':'أيام'}`:`In ${days} day${days>1?'s':''}`}</span>
-}
+import { Btn, Modal, Textarea } from '../components/ui'
+import Dashboard from './Dashboard.jsx'
 
 function ExcuseModal({ open, onClose, onSubmit, serviceName, isAr }) {
   const [reason, setReason] = useState('')
@@ -81,173 +62,29 @@ function SubModal({ open, onClose, onSubmit, service, myRole, people, isAr }) {
 
 export default function MemberHome() {
   const { isAr } = useLang()
-  const {
-    currentUser, services, people, songs, excuseRequests, substituteRequests,
-    updateTeamMemberStatus, submitExcuse, requestSubstitute,
-  } = useStore()
-  const navigate   = useNavigate()
+  const { currentUser, people, substituteRequests, submitExcuse, requestSubstitute } = useStore()
   const [excuseModal, setExcuseModal] = useState(null)
-  const [subModal,    setSubModal]    = useState(null)
+  const [subModal, setSubModal] = useState(null)
+  const copy = (en, ar) => isAr ? ar : en
 
-  const today  = new Date()
-  const locale = isAr ? ar : undefined
+  function assignmentActions(service, entry) {
+    if (!service || !entry || entry.status === 'declined') return null
+    const committed = substituteRequests.some(request =>
+      request.service_id === service.id && request.substitute_id === currentUser.id && request.status === 'filled')
+    if (committed) return <small>{copy('Assigned substitute', 'مُعيّن كبديل')}</small>
+    return <>
+      <button type="button" onClick={() => setExcuseModal(service)}>{copy('Submit excuse', 'تقديم عذر')}</button>
+      {service.publishedSchedule
+        ? <Link to={`/schedule?event=${encodeURIComponent(service.id)}`}>{copy('Replacements', 'البدلاء')}</Link>
+        : <button type="button" onClick={() => setSubModal({ service, role: entry.role })}>{copy('Request substitute', 'طلب بديل')}</button>}
+    </>
+  }
 
-  // My upcoming assignments
-  const myServices = services
-    .filter(s => s.status !== 'cancelled' && s.team.find(t=>t.personId===currentUser?.id) && s.date>=format(today,'yyyy-MM-dd'))
-    .sort((a,b)=>parseISO(a.date)-parseISO(b.date))
-
-  const nextSvc   = myServices[0]
-
-  // Top songs
-  const topSongs  = songs.filter(s => s.status !== 'inactive').sort((a,b)=>(b.usageCount||0)-(a.usageCount||0)).slice(0,5)
-
-  const STATUS_COLORS = { confirmed:'green', pending:'yellow', declined:'red' }
-  const STATUS_LABEL  = isAr
-    ? { confirmed:'مؤكد', pending:'انتظار', declined:'معتذر' }
-    : { confirmed:'Confirmed', pending:'Pending', declined:'Declined' }
-
-  return (
-    <div className="space-y-6 max-w-5xl animate-fade-in">
-
-      <div className="worship-page-heading">
-        <div><h1>{isAr ? `أهلاً، ${currentUser?.name?.split(' ')[0] || ''}` : `Welcome, ${currentUser?.name?.split(' ')[0] || ''}`}</h1>
-          <p className="worship-mantra"><bdi lang="en" dir="ltr">Intimacy, Sacrifice, Heart Posture</bdi></p>
-          <p>{isAr ? 'قلب واحد. لنستعد ونخدم معًا.' : 'One heart. Let’s prepare and serve together.'}</p>
-        </div><Badge color="indigo">{((Array.isArray(currentUser?.roles) && currentUser.roles.length>0) ? currentUser.roles : (currentUser?.role?[currentUser.role]:[])).join(' · ')}</Badge>
-      </div>
-      {nextSvc && <section className="worship-next-service">
-        <p className="worship-eyebrow">{isAr?'خدمتك القادمة':'Your next service'}</p>
-        <h2 dir="auto">{nextSvc.title}</h2>
-        <p className="text-slate-500 mt-2">{format(parseISO(nextSvc.date),'EEEE, d MMMM',{locale})} · <bdi>{formatClock(nextSvc.time)}</bdi></p>
-        <div className="flex items-center justify-between flex-wrap gap-4 mt-5"><TimeUntil dateStr={nextSvc.date} timeStr={nextSvc.time} isAr={isAr}/><Btn onClick={()=>navigate(`/services/${nextSvc.id}`)}>{isAr?'عرض الخدمة':'Open service'}</Btn></div>
-      </section>}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* My upcoming services */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display font-semibold text-slate-800">{isAr?'خدماتي القادمة':'My Upcoming Services'}</h3>
-            <button onClick={()=>navigate('/schedule')} className="text-sm text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer">
-              {isAr?'عرض الجدول':'View Schedule'} <ChevronRight size={14}/>
-            </button>
-          </div>
-
-          {myServices.length===0 ? (
-            <Card className="p-8 text-center">
-              <Calendar size={32} className="text-slate-200 mx-auto mb-2"/>
-              <p className="text-slate-500 text-sm">{isAr?'لا توجد خدمات قادمة':'No upcoming services assigned'}</p>
-            </Card>
-          ) : myServices.slice(0,4).map(svc => {
-            const entry = svc.team.find(t=>t.personId===currentUser?.id)
-            const responseLocked = excuseRequests.some(request => (
-              request.service_id===svc.id && request.person_id===currentUser?.id && ['pending','approved'].includes(request.status)
-            )) || substituteRequests.some(request => (
-              request.service_id===svc.id && request.requester_id===currentUser?.id && ['open','filled'].includes(request.status)
-            ))
-            const committedSubstitute = substituteRequests.some(request => (
-              request.service_id===svc.id && request.substitute_id===currentUser?.id && request.status==='filled'
-            ))
-            return (
-              <Card key={svc.id} className="p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-14 text-center bg-slate-50 rounded-xl py-2">
-                    <div className="text-xs font-medium text-slate-400">{format(parseISO(svc.date),'MMM',{locale})}</div>
-                    <div className="text-2xl font-display font-bold text-slate-800">{format(parseISO(svc.date),'d')}</div>
-                    <div className="text-xs text-slate-400">{format(parseISO(svc.date),'EEE',{locale})}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-display font-semibold text-slate-800">
-                      <button onClick={()=>navigate(`/services/${svc.id}`)} className="text-start hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded">
-                        {svc.title}
-                      </button>
-                    </h4>
-                    <div className="flex items-center gap-3 text-sm text-slate-500 mt-1 flex-wrap">
-                      <span className="flex items-center gap-1"><Clock size={12}/>{formatClock(svc.time)}</span>
-                      <span className="flex items-center gap-1"><Music2 size={12}/>{svc.setlist.length} {isAr?'ترنيمة':'songs'}</span>
-                      {entry && <Badge color={STATUS_COLORS[entry.status]||'slate'} size="xs">{STATUS_LABEL[entry.status]||entry.status}</Badge>}
-                    </div>
-                    {entry && (
-                      <div className="flex gap-2 mt-3">
-                        {entry.status!=='confirmed' && !responseLocked && (
-                          <Btn variant="success" size="xs" onClick={()=>updateTeamMemberStatus(svc.id,currentUser.id,'confirmed')}>
-                            <CheckCircle size={12}/> {isAr?'تأكيد':'Confirm'}
-                          </Btn>
-                        )}
-                        {responseLocked && <button type="button" onClick={()=>navigate('/requests')}
-                          className="text-xs text-amber-700 underline underline-offset-2 cursor-pointer">
-                          {isAr?'راجع الطلبات':'Review requests'}
-                        </button>}
-                        {entry.status!=='declined' && !committedSubstitute && (
-                          <Btn variant="secondary" size="xs" onClick={()=>setExcuseModal(svc)}>
-                            <X size={12}/> {isAr?'اعتذار':'Excuse'}
-                          </Btn>
-                        )}
-                        {svc.publishedSchedule&&<Btn variant="outline" size="xs" onClick={()=>navigate('/schedule')}>{isAr?'البدلاء والموافقات':'Replacements & approvals'}</Btn>}
-                        {!svc.publishedSchedule&&!committedSubstitute && <Btn variant="outline" size="xs" onClick={()=>setSubModal(svc)}>
-                          <Users size={12}/> {isAr?'بديل':'Sub'}
-                        </Btn>}
-                        {committedSubstitute && <span className="text-xs font-medium text-indigo-600">
-                          {isAr?'مُعيّن كبديل':'Assigned substitute'}
-                        </span>}
-                      </div>
-                    )}
-                  </div>
-                  <ChevronRight size={16} className="text-slate-300 flex-shrink-0"/>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Sidebar: rehearsals, top songs and quick links */}
-        <div className="space-y-4">
-          <RehearsalReminder services={myServices}/>
-          <div>
-            <h3 className="font-display font-semibold text-slate-800 mb-3">{isAr?'أكثر الترانيم':'Top Songs'}</h3>
-            <Card className="divide-y divide-slate-100">
-              {topSongs.map((s,i)=>(
-                <div key={s.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-xs font-bold text-slate-300 w-4">{i+1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-700 truncate">{isAr?s.title:s.titleEn||s.title}</div>
-                    <div className="text-xs text-slate-400">{s.key} · {s.usageCount} {isAr?'مرة':'times'}</div>
-                  </div>
-                </div>
-              ))}
-            </Card>
-          </div>
-
-          <div>
-            <h3 className="font-display font-semibold text-slate-800 mb-3">{isAr?'روابط سريعة':'Quick Links'}</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                {icon:<Calendar size={18}/>,label:isAr?'الجدول':'Schedule',to:'/schedule',color:'bg-indigo-50 text-indigo-600'},
-                {icon:<Music2 size={18}/>,label:isAr?'الترانيم':'Songs',to:'/songs',color:'bg-violet-50 text-violet-600'},
-                {icon:<Users size={18}/>,label:isAr?'الفريق':'Team',to:'/people',color:'bg-emerald-50 text-emerald-600',permission:'users.view'},
-                {icon:<AlertCircle size={18}/>,label:isAr?'الإعلانات':'Announcements',to:'/announcements',color:'bg-amber-50 text-amber-600'},
-              ].filter(item=>!item.permission||hasPermission(currentUser,item.permission)).map(({icon,label,to,color})=>(
-                <button key={to} onClick={()=>navigate(to)}
-                  className={`${color} rounded-xl p-3 flex flex-col items-center gap-1.5 text-xs font-medium hover:opacity-80 cursor-pointer transition-all`}>
-                  {icon}<span>{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <ExcuseModal
-        open={!!excuseModal} onClose={()=>setExcuseModal(null)}
-        serviceName={excuseModal?.title||''}
-        onSubmit={reason=>submitExcuse(excuseModal?.id,reason)}
-        isAr={isAr}
-      />
-      <SubModal
-        open={!!subModal} onClose={()=>setSubModal(null)}
-        service={subModal} myRole={subModal?.team.find(entry=>entry.personId===currentUser?.id)?.role||currentUser?.role}
-        people={people} onSubmit={note=>requestSubstitute(subModal?.id,subModal?.team.find(entry=>entry.personId===currentUser?.id)?.role||currentUser?.role,note)} isAr={isAr}
-      />
-    </div>
-  )
+  return <>
+    <Dashboard renderAssignmentActions={assignmentActions}/>
+    {excuseModal && <ExcuseModal open onClose={() => setExcuseModal(null)} serviceName={excuseModal.title}
+      onSubmit={reason => submitExcuse(excuseModal.id, reason)} isAr={isAr}/>}
+    {subModal && <SubModal open onClose={() => setSubModal(null)} service={subModal.service} myRole={subModal.role}
+      people={people} onSubmit={note => requestSubstitute(subModal.service.id, subModal.role, note)} isAr={isAr}/>}
+  </>
 }
