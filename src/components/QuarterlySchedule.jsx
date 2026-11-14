@@ -23,17 +23,25 @@ export default function QuarterlySchedule() {
   const {isAr}=useLang()
   const navigate=useNavigate()
   const [params,setParams]=useSearchParams()
+  const linkedEvent=services.find(event=>event.id===params.get('event'))
   const today=cairoToday()
+  const referenceDate=linkedEvent?.date || today
   const requestedYear=Number(params.get('year'))
-  const year=Number.isInteger(requestedYear)&&requestedYear>=2000&&requestedYear<=2200?requestedYear:Number(today.slice(0,4))
-  const quarter=[1,2,3,4].includes(Number(params.get('quarter')))?Number(params.get('quarter')):Math.ceil(Number(today.slice(5,7))/3)
+  const year=Number.isInteger(requestedYear)&&requestedYear>=2000&&requestedYear<=2200?requestedYear:Number(referenceDate.slice(0,4))
+  const quarter=[1,2,3,4].includes(Number(params.get('quarter')))?Number(params.get('quarter')):Math.ceil(Number(referenceDate.slice(5,7))/3)
   const [view,setView]=useState('calendar')
   const [mine,setMine]=useState(false)
   const showCancelled=false
   const [kind,setKind]=useState('all')
   const [showImport,setShowImport]=useState(false)
   const [form,setForm]=useState(null)
-  const [detailId,setDetailId]=useState(null)
+  const detailId=params.get('event')
+  const setDetailId=id=>setParams(previous=>{
+    const next=new URLSearchParams(previous)
+    if(id) next.set('event',id)
+    else next.delete('event')
+    return next
+  },{replace:true})
   const [review,setReview]=useState(false)
   const [cancel,setCancel]=useState(false)
   const [busy,setBusy]=useState(false)

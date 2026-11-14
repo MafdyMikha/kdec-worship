@@ -1,3 +1,4 @@
+import './navigationMotion.css'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import PwaStatus from '../pwa/PwaStatus.jsx'
@@ -37,6 +38,7 @@ export default function Layout({ children }) {
   const base  = Object.keys(PAGE_KEYS).find(k => pathname === k || (k !== '/' && k !== '/home' && pathname.startsWith(k)))
   const key   = PAGE_KEYS[base] || 'dashboard'
   const title = t(key)
+  const home = ['/', '/home', '/dashboard'].includes(pathname)
   const introductions = {
     '/services': isAr ? 'مساحة للاستعداد والتخطيط والخدمة معًا.' : 'A space to prepare, plan, and serve together.',
     '/songs': isAr ? 'ترانيم نحملها معنا في العبادة.' : 'The songs we carry into worship.',
@@ -46,10 +48,10 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="worship-app flex h-screen h-dvh overflow-hidden bg-slate-50" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className={`worship-app flex h-screen h-dvh overflow-hidden bg-slate-50 ${home ? 'worship-dashboard-shell' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
       <a href="#main-content" className="worship-skip-link">{isAr ? 'انتقل إلى المحتوى' : 'Skip to content'}</a>
       {/* Sidebar — desktop only */}
-      <Sidebar/>
+      <Sidebar compactByDefault={home}/>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header title={title}/>
@@ -57,7 +59,7 @@ export default function Layout({ children }) {
 
         {/* Page content — extra bottom padding on mobile for bottom nav */}
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
-          <div className="worship-content p-4 md:p-8 pb-24 md:pb-8 animate-fade-in">
+          <div className={`worship-content p-4 pb-24 md:pb-8 ${home ? 'md:p-5' : 'md:p-8 animate-fade-in'}`}>
             {introductions[pathname] && <div className="worship-page-heading"><div><h1>{title}</h1><p>{introductions[pathname]}</p></div></div>}
             {children}
           </div>

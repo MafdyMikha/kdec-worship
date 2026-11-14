@@ -313,6 +313,7 @@ export function AppProvider({ children }) {
   const [attendanceReady,setAttendanceReady]=useState(false)
   const [planningReady, setPlanningReady] = useState(false)
   const [quarterly, setQuarterly] = useState({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
+  const [dashboardErrors, setDashboardErrors] = useState({})
   const [loading,        setLoading]        = useState(false)
   const [demoReady,      setDemoReady]      = useState(false)
   const authGenerationRef = useRef(0)
@@ -367,6 +368,7 @@ export function AppProvider({ children }) {
     setQuarterly({ quarters:[], slots:[], attempts:[], inbox:[], audit:[], ready:false })
     setOrganizationSettings(DEFAULT_ORGANIZATION_SETTINGS)
     setLoading(false)
+    setDashboardErrors({})
   }, [])
 
   // ── DEMO MODE bootstrap ─────────────────────────────────
@@ -575,6 +577,12 @@ export function AppProvider({ children }) {
       const resolved = await Promise.all(queries.map(async ([key, query]) => [key, await query]))
       if (expectedGeneration !== authGenerationRef.current) return
       const resultByKey = Object.fromEntries(resolved)
+      setDashboardErrors({
+        services:Boolean(resultByKey.services.error),
+        updates:Boolean(resultByKey.announcements.error || resultByKey.scheduleInbox.error),
+        management:Boolean(resultByKey.scheduleSlots.error),
+        attendance:Boolean(resultByKey.attendanceRecords.error || (resultByKey.attendanceSessions.error && resultByKey.reportAttendanceSessions.error)),
+      })
       const scheduleKeys = ['scheduleQuarters','scheduleSlots','scheduleAttempts','scheduleInbox','scheduleAudit']
       setAttendanceReady(!resultByKey.attendanceReady.error)
       setPlanningReady(!resultByKey.planningReady.error)
@@ -646,6 +654,11 @@ export function AppProvider({ children }) {
       if (resultByKey.invitations?.data) setInvitations(resultByKey.invitations.data.map(normalizeInvitation))
       if(resultByKey.attendanceSessions?.data||resultByKey.reportAttendanceSessions?.data){const sessions=new Map((resultByKey.reportAttendanceSessions?.data||[]).map(row=>[row.id,row]));(resultByKey.attendanceSessions?.data||[]).forEach(row=>sessions.set(row.id,row));setAttendanceSessions([...sessions.values()].map(normalizeAttendanceSession))}
       return firstError?{error:`Some data could not be loaded: ${firstError.message}`}:{success:true}
+    } catch (error) {
+      if (expectedGeneration === authGenerationRef.current) {
+        setDashboardErrors({services:true,updates:true,management:true,attendance:true})
+      }
+      return {error:error.message || 'Unable to load app data.'}
     } finally {
       if (expectedGeneration === authGenerationRef.current) setLoading(false)
     }
@@ -1801,7 +1814,7 @@ export function AppProvider({ children }) {
   const ROLES=worshipRoles.filter(role=>role.active).sort((a,b)=>a.displayOrder-b.displayOrder||a.name.localeCompare(b.name)).map(role=>role.name)
 
   const value = {
-    isDemoMode, configurationError, currentUser, authLoading, loading, isPasswordRecovery,
+    isDemoMode, configurationError, currentUser, authLoading, loading, dashboardErrors, isPasswordRecovery,
     people:ministry.people, ministry, songs, services, announcements, invitations, events, eventResponses,
     attendanceSessions, attendanceRecords, excuseRequests, substituteRequests,
     quarterly, scheduleAction, planningReady, savePlanningEvent,

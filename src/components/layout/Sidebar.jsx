@@ -1,6 +1,6 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Calendar, Music2, Users, MessageSquare, BarChart3, BookOpen, ChevronLeft, ChevronRight, Settings, UserPlus, QrCode,  Home, MessageCircle, ClipboardList, ShieldCog } from 'lucide-react'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import BrandLogo from '../BrandLogo.jsx'
@@ -13,15 +13,19 @@ const WaIcon = () => (
   </svg>
 )
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+export default function Sidebar({ compactByDefault = false }) {
+  const [collapsed, setCollapsed] = useState(true)
+  const railRef = useRef(null)
+  const markerRef = useRef(null)
+  const { pathname } = useLocation()
+  const homePath = compactByDefault ? pathname : '/'
   const { currentUser, announcements } = useStore()
   const { t, isAr } = useLang()
   const isAdmin = isAdminUser(currentUser)
   const isManager = canManageWorship(currentUser)
 
   const adminNav = [
-    { to:'/',              icon:<LayoutDashboard size={20}/>, key:'dashboard'    },
+    { to:homePath,         icon:<LayoutDashboard size={20}/>, key:'dashboard'    },
     { to:'/songs',         icon:<Music2 size={20}/>,          key:'songs'        },
     { to:'/people',        icon:<Users size={20}/>,           key:'people', permission:'users.view' },
     { to:'/schedule',      icon:<BookOpen size={20}/>,        key:'schedule'     },
@@ -33,7 +37,7 @@ export default function Sidebar() {
   ]
 
   const memberNav = [
-    { to:'/',              icon:<Home size={20}/>,            key:'home'         },
+    { to:homePath,         icon:<Home size={20}/>,            key:'home'         },
     { to:'/schedule',      icon:<Calendar size={20}/>,        key:'schedule'     },
     { to:'/songs',         icon:<Music2 size={20}/>,          key:'songs'        },
     { to:'/attendance',    icon:<QrCode size={20}/>,          key:'checkIn'      },
@@ -58,8 +62,46 @@ export default function Sidebar() {
     ...permissionNav.filter(item=>(hasPermission(currentUser,item.permission)||(item.ownReports&&hasPermission(currentUser,'reports.own')))&&!baseNav.some(base=>base.to===item.to)),
   ]
 
+  useLayoutEffect(() => {
+    const rail = railRef.current
+    const marker = markerRef.current
+    const nav = rail.querySelector('nav')
+    const active = rail.querySelector('a[aria-current="page"]')
+
+    function align(immediate = false) {
+      if (!collapsed || !active || !rail.offsetWidth) {
+        marker.style.visibility = 'hidden'
+        return
+      }
+      const bounds = rail.getBoundingClientRect()
+      const target = active.getBoundingClientRect()
+      const clip = (nav.contains(active) ? nav : rail).getBoundingClientRect()
+      const visibleTop = Math.max(0, clip.top - target.top)
+      const visibleBottom = Math.max(0, target.bottom - clip.bottom)
+      marker.style.visibility = visibleTop + visibleBottom < target.height ? 'visible' : 'hidden'
+      marker.style.transitionDuration = immediate ? '0ms' : ''
+      marker.style.width = `${target.width}px`
+      marker.style.height = `${target.height}px`
+      marker.style.clipPath = `inset(${visibleTop}px 0 ${visibleBottom}px 0)`
+      marker.style.transform = `translate(${target.left - bounds.left - rail.clientLeft}px, ${target.top - bounds.top - rail.clientTop}px)`
+    }
+
+    align()
+    const followScroll = () => align(true)
+    const observer = new ResizeObserver(() => align())
+    observer.observe(rail)
+    observer.observe(nav)
+    if (active) observer.observe(active)
+    nav.addEventListener('scroll', followScroll, { passive: true })
+    return () => {
+      observer.disconnect()
+      nav.removeEventListener('scroll', followScroll)
+    }
+  })
+
   return (
-    <aside className={`worship-sidebar ${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 flex-col transition-all duration-300 relative hidden md:flex`}>
+    <aside ref={railRef} className={`worship-sidebar ${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 flex-col relative hidden md:flex`}>
+      <span ref={markerRef} className="worship-nav-indicator" aria-hidden="true"/>
       {/* Theme-aware clean lockup; tower only in the compact sidebar. */}
       <div className={`worship-sidebar-brand ${collapsed ? 'is-collapsed' : ''}`}>
         <BrandLogo compact={collapsed} />
@@ -71,7 +113,8 @@ export default function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto" style={{ scrollbarWidth:'none' }}>
         {nav.map(item => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/dashboard'}
+          <NavLink key={item.to} to={item.to} end={item.to === homePath}
+            title={collapsed ? t(item.key) : undefined}
             aria-label={(item.key==='evaluations'?(isAr?'التقييمات':'Evaluations'):t(item.key))}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${

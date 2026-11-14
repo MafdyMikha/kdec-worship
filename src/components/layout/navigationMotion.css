@@ -1,0 +1,99 @@
+.worship-app {
+  --dashboard-navy: #101923;
+  --dashboard-ivory: #f6f5f1;
+  --dashboard-sand: var(--brand-sand);
+  --dashboard-sand-hover: #dfd1b5;
+
+}
+
+.worship-dashboard-shell { background-color: var(--bg-page); }
+
+@media (min-width: 768px) {
+  .worship-sidebar.w-16 {
+    align-self: center;
+    max-block-size: calc(100% - 2rem);
+    min-block-size: 0;
+    margin-inline: .85rem .25rem;
+    border: 1px solid #354651;
+    border-radius: 999px;
+    background: var(--dashboard-navy);
+    box-shadow: 0 6px 16px #10192329;
+    --border: #354651;
+    --text-p: var(--dashboard-ivory);
+    --text-s: #c5ced0;
+  }
+
+  .worship-sidebar.w-16 > .worship-sidebar-brand {
+    padding-block: 1rem .85rem;
+    border: 0;
+  }
+
+  .worship-sidebar.w-16 .worship-brand-logo {
+    inline-size: 2rem;
+    color: var(--dashboard-ivory);
+  }
+
+  .worship-sidebar.w-16 nav { min-block-size: 0; padding-block: .25rem; }
+  .worship-sidebar.w-16 a {
+    justify-content: center;
+    min-block-size: 44px;
+    padding: 0;
+    border-radius: 999px;
+  }
+
+  .worship-sidebar.w-16 a:hover {
+    background: #233a50;
+    color: var(--dashboard-ivory);
+  }
+
+  .worship-sidebar.w-16 a[aria-current='page'] {
+    color: var(--dashboard-navy);
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .worship-sidebar.w-16 > button {
+    background: #233a50;
+    color: var(--dashboard-ivory);
+  }
+
+  .worship-sidebar.w-16 :focus-visible {
+    outline-color: var(--dashboard-sand);
+    outline-offset: -2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .worship-sidebar { transition: none; }
+}
+
+.worship-nav-indicator { display: none; }
+
+@media (min-width: 768px) {
+  .worship-sidebar.w-16 .worship-nav-indicator {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 999px;
+    background: var(--dashboard-sand);
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .worship-sidebar.w-16 a { position: relative; }
+  .worship-sidebar.w-16 .worship-initials { background: none; color: inherit; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .worship-sidebar.w-16 { animation: worship-rail-enter 280ms ease-out both; }
+  .worship-nav-indicator { transition: transform 180ms cubic-bezier(.2,.75,.25,1); }
+  .worship-mobile-nav a > svg { transition: transform 160ms ease-out; }
+  .worship-mobile-nav a[aria-current='page'] > svg { transform: translateY(-2px); }
+  .worship-mobile-nav a:active > svg { transform: scale(.94); }
+
+  @keyframes worship-rail-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

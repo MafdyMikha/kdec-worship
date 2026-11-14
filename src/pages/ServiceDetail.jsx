@@ -24,7 +24,13 @@ export default function ServiceDetail() {
   const {services,people,currentUser,updateService,deleteService,deleteRecurringService,generateMoreOccurrences,addTeamMember,updateTeamMemberStatus,removeTeamMember,requestSubstitute,ROLES,worshipRoles}=useStore()
   const { t, isAr } = useLang()
 
-  const [tab,             setTab]            = useState('team')
+  const tab = ['setlist','notes'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'team'
+  const setTab = value => setSearchParams(previous => {
+    const next = new URLSearchParams(previous)
+    if (value === 'team') next.delete('tab')
+    else next.set('tab', value)
+    return next
+  }, {replace:true})
   const [showAddPerson,   setShowAddPerson]  = useState(false)
   const [selectedPerson,  setSelectedPerson] = useState('')
   const [selectedRole,    setSelectedRole]   = useState(ROLES[0])
