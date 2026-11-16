@@ -11,7 +11,7 @@ import { primaryLeader } from '../lib/ministry.js'
 import { scheduleLabels } from '../lib/quarterlySchedule.js'
 import { hasPermission } from '../lib/permissions.js'
 import { formatClock } from '../lib/time.js'
-import { DashboardDate, DashboardUtilities } from '../components/layout/Header.jsx'
+import Header from '../components/layout/Header.jsx'
 import './dashboard.css'
 
 const detailUrl = event => `/services/${event.parentId || event.id}?view=details`
@@ -174,20 +174,16 @@ export default function Dashboard({ renderAssignmentActions }) {
   }
 
   return <div className="worship-dashboard">
-    <header className="dashboard-heading">
-      <div className="dashboard-greeting">
-        <div>
-          <DashboardDate/>
-          <h1>{copy('Welcome,', 'أهلاً،')} <bdi>{currentUser.name?.trim().split(/\s+/)[0] || currentUser.email}</bdi></h1>
-        </div>
-        <DashboardUtilities/>
-      </div>
+    <div className="dashboard-heading">
+      <Header>
+        <h1>{copy('Welcome,', 'أهلاً،')} <bdi>{currentUser.name?.trim().split(/\s+/)[0] || currentUser.email}</bdi></h1>
+      </Header>
       <div className="dashboard-links">
         <Link to="/schedule"><CalendarDays size={16} aria-hidden="true"/>{t('schedule')}</Link>
         <Link to="/attendance"><ScanLine size={16} aria-hidden="true"/>{t('attendance')}</Link>
         <button type="button" onClick={refresh} disabled={loading} aria-label={copy('Refresh dashboard', 'تحديث الرئيسية')}><RefreshCw size={16} aria-hidden="true"/></button>
       </div>
-    </header>
+    </div>
     {notice && <p className="dashboard-notice" role={notice.error ? 'alert' : 'status'}>{notice.text}</p>}
     {loading && <p className="dashboard-muted" role="status">{t('loading')}</p>}
     <div className="dashboard-grid">

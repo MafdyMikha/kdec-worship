@@ -1,10 +1,9 @@
-import { Bell, User, ChevronDown, LogOut, UserPlus, Sun, Moon } from 'lucide-react'
+import { Bell, User, LogOut, UserPlus, Sun, Moon } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { Avatar } from '../ui'
-import BrandLogo from '../BrandLogo.jsx'
 import { format } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { ACCESS_LEVEL_LABELS, hasPermission } from '../../lib/permissions.js'
@@ -19,24 +18,21 @@ function useDarkMode() {
   return [dark, () => setDark(d => !d)]
 }
 
-export function DashboardDate({ className = "dashboard-greeting-date" }) {
+function HeaderDate() {
   const { isAr } = useLang()
   const dateStr = isAr
     ? format(new Date(), 'EEEE، d MMMM', { locale: arLocale })
     : format(new Date(), 'EEE, MMM d')
-  return <p className={className}>{dateStr}</p>
+  return <p className="dashboard-greeting-date">{dateStr}</p>
 }
 
-function HeaderControls({ dark, toggleDark, dashboard = false }) {
+function HeaderControls({ dark, toggleDark }) {
   const { announcements, quarterly } = useStore()
   const { lang, setLang, t, isAr } = useLang()
   const navigate = useNavigate()
   const unreadSchedule = quarterly.inbox.filter(item => !item.readAt).length
 
   return <>
-    {/* Date — desktop only */}
-    {!dashboard && <DashboardDate className="text-xs text-slate-400 hidden lg:block me-1"/>}
-
     {/* Language toggle */}
     <div className="header-language-switch flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
       <button
@@ -55,11 +51,10 @@ function HeaderControls({ dark, toggleDark, dashboard = false }) {
       </button>
     </div>
 
-    {/* Dark mode — hidden on smallest screens */}
     <button
       onClick={toggleDark}
       aria-label={dark ? (isAr ? 'تفعيل الوضع النهاري' : 'Use light mode') : (isAr ? 'تفعيل الوضع الليلي' : 'Use dark mode')}
-      className={`${dashboard ? 'flex' : 'hidden sm:flex'} p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition-all`}>
+      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition-all">
       {dark ? <Sun size={17}/> : <Moon size={17}/>}
     </button>
 
@@ -78,16 +73,7 @@ function HeaderControls({ dark, toggleDark, dashboard = false }) {
   </>
 }
 
-export function DashboardUtilities() {
-  const [dark, toggleDark] = useDarkMode()
-  const { isAr } = useLang()
-  return <div className="dashboard-utilities" role="group" aria-label={isAr ? 'أدوات الرئيسية' : 'Dashboard utilities'}>
-    <HeaderControls dark={dark} toggleDark={toggleDark} dashboard/>
-    <AccountMenu dark={dark} toggleDark={toggleDark} compact/>
-  </div>
-}
-
-function AccountMenu({ dark, toggleDark, compact = false }) {
+function AccountMenu({ dark, toggleDark }) {
   const { currentUser, logout } = useStore()
   const { isAr, t } = useLang()
   const navigate     = useNavigate()
@@ -119,24 +105,12 @@ function AccountMenu({ dark, toggleDark, compact = false }) {
         onClick={() => setOpen(!open)}
         aria-label={isAr ? 'قائمة المستخدم' : 'User menu'}
         aria-expanded={open}
-        className={compact ? 'dashboard-account-trigger' : 'flex items-center gap-1.5 px-1.5 py-1.5 hover:bg-slate-100 rounded-xl cursor-pointer'}>
-        {compact ? <span className="dashboard-avatar" aria-hidden="true">
+        className="dashboard-account-trigger">
+        <span className="dashboard-avatar" aria-hidden="true">
           <Avatar name={currentUser?.name || currentUser?.email} size="lg"/>
           {currentUser?.avatar_url && <img key={currentUser.avatar_url} src={currentUser.avatar_url} alt=""
             onError={event => { event.currentTarget.hidden = true }}/>}
-        </span> : <>
-          <Avatar name={currentUser?.name || currentUser?.email} size="sm"/>
-          {/* Name — hidden on small screens */}
-          <div className="text-start hidden sm:block">
-            <div className="text-xs font-semibold text-slate-700 leading-tight max-w-[90px] truncate">
-              {currentUser?.name || (isAr ? 'مستخدم' : 'User')}
-            </div>
-            <div className="text-[10px] text-slate-400 leading-tight">
-              {ACCESS_LEVEL_LABELS[currentUser?.accessLevel||'member']?.[isAr?'ar':'en']}
-            </div>
-          </div>
-          <ChevronDown size={13} className={`text-slate-400 transition-transform hidden sm:block ${open ? 'rotate-180' : ''}`}/>
-        </>}
+        </span>
       </button>
 
       {open && (
@@ -144,7 +118,7 @@ function AccountMenu({ dark, toggleDark, compact = false }) {
           {/* User info */}
           <div className="px-3 py-2.5 border-b border-slate-100 mb-1">
             <div className="text-sm font-semibold text-slate-700" dir="auto">{currentUser?.name}</div>
-            {compact && <div className="text-xs text-slate-500">{ACCESS_LEVEL_LABELS[currentUser?.accessLevel || 'member']?.[isAr ? 'ar' : 'en']}</div>}
+            <div className="text-xs text-slate-500">{ACCESS_LEVEL_LABELS[currentUser?.accessLevel || 'member']?.[isAr ? 'ar' : 'en']}</div>
             <div className="text-xs text-slate-400 truncate">{currentUser?.email}</div>
           </div>
 
@@ -186,21 +160,18 @@ function AccountMenu({ dark, toggleDark, compact = false }) {
   )
 }
 
-export default function Header({ title }) {
+export default function Header({ children }) {
   const [dark, toggleDark] = useDarkMode()
+  const { isAr } = useLang()
+
   return (
-    <header className="worship-header min-h-16 flex items-center justify-between px-4 md:px-8 flex-shrink-0 gap-2 z-20">
-      {/* Page title */}
-      <div className="worship-header-identity">
-        <BrandLogo compact className="worship-header-logo" />
-        <span className="worship-header-divider" aria-hidden="true" />
-        <div className="text-sm text-slate-500 truncate">{title}</div>
+    <header className="dashboard-greeting">
+      <div>
+        <HeaderDate/>
+        {children}
       </div>
-
-      <div className="flex items-center gap-1 flex-shrink-0">
-
+      <div className="dashboard-utilities" role="group" aria-label={isAr ? 'أدوات التنقل' : 'Page utilities'}>
         <HeaderControls dark={dark} toggleDark={toggleDark}/>
-
         <AccountMenu dark={dark} toggleDark={toggleDark}/>
       </div>
     </header>

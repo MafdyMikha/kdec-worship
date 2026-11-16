@@ -97,3 +97,95 @@
     to { opacity: 1; transform: translateY(0); }
   }
 }
+
+.dashboard-greeting,
+.dashboard-utilities {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.dashboard-greeting {
+  justify-content: space-between;
+  gap: .75rem;
+  margin-block-end: .75rem;
+}
+
+.dashboard-greeting-date {
+  font-size: .75rem;
+  color: var(--text-s);
+  margin-block-end: .25rem;
+}
+
+.dashboard-utilities {
+  margin-inline-start: auto;
+  color: var(--text-s);
+  gap: .5rem;
+}
+
+.dashboard-utilities .header-language-switch {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+}
+
+.dashboard-utilities .header-language-switch button {
+  min-block-size: 38px;
+  min-inline-size: 36px;
+  border-radius: 999px;
+}
+
+.dashboard-utilities > button,
+.dashboard-account-trigger {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-p);
+}
+
+.dashboard-utilities > button:hover,
+.dashboard-account-trigger:hover {
+  background: var(--accent-soft);
+}
+
+.dashboard-utilities button[aria-pressed='true'],
+.dashboard-utilities .header-notification-badge {
+  background: var(--dashboard-sand);
+  color: var(--dashboard-navy);
+}
+
+.dashboard-avatar {
+  position: relative;
+  display: block;
+}
+
+.dashboard-avatar img {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.worship-content > .dashboard-greeting {
+  padding-block-start: env(safe-area-inset-top, 0px);
+  margin-block-end: 1.25rem;
+}
+
+.worship-header-page-title {
+  color: var(--text-p);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.dashboard-greeting :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
