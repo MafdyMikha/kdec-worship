@@ -22,6 +22,8 @@ export default function Layout({ children }) {
     '/songs':        'songs',
     '/people':       'people',
     '/schedule':     'schedule',
+    '/evaluations':  'evaluations',
+    '/ratings/settings': 'ratings',
     '/reports':      'reports',
     '/announcements':'announcements',
     '/settings':     'settings',
@@ -37,7 +39,8 @@ export default function Layout({ children }) {
 
   const base  = Object.keys(PAGE_KEYS).find(k => pathname === k || (k !== '/' && k !== '/home' && pathname.startsWith(k)))
   const key   = PAGE_KEYS[base] || 'dashboard'
-  const title = t(key)
+  const title = key === 'evaluations' ? (isAr ? 'التقييمات' : 'Evaluations')
+    : key === 'ratings' ? (isAr ? 'إعدادات التقييم' : 'Rating Settings') : t(key)
   const home = ['/', '/home', '/dashboard'].includes(pathname.replace(/\/$/, '') || '/')
   const introductions = {
     '/songs': isAr ? 'ترانيم نحملها معنا في العبادة.' : 'The songs we carry into worship.',
@@ -54,13 +57,16 @@ export default function Layout({ children }) {
       <Sidebar compactByDefault={home}/>
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {!home && <Header title={title}/>}
         <PwaStatus/>
 
         {/* Page content — extra bottom padding on mobile for bottom nav */}
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
           <div className={`worship-content p-4 pb-24 md:pb-8 ${home ? 'md:p-5' : 'md:p-8 animate-fade-in'}`}>
-            {introductions[pathname] && <div className="worship-page-heading"><div><h1>{title}</h1><p>{introductions[pathname]}</p></div></div>}
+            {!home && <Header>
+              {introductions[pathname] ? <div className="worship-page-heading !mb-0 !p-0">
+                <div><h1>{title}</h1><p>{introductions[pathname]}</p></div>
+              </div> : <p className="worship-header-page-title">{title}</p>}
+            </Header>}
             {children}
           </div>
         </main>
