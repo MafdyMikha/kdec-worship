@@ -1,8 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Calendar, Music2, Users, QrCode,
   MessageSquare, Home, BarChart3,  Settings, User,
-  ChevronUp, X, ClipboardList, ShieldCog
+  ChevronUp, X, ClipboardList, ShieldCog, LogOut
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/useStore.jsx'
@@ -16,10 +16,11 @@ const WaIcon = () => (
   </svg>
 )
 
-export default function MobileNav() {
-  const { currentUser, announcements } = useStore()
+export default function MobileNav({ showSignOut }) {
+  const { currentUser, announcements, logout } = useStore()
   const { t, isAr } = useLang()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const homePath = ['/home', '/dashboard'].includes(pathname) ? pathname : '/'
   const isAdmin = isAdminUser(currentUser)
   const isManager = canManageWorship(currentUser)
@@ -169,6 +170,12 @@ export default function MobileNav() {
                   <span className="text-[10px] font-medium text-center leading-tight">{item.label}</span>
                 </NavLink>
               ))}
+              {showSignOut && <button type="button"
+                onClick={async () => { setMoreOpen(false); await logout(); navigate('/') }}
+                className="flex flex-col items-center gap-1.5 rounded-xl p-3 text-slate-600 hover:bg-slate-50">
+                <LogOut size={20} aria-hidden="true"/>
+                <span className="text-[10px] font-medium text-center leading-tight">{t('signOut')}</span>
+              </button>}
             </div>
           </div>
         </div>

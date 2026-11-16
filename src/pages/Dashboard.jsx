@@ -11,6 +11,7 @@ import { primaryLeader } from '../lib/ministry.js'
 import { scheduleLabels } from '../lib/quarterlySchedule.js'
 import { hasPermission } from '../lib/permissions.js'
 import { formatClock } from '../lib/time.js'
+import { DashboardDate, DashboardUtilities } from '../components/layout/Header.jsx'
 import './dashboard.css'
 
 const detailUrl = event => `/services/${event.parentId || event.id}?view=details`
@@ -174,7 +175,13 @@ export default function Dashboard({ renderAssignmentActions }) {
 
   return <div className="worship-dashboard">
     <header className="dashboard-heading">
-      <h1>{copy('Welcome,', 'أهلاً،')} <bdi>{currentUser.name?.trim().split(/\s+/)[0] || currentUser.email}</bdi></h1>
+      <div className="dashboard-greeting">
+        <div>
+          <DashboardDate/>
+          <h1>{copy('Welcome,', 'أهلاً،')} <bdi>{currentUser.name?.trim().split(/\s+/)[0] || currentUser.email}</bdi></h1>
+        </div>
+        <DashboardUtilities/>
+      </div>
       <div className="dashboard-links">
         <Link to="/schedule"><CalendarDays size={16} aria-hidden="true"/>{t('schedule')}</Link>
         <Link to="/attendance"><ScanLine size={16} aria-hidden="true"/>{t('attendance')}</Link>
