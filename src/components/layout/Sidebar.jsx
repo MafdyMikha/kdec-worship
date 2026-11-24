@@ -18,7 +18,7 @@ export default function Sidebar({ compactByDefault = false }) {
   const railRef = useRef(null)
   const markerRef = useRef(null)
   const { pathname } = useLocation()
-  const homePath = compactByDefault ? pathname : '/'
+  const homePath = compactByDefault && ['/home', '/dashboard'].includes(pathname) ? pathname : '/'
   const { currentUser, announcements } = useStore()
   const { t, isAr } = useLang()
   const isAdmin = isAdminUser(currentUser)
@@ -111,7 +111,7 @@ export default function Sidebar({ compactByDefault = false }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto" style={{ scrollbarWidth:'none' }}>
+      <nav aria-label={isAr ? 'التنقل الرئيسي' : 'Main navigation'} className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto" style={{ scrollbarWidth:'none' }}>
         {nav.map(item => (
           <NavLink key={item.to} to={item.to} end={item.to === homePath}
             title={collapsed ? t(item.key) : undefined}
@@ -164,6 +164,7 @@ export default function Sidebar({ compactByDefault = false }) {
 
       {/* Collapse toggle */}
       <button onClick={() => setCollapsed(!collapsed)}
+        aria-expanded={!collapsed}
         aria-label={collapsed ? (isAr ? 'توسيع القائمة' : 'Expand sidebar') : (isAr ? 'طي القائمة' : 'Collapse sidebar')}
         className={`absolute top-20 w-6 h-6 bg-slate-700 border border-slate-600 rounded-full flex items-center justify-center text-slate-300 hover:bg-slate-600 cursor-pointer shadow-lg z-10 transition-all ${isAr ? '-left-3' : '-right-3'}`}>
         {(collapsed ? isAr : !collapsed) ? <ChevronLeft size={12}/> : <ChevronRight size={12}/>}

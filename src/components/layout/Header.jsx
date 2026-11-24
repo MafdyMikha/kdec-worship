@@ -1,9 +1,10 @@
-import { Bell, User, LogOut, UserPlus, Sun, Moon } from 'lucide-react'
+import { Bell, User, LogOut, UserPlus, Sun, Moon, Settings } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore.jsx'
 import { useLang } from '../../lib/i18n.jsx'
 import { Avatar } from '../ui'
+import BrandLogo from '../BrandLogo.jsx'
 import { format } from 'date-fns'
 import { ar as arLocale } from 'date-fns/locale'
 import { ACCESS_LEVEL_LABELS, hasPermission } from '../../lib/permissions.js'
@@ -137,6 +138,11 @@ function AccountMenu({ dark, toggleDark }) {
             {t('profile')}
           </button>
 
+          <button onClick={() => { navigate('/settings'); setOpen(false) }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer">
+            <Settings size={15} className="text-slate-400"/>{t('settings')}
+          </button>
+
           {canManageInvitations && (
             <button
               onClick={() => { navigate('/invitations'); setOpen(false) }}
@@ -166,9 +172,12 @@ export default function Header({ children }) {
 
   return (
     <header className="dashboard-greeting">
-      <div>
-        <HeaderDate/>
-        {children}
+      <div className="worship-heading-identity">
+        <BrandLogo compact className="worship-mobile-tower"/>
+        <div>
+          <HeaderDate/>
+          {children}
+        </div>
       </div>
       <div className="dashboard-utilities" role="group" aria-label={isAr ? 'أدوات التنقل' : 'Page utilities'}>
         <HeaderControls dark={dark} toggleDark={toggleDark}/>

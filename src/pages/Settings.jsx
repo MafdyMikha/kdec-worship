@@ -54,7 +54,7 @@ function OrganizationForm({ settings, onSave, isAr, t }) {
 }
 
 export default function Settings() {
-  const { isAr, t, lang } = useLang()
+  const { isAr, t, lang, setLang } = useLang()
   const {
     people, songs, services, announcements, events, eventResponses, attendanceSessions, attendanceRecords,
     invitations, excuseRequests, substituteRequests,
@@ -98,12 +98,12 @@ export default function Settings() {
           {isAr?'استخدم زر AR/EN في الأعلى للتبديل بين العربية والإنجليزية.':'Use the AR/EN control in the header to switch between Arabic and English.'}
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <div className={`p-3 rounded-xl border ${lang==='ar'?'bg-indigo-50 border-indigo-200':'bg-slate-50 border-slate-100'}`} dir="rtl">
+          <button type="button" onClick={() => setLang('ar')} aria-pressed={lang==='ar'} className={`p-3 rounded-xl border ${lang==='ar'?'bg-indigo-50 border-indigo-200':'bg-slate-50 border-slate-100'}`} dir="rtl">
             <div className="font-semibold text-slate-700">عربي {lang==='ar'&&'✓'}</div>
-          </div>
-          <div className={`p-3 rounded-xl border ${lang==='en'?'bg-indigo-50 border-indigo-200':'bg-slate-50 border-slate-100'}`}>
+          </button>
+          <button type="button" onClick={() => setLang('en')} aria-pressed={lang==='en'} className={`p-3 rounded-xl border ${lang==='en'?'bg-indigo-50 border-indigo-200':'bg-slate-50 border-slate-100'}`}>
             <div className="font-semibold text-slate-700">English {lang==='en'&&'✓'}</div>
-          </div>
+          </button>
         </div>
       </Section>
 

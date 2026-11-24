@@ -28,11 +28,9 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 function Spinner() {
   return (
-    <div className="flex items-center justify-center h-screen flex-col gap-4">
-      <div className="w-10 h-10 border-3 border-indigo-200 border-t-indigo-600 rounded-full"
-        style={{ borderWidth:'3px', animation:'spin 0.7s linear infinite' }}/>
-      <p className="text-slate-400 text-sm">Loading KDEC Worship...</p>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    <div className="worship-loading" role="status">
+      <p>{document.documentElement.lang === 'ar' ? 'جاري تحميل مساحة الفريق…' : 'Loading your team workspace…'}</p>
+      <div className="worship-loading-bars" aria-hidden="true"><span/><span/><span/></div>
     </div>
   )
 }

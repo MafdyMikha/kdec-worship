@@ -5,6 +5,7 @@ import { LangProvider } from './lib/i18n.jsx'
 import './index.css'
 import './worship-theme.css'
 import './pwa-theme.css'
+import './components/layout/productCraft.css'
 import { PwaProvider } from './components/pwa/PwaProvider.jsx'
 import { observePhoneViewport } from './lib/phoneViewport.js'
 

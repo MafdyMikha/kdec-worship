@@ -117,8 +117,8 @@ export default function Songs() {
   const canManage = hasPermission(currentUser,'songs.manage')
 
   const activeSongs = songs.filter(s => s.status!=='inactive')
+  const q = search.trim().toLowerCase()
   const filtered = activeSongs.filter(s => {
-    const q = search.toLowerCase()
     const matchQ = (s.title||'').toLowerCase().includes(q)||(s.titleEn||'').toLowerCase().includes(q)||(s.author||'').toLowerCase().includes(q)
     const matchKey = filterKey==='all'||s.key===filterKey
     const matchTab = tab==='all'||s.language==='both'||(tab==='ar'?s.language==='ar':s.language==='en')
@@ -136,6 +136,9 @@ export default function Songs() {
     else setSaveError(result.error)
   }
 
+  const hasFilters = Boolean(search || filterKey !== 'all' || tagFilter || yearFilter || tab !== 'all')
+  const resetFilters = () => { setSearch(''); setFilterKey('all'); setTagFilter(''); setYearFilter(''); setTab('all') }
+
   const LANG_COLOR = {ar:'orange',en:'blue',both:'purple'}
   const LANG_LABEL = isAr
     ? {ar:'عربي',en:'إنجليزي',both:'الاثنان'}
@@ -143,24 +146,40 @@ export default function Songs() {
 
   return (
     <div className="max-w-5xl space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <SearchInput value={search} onChange={setSearch}
-            placeholder={isAr?'ابحث بالعربي أو الإنجليزي...':'Search in Arabic or English...'} className="w-full sm:w-64"/>
-          <select value={filterKey} onChange={e=>setFilterKey(e.target.value)}
-            aria-label={isAr?'تصفية حسب الطبقة':'Filter by key'}
-            className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="all">{isAr?'كل الطبقات':'All Keys'}</option>
-            {MUSICAL_KEYS.map(k=><option key={k} value={k}>{k}</option>)}
-          </select>
-        </div>
-        {canManage&&<div className="flex flex-wrap gap-2">
+      <div className="worship-page-actions">
+        <p className="text-sm text-slate-500">{isAr ? `${activeSongs.length} ترنيمة في مكتبة الفريق` : `${activeSongs.length} songs in your team's library`}</p>
+        {canManage && <div className="flex flex-wrap gap-2">
           <Btn variant="secondary" onClick={()=>setShowManage(true)} icon={<LibraryBig size={16}/>}>{isAr?'إدارة المكتبة':'Manage Library'}</Btn>
           <Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>
         </div>}
       </div>
-
-      <div className="flex flex-wrap gap-3"><Select label={isAr?'التصنيف':'Tag'} value={tagFilter} onChange={e=>setTagFilter(e.target.value)}><option value="">{isAr?'كل التصنيفات':'All tags'}</option>{[...new Set(activeSongs.flatMap(song=>song.themes||song.tags||[]))].sort().map(tag=><option key={tag}>{tag}</option>)}</Select><Select label={isAr?'سنة الإصدار الأصلية':'Origin year'} value={yearFilter} onChange={e=>setYearFilter(e.target.value)}><option value="">{isAr?'كل السنوات':'All years'}</option><option value="unknown">{isAr?'غير معروف':'Unknown'}</option>{[...new Set(activeSongs.map(song=>song.originYear).filter(Boolean))].sort((a,b)=>b-a).map(year=><option key={year}>{year}</option>)}</Select>{canManage&&<Btn variant="secondary" onClick={()=>setShowTags(true)}>{isAr?'إدارة التصنيفات':'Manage tags'}</Btn>}</div>
+      <Card className="worship-filter-panel p-4 sm:p-5">
+        <div className="worship-filter-heading">
+          <h2>{isAr ? 'ابحث عن الترنيمة المناسبة' : 'Find the right song'}</h2>
+          {hasFilters && <Btn size="sm" variant="ghost" onClick={resetFilters}>{isAr ? 'مسح الفلاتر' : 'Clear filters'}</Btn>}
+        </div>
+        <div className="worship-song-filters">
+          <div><label htmlFor="song-search" className="block text-sm font-medium text-slate-700 mb-1.5">{isAr ? 'بحث' : 'Search library'}</label>
+            <SearchInput id="song-search" value={search} onChange={setSearch} placeholder={isAr?'ابحث بالعربي أو الإنجليزي...':'Title, artist, or tag...'}/>
+          </div>
+          <Select label={isAr?'الطبقة':'Musical key'} value={filterKey} onChange={e=>setFilterKey(e.target.value)}>
+            <option value="all">{isAr?'كل الطبقات':'All keys'}</option>
+            {MUSICAL_KEYS.map(k=><option key={k} value={k}>{k}</option>)}
+          </Select>
+          <Select label={isAr?'التصنيف':'Tag'} value={tagFilter} onChange={e=>setTagFilter(e.target.value)}>
+            <option value="">{isAr?'كل التصنيفات':'All tags'}</option>
+            {[...new Set(activeSongs.flatMap(song=>song.themes||song.tags||[]))].sort().map(tag=><option key={tag}>{tag}</option>)}
+          </Select>
+          <Select label={isAr?'سنة الإصدار':'Origin year'} value={yearFilter} onChange={e=>setYearFilter(e.target.value)}>
+            <option value="">{isAr?'كل السنوات':'All years'}</option><option value="unknown">{isAr?'غير معروف':'Unknown'}</option>
+            {[...new Set(activeSongs.map(song=>song.originYear).filter(Boolean))].sort((a,b)=>b-a).map(year=><option key={year}>{year}</option>)}
+          </Select>
+        </div>
+        <div className="worship-filter-footer">
+          <p role="status" className="text-sm text-slate-500">{isAr ? `عرض ${filtered.length} من ${activeSongs.length} ترنيمة` : `Showing ${filtered.length} of ${activeSongs.length} songs`}</p>
+          {canManage && <Btn size="sm" variant="ghost" onClick={()=>setShowTags(true)}>{isAr?'إدارة التصنيفات':'Manage tags'}</Btn>}
+        </div>
+      </Card>
       <Modal open={showTags} onClose={()=>setShowTags(false)} title={isAr?'تصنيفات الترانيم':'Song tags'}><SongTags/></Modal>
       <Tabs tabs={[
         { label:t('all'),     value:'all', count:activeSongs.length },
@@ -171,8 +190,8 @@ export default function Songs() {
       {filtered.length===0 ? (
         <EmptyState icon={<Music2 size={28}/>}
           title={isAr?'لا توجد ترانيم':'No songs found'}
-          description={isAr?'أضف ترانيم لبناء مكتبة التسبيح.':'Add songs to build your library.'}
-          action={canManage?<Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>:null}/>
+          description={hasFilters ? (isAr?'جرّب كلمات بحث أخرى أو امسح الفلاتر.':'Try a different search or clear your filters.') : (isAr?'أضف ترانيم لبناء مكتبة التسبيح.':'Add songs to build your library.')}
+          action={hasFilters ? <Btn variant="secondary" onClick={resetFilters}>{isAr?'مسح الفلاتر':'Clear filters'}</Btn> : canManage?<Btn onClick={openAdd} icon={<Plus size={16}/>}>{isAr?'إضافة ترنيمة':'Add Song'}</Btn>:null}/>
       ) : (
         <div className="space-y-2">
           <div className="grid grid-cols-12 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
