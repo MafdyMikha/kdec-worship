@@ -227,19 +227,19 @@ export function EmptyState({ icon, title, description, action }) {
     <div className="worship-empty flex flex-col items-center justify-center py-16 px-4 text-center">
       <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 mb-4">{icon}</div>
       <h3 className="font-display font-semibold text-slate-700 mb-1">{title}</h3>
-      <p className="text-sm text-slate-500 max-w-xs mb-5">{description}</p>
+      {description && <p className="text-sm text-slate-500 max-w-xs mb-5">{description}</p>}
       {action}
     </div>
   )
 }
 
 // Search input
-export function SearchInput({ value, onChange, placeholder = 'Search...', className = '' }) {
+export function SearchInput({ value, onChange, placeholder = 'Search...', className = '', id }) {
   return (
     <div className={`relative ${className}`}>
-      <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        aria-label={placeholder}
+      <svg aria-hidden="true" className="absolute pointer-events-none start-3 top-1/2 -translate-y-1/2 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id={id} type="search" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        aria-label={id ? undefined : placeholder}
         className="w-full ps-9 pe-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-900/60 placeholder:text-slate-400 dark:placeholder:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600 transition-all" />
     </div>
   )
@@ -268,6 +268,7 @@ export function Notifications({ items }) {
 
 // Tabs
 export function Tabs({ tabs, active, onChange }) {
+  const { isAr } = useLang()
   const onKeyDown = event => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')]
@@ -277,13 +278,13 @@ export function Tabs({ tabs, active, onChange }) {
     let nextIndex = currentIndex
     if (event.key === 'Home') nextIndex = 0
     else if (event.key === 'End') nextIndex = buttons.length - 1
-    else if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % buttons.length
+    else if ((event.key === 'ArrowRight') !== isAr) nextIndex = (currentIndex + 1) % buttons.length
     else nextIndex = (currentIndex - 1 + buttons.length) % buttons.length
     buttons[nextIndex].focus()
     buttons[nextIndex].click()
   }
   return (
-    <div className="max-w-full overflow-x-auto">
+    <div className="worship-tabs max-w-full overflow-x-auto">
       <div className="flex gap-1 bg-slate-100 p-1 rounded-lg w-max min-w-full sm:min-w-0" role="tablist" onKeyDown={onKeyDown}>
         {tabs.map(tab => (
           <button key={tab.value} type="button" role="tab" aria-selected={active === tab.value} tabIndex={active === tab.value ? 0 : -1} onClick={() => onChange(tab.value)}

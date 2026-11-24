@@ -47,6 +47,8 @@ export default function Layout({ children }) {
     '/services': isAr ? 'مساحة للاستعداد والتخطيط والخدمة معًا.' : 'A space to prepare, plan, and serve together.',
     '/people': isAr ? 'مواهب متعددة. فريق واحد.' : 'Many gifts. One team.',
     '/schedule': isAr ? 'خطط الفريق القادمة، في مكان واحد.' : 'Your team’s plans, together in one place.',
+    '/attendance': isAr ? 'الحضور والاستعداد للخدمة، في مكان واحد.' : 'Check in, stay connected, and be ready to serve.',
+    '/settings': isAr ? 'اضبط تجربتك بالطريقة التي تناسبك.' : 'Make this space work for you.',
     '/profile': isAr ? 'نبذة عنك وعن خدمتك.' : 'A little about you, and how you serve.',
   }
 
@@ -60,12 +62,12 @@ export default function Layout({ children }) {
         <PwaStatus/>
 
         {/* Page content — extra bottom padding on mobile for bottom nav */}
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
+        <main data-page={key} id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
           <div className={`worship-content p-4 pb-24 md:pb-8 ${home ? 'md:p-5' : 'md:p-8 animate-fade-in'}`}>
             {!home && <Header>
               {introductions[pathname] ? <div className="worship-page-heading !mb-0 !p-0">
                 <div><h1>{title}</h1><p>{introductions[pathname]}</p></div>
-              </div> : <p className="worship-header-page-title">{title}</p>}
+              </div> : <h1 className="worship-header-page-title">{title}</h1>}
             </Header>}
             {children}
           </div>
